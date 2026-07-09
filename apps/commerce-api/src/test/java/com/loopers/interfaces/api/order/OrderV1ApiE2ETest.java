@@ -109,7 +109,7 @@ class OrderV1ApiE2ETest {
     }
 
     private void issueEntryToken(Long userId) {
-        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "redis-token");
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, ENTRY_TOKEN);
     }
 
     private ProductModel saveProduct(String name, BigDecimal price) {
@@ -137,13 +137,16 @@ class OrderV1ApiE2ETest {
         return new HttpEntity<>(null, headers);
     }
 
-    // 헤더 값 자체는 검증되지 않고 존재 여부만 요구되므로(설계 결정 2번), 실제 검증은 Redis의 토큰 존재 여부로 이뤄진다.
     private <T> HttpEntity<T> authJsonEntity(T body, String loginId, String loginPw) {
+        return authJsonEntity(body, loginId, loginPw, ENTRY_TOKEN);
+    }
+
+    private <T> HttpEntity<T> authJsonEntity(T body, String loginId, String loginPw, String entryToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(AuthHeaders.LOGIN_ID, loginId);
         headers.set(AuthHeaders.LOGIN_PW, loginPw);
-        headers.set(AuthHeaders.ENTRY_TOKEN, ENTRY_TOKEN);
+        headers.set(AuthHeaders.ENTRY_TOKEN, entryToken);
         return new HttpEntity<>(body, headers);
     }
 
@@ -312,6 +315,26 @@ class OrderV1ApiE2ETest {
             // when
             ResponseEntity<Void> response =
                     testRestTemplate.exchange(BASE_URL, HttpMethod.POST, authJsonEntity(request, LOGIN_ID, LOGIN_PW), Void.class);
+
+            // then
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        }
+
+        @DisplayName("입장 토큰 헤더 값이 저장된 토큰과 다르면 403 Forbidden을 반환한다.")
+        @Test
+        void returnsForbidden_whenEntryTokenDoesNotMatch() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            OrderV1Dto.CreateRequest request = new OrderV1Dto.CreateRequest(
+                    List.of(new OrderV1Dto.OrderItemRequest(product.getId(), 1L)), null
+            );
+
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL, HttpMethod.POST,
+                            authJsonEntity(request, LOGIN_ID, LOGIN_PW, "wrong-token"), Void.class);
 
             // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);

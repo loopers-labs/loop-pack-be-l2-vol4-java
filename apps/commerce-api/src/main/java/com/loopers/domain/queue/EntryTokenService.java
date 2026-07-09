@@ -17,9 +17,12 @@ public class EntryTokenService {
         return entryTokenRepository.find(userId);
     }
 
-    public void verify(Long userId) {
-        find(userId)
+    public void verify(Long userId, String token) {
+        String storedToken = find(userId)
                 .orElseThrow(() -> new CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요."));
+        if (!storedToken.equals(token)) {
+            throw new CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요.");
+        }
     }
 
     public void consume(Long userId) {

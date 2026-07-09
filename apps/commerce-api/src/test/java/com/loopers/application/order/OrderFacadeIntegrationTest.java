@@ -48,6 +48,7 @@ class OrderFacadeIntegrationTest {
 
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Password1!";
+    private static final String ENTRY_TOKEN = "test-token";
     private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
 
     @Autowired
@@ -114,7 +115,7 @@ class OrderFacadeIntegrationTest {
     }
 
     private void issueEntryToken(Long userId) {
-        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "test-token");
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, ENTRY_TOKEN);
     }
 
     private ProductModel saveProduct(String name, BigDecimal price) {
@@ -151,7 +152,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null);
 
             // then
             StockModel stock = stockRepository.findByProductId(product.getId()).orElseThrow();
@@ -179,7 +180,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null);
 
             // then
             List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
@@ -207,7 +208,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null);
 
             // then
             assertThat(result.originalPrice()).isEqualByComparingTo(BigDecimal.valueOf(35000));
@@ -223,7 +224,7 @@ class OrderFacadeIntegrationTest {
             List<OrderFacade.OrderItemDto> commands = List.of(
                     new OrderFacade.OrderItemDto(product.getId(), 1L)
             );
-            OrderInfo orderInfo = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            OrderInfo orderInfo = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null);
 
             // 상품 정보 변경
             product.update("변경된 상품명", BigDecimal.valueOf(99999));
@@ -250,7 +251,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -269,7 +270,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null));
 
             // then
             StockModel stock = stockRepository.findByProductId(product.getId()).orElseThrow();
@@ -295,7 +296,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            assertThrows(CoreException.class, () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
+            assertThrows(CoreException.class, () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null));
 
             // then
             StockModel stockA = stockRepository.findByProductId(productA.getId()).orElseThrow();
@@ -319,7 +320,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, "WrongPass1!", commands, null));
+                    () -> orderFacade.createOrder(LOGIN_ID, "WrongPass1!", ENTRY_TOKEN, commands, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -343,7 +344,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null);
 
             // then
             assertThat(entryTokenRepository.find(user.getId())).isEmpty();
@@ -362,7 +363,26 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, null));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
+
+        @DisplayName("저장된 토큰과 다른 값을 보내면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenEntryTokenDoesNotMatch() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, "wrong-token", commands, null));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
@@ -380,7 +400,7 @@ class OrderFacadeIntegrationTest {
             saveUser();
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                     List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             LocalDate today = LocalDate.now();
@@ -399,7 +419,7 @@ class OrderFacadeIntegrationTest {
             saveUser();
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                     List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -418,7 +438,7 @@ class OrderFacadeIntegrationTest {
             saveUser();
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                     List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             String otherId = "other01";
@@ -445,7 +465,7 @@ class OrderFacadeIntegrationTest {
             saveUser();
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
-            OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+            OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                     List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             // when
@@ -462,7 +482,7 @@ class OrderFacadeIntegrationTest {
             saveUser();
             ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
-            OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+            OrderInfo created = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                     List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
 
             String otherId = "other01";
@@ -511,7 +531,7 @@ class OrderFacadeIntegrationTest {
             );
 
             // when
-            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId());
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId());
 
             // then
             IssuedCouponModel usedCoupon = issuedCouponRepository.findById(issued.getId()).orElseThrow();
@@ -538,7 +558,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, 999L));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, 999L));
 
             // then
             List<OrderInfo> orders = orderFacade.getOrders(LOGIN_ID, LOGIN_PW, LocalDate.now().minusDays(1), LocalDate.now());
@@ -565,7 +585,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -588,7 +608,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -613,7 +633,7 @@ class OrderFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
@@ -633,12 +653,12 @@ class OrderFacadeIntegrationTest {
             List<OrderFacade.OrderItemDto> commands = List.of(
                     new OrderFacade.OrderItemDto(product.getId(), 1L)
             );
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId());
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId());
             issueEntryToken(user.getId()); // 첫 주문에서 소비된 토큰을 재발급해, 이번 검증이 FORBIDDEN이 아닌 CONFLICT에서 막히게 한다.
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId()));
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, commands, issued.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);

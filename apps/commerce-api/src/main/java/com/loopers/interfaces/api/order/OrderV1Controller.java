@@ -33,7 +33,7 @@ public class OrderV1Controller {
             @RequestHeader(AuthHeaders.ENTRY_TOKEN) String entryToken,
             @Valid @RequestBody OrderV1Dto.CreateRequest request
     ) {
-        OrderInfo info = orderFacade.createOrder(loginId, loginPw, request.items().stream()
+        OrderInfo info = orderFacade.createOrder(loginId, loginPw, entryToken, request.items().stream()
                 .map(item -> new OrderFacade.OrderItemDto(item.productId(), item.quantity()))
                 .toList(), request.couponId());
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));

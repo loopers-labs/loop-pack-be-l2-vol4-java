@@ -50,15 +50,15 @@ class EntryTokenServiceTest {
     @Nested
     class Verify {
 
-        @DisplayName("토큰이 있으면 예외 없이 통과한다.")
+        @DisplayName("보낸 토큰이 저장된 토큰과 일치하면 예외 없이 통과한다.")
         @Test
-        void doesNotThrow_whenTokenExists() {
+        void doesNotThrow_whenTokenMatches() {
             // given
             Long userId = 1L;
             when(entryTokenRepository.find(userId)).thenReturn(Optional.of("abc-123"));
 
             // when & then
-            assertDoesNotThrow(() -> entryTokenService.verify(userId));
+            assertDoesNotThrow(() -> entryTokenService.verify(userId, "abc-123"));
         }
 
         @DisplayName("토큰이 없으면 FORBIDDEN 예외가 발생한다.")
@@ -69,7 +69,24 @@ class EntryTokenServiceTest {
             when(entryTokenRepository.find(userId)).thenReturn(Optional.empty());
 
             // when
-            CoreException result = assertThrows(CoreException.class, () -> entryTokenService.verify(userId));
+            CoreException result = assertThrows(CoreException.class, () -> entryTokenService.verify(userId, "abc-123"));
+
+            // then
+            assertAll(
+                    () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN),
+                    () -> assertThat(result.getMessage()).isEqualTo("입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요.")
+            );
+        }
+
+        @DisplayName("보낸 토큰이 저장된 토큰과 다르면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbiddenException_whenTokenDoesNotMatch() {
+            // given
+            Long userId = 1L;
+            when(entryTokenRepository.find(userId)).thenReturn(Optional.of("abc-123"));
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> entryTokenService.verify(userId, "wrong-token"));
 
             // then
             assertAll(

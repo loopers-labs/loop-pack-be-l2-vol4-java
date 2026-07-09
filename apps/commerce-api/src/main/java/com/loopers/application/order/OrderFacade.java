@@ -40,9 +40,9 @@ public class OrderFacade {
     }
 
     @Transactional
-    public OrderInfo createOrder(String loginId, String loginPw, List<OrderItemDto> orderItems, Long issuedCouponId) {
+    public OrderInfo createOrder(String loginId, String loginPw, String entryToken, List<OrderItemDto> orderItems, Long issuedCouponId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
-        entryTokenService.verify(user.getId());
+        entryTokenService.verify(user.getId(), entryToken);
 
         List<Long> productIds = orderItems.stream().map(OrderItemDto::productId).toList();
 
