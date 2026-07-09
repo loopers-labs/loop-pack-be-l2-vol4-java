@@ -95,7 +95,7 @@
 
 ## Phase 6 — 신규 엔드포인트 (6단계)
 
-- [ ] **6.1** `QueueInfo`
+- [x] **6.1** `QueueInfo`
   - 산출물: `application/queue/QueueInfo.java`(record — `position`, `totalWaiting`(nullable), `estimatedWaitSeconds`(nullable), `token`(nullable)), 정적 팩토리 `forEnter(Long rank)`/`forPosition(Long rank, Long size, Long estimatedWaitSeconds, String token)`
   - 검증: `QueueInfoTest` (순수 단위 테스트)
     - `forEnter`는 `totalWaiting`/`estimatedWaitSeconds`/`token`이 모두 `null`이다([DTO 설계 근거](waiting-queue-architecture.md#dto-설계))
