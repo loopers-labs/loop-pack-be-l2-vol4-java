@@ -110,12 +110,32 @@ class ProductModifyLikeConcurrencyIntegrationTest {
         executor.shutdownNow();
         assertThat(finished).as("모든 작업이 30초 내에 끝나야 한다").isTrue();
 
+        // 좋아요 행(INSERT)은 동기라 즉시 일치한다.
         long rows = likeRepository.countByProductId(productId);
-        long counter = productJpaRepository.findById(productId).orElseThrow().getLikeCount();
-
         assertThat(rows).as("실제 좋아요 행 수").isEqualTo(likeUsers);
+
+        // 집계(likeCount)는 @Async(AFTER_COMMIT)로 분리되어 eventual → 수렴까지 대기 후 검사한다.
+        // (상품 수정의 전체 행 UPDATE 가 @DynamicUpdate 로 like_count 를 건드리지 않아, 수렴값도 덮어써지지 않아야 한다.)
+        long counter = awaitLikeCount(likeUsers);
         assertThat(counter)
-                .as("상품 수정이 동시에 일어나도 like_count 는 좋아요 행 수와 정확히 일치해야 한다")
+                .as("상품 수정이 동시에 일어나도 like_count 는 좋아요 행 수와 정확히 일치해야 한다(수렴 후)")
                 .isEqualTo(likeUsers);
+    }
+
+    private long awaitLikeCount(long expected) {
+        long counter = -1L;
+        for (int i = 0; i < 100; i++) {
+            counter = productJpaRepository.findById(productId).orElseThrow().getLikeCount();
+            if (counter == expected) {
+                return counter;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return counter;
     }
 }

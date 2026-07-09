@@ -1,5 +1,7 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueRequest;
+import com.loopers.domain.coupon.CouponIssueStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponTemplate;
 import com.loopers.domain.coupon.DiscountType;
@@ -105,6 +107,25 @@ public final class CouponInfo {
                     toLocal(coupon.getExpiresAt()),
                     toLocal(coupon.getUsedAt())
             );
+        }
+    }
+
+    /** 선착순 발급 요청 접수 응답 — 폴링 핸들(requestId)만 즉시 돌려준다. */
+    public record IssueRequested(String requestId) {
+
+        public static IssueRequested from(CouponIssueRequest request) {
+            return new IssueRequested(request.getRequestId());
+        }
+    }
+
+    /** 선착순 발급 요청 폴링 응답 — 처리 상태. (발급된 쿠폰은 내 쿠폰 목록에서 조회한다.) */
+    public record IssueRequestStatus(
+            String requestId,
+            CouponIssueStatus status
+    ) {
+
+        public static IssueRequestStatus from(CouponIssueRequest request) {
+            return new IssueRequestStatus(request.getRequestId(), request.getStatus());
         }
     }
 

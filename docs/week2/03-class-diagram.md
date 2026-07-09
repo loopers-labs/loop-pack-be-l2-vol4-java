@@ -6,7 +6,7 @@
 
 문서는 **두 층**으로 본다 — 맨 위에 도메인 전체를 잇는 **통합 클래스 다이어그램** 하나를 두어 Aggregate 사이 참조를 조망하고, 그 아래에서 **도메인별로 쪼개** 각 영역의 객체를 자세히 설명한다.
 
-## 한눈에 — Aggregate 9개
+## 한눈에 — Aggregate 10개
 
 외부에서는 각 Aggregate의 대표 객체(Root)로만 접근한다.
 
@@ -18,8 +18,9 @@
 | 재고 | `Inventory` | 상품과 1:1(별도 애그리거트). 재고는 음수가 될 수 없다. |
 | 좋아요 | `Like` | 한 사용자-상품 쌍에 좋아요는 최대 1개. |
 | 주문 | `Order` | 최종 금액 = 적용 전 금액 − 할인액(≥ 0). 주문 이력은 불변. |
-| 쿠폰 템플릿 | `CouponTemplate` | 할인 종류·값·유효일수가 유효 범위를 지킨다. 삭제는 논리 삭제. |
+| 쿠폰 템플릿 | `CouponTemplate` | 할인 종류·값·유효일수가 유효 범위를 지킨다. 삭제는 논리 삭제. 선착순 한도가 있으면 발급 수는 한도를 넘지 않는다. |
 | 내 쿠폰 | `UserCoupon` | 한 사용자-템플릿 쌍에 쿠폰은 최대 1장. 사용 완료된 쿠폰은 재사용 불가. |
+| 발급 요청 | `CouponIssueRequest` | (Round 7) 선착순 발급 시도의 상태기계. `PENDING`에서만 전이, 터미널 불변(멱등·이중발급 방지). `requestId`가 멱등 키. |
 | 결제 | `Payment` | 한 주문에 여러 시도(N:1). 종결(`SUCCESS`/`FAILED`) 상태는 다시 전이하지 않는다(멱등). 같은 주문의 동시 결제는 주문 행 비관락으로 직렬화한다. |
 
 ---
@@ -145,10 +146,13 @@ classDiagram
         -string name
         -DiscountPolicy discountPolicy
         -int validDays
+        -Integer issueLimit
+        -int issuedCount
         +modify(name, discountPolicy, validDays)
         +delete()
         +isDeleted() bool
         +issueExpiresAt(now) datetime
+        +isLimited() bool
     }
     class UserCoupon {
         <<AggregateRoot>>
@@ -339,10 +343,13 @@ classDiagram
         -string name
         -DiscountPolicy discountPolicy
         -int validDays
+        -Integer issueLimit
+        -int issuedCount
         +modify(name, discountPolicy, validDays)
         +delete()
         +isDeleted() bool
         +issueExpiresAt(now) datetime
+        +isLimited() bool
     }
     class UserCoupon {
         <<AggregateRoot>>
@@ -382,17 +389,43 @@ classDiagram
         EXPIRED
     }
 
+    class CouponIssueRequest {
+        <<AggregateRoot>>
+        -Long id
+        -string requestId
+        -Long userId
+        -Long templateId
+        -CouponIssueStatus status
+        +pending(requestId, userId, templateId)$ CouponIssueRequest
+        +isPending() bool
+        +markSuccess()
+        +markSoldOut()
+        +markAlreadyIssued()
+        +markFailed()
+    }
+    class CouponIssueStatus {
+        <<enumeration>>
+        PENDING
+        SUCCESS
+        SOLD_OUT
+        ALREADY_ISSUED
+        FAILED
+    }
+
     CouponTemplate "1" *-- "1" DiscountPolicy : 보유
     UserCoupon "0..*" ..> "1" CouponTemplate : 발급 원형
     UserCoupon "1" *-- "1" DiscountPolicy : 스냅샷
     UserCoupon ..> CouponStatus : 상태
     DiscountPolicy ..> DiscountType : 종류
+    CouponIssueRequest ..> CouponIssueStatus : 상태
+    CouponIssueRequest ..> CouponTemplate : templateId 참조
 ```
 
-- **`CouponTemplate`** (AggregateRoot) — 어드민이 정의하는 쿠폰의 원형. 할인 정책(`DiscountPolicy`)과 유효일수(`validDays`)를 가진다. `issueExpiresAt(now)` = `now + validDays`로 발급될 쿠폰의 만료일을 계산해 준다. `Brand`처럼 논리 삭제(`BaseEntity.deletedAt`, `isDeleted()`)를 따른다. 템플릿 수정·삭제는 **이후 발급분에만** 영향을 주고, 이미 발급된 `UserCoupon`은 스냅샷이라 영향받지 않는다(AC-22-2·AC-23-2).
+- **`CouponTemplate`** (AggregateRoot) — 어드민이 정의하는 쿠폰의 원형. 할인 정책(`DiscountPolicy`)과 유효일수(`validDays`)를 가진다. `issueExpiresAt(now)` = `now + validDays`로 발급될 쿠폰의 만료일을 계산해 준다. `Brand`처럼 논리 삭제(`BaseEntity.deletedAt`, `isDeleted()`)를 따른다. 템플릿 수정·삭제는 **이후 발급분에만** 영향을 주고, 이미 발급된 `UserCoupon`은 스냅샷이라 영향받지 않는다(AC-22-2·AC-23-2). **(Round 7)** 선착순 한도를 위해 `issueLimit`(nullable — `null`이면 무제한)과 `issuedCount`를 가진다. `isLimited()`는 한도 유무 판정(동기 발급 경로가 한정 템플릿을 거부하는 데 쓰임)이다. **한도 강제(`issued_count < issue_limit`)는 이 엔티티가 아니라 발급 소비자(`commerce-streamer`)의 조건부 원자 UPDATE**(`SET issued_count = issued_count + 1 WHERE issued_count < issue_limit`, shared DB·JdbcTemplate)가 수행하므로, 카운터 증가 메서드는 도메인에 두지 않는다 — 한도 규칙은 소비자 SQL 한 곳에만 산다(원래 도메인 `issueOne()` 이 있었으나 소비자 분리로 프로덕션 미사용이 되어 제거).
 - **`UserCoupon`** (AggregateRoot) — 사용자가 발급받은 쿠폰 한 장. 발급 시 `issue(userId, template, now)`가 템플릿의 **할인 정책·쿠폰명을 복사(스냅샷)** 하고 만료일(`expiresAt = template.issueExpiresAt(now)`)을 확정한다. 템플릿은 `templateId`로 ID 참조만 하므로, 발급 이후 템플릿이 수정·삭제돼도 이 쿠폰의 가치는 변하지 않는다(`OrderItem`의 상품명·단가 스냅샷과 같은 원칙). `calculateDiscount(orderAmount)`는 스냅샷한 `DiscountPolicy`에 위임해 할인액을 구한다. `assertUsableBy(userId, now)`는 본인 소유·사용 가능(미사용·미만료) 여부를 검증해 위반 시 `CoreException`(FORBIDDEN/BAD_REQUEST)으로 거부하는데 — 주문 흐름은 이를 **재고 비관락보다 앞서** 호출해 무효 쿠폰이 핫 로우 락을 점유하지 않게 한다(fail-cheap-first, 2단계 시퀀스). `use(orderId, now)`는 사용 가능(미사용·미만료)일 때만 `USED`로 전이하고 `usedAt`·`orderId`를 기록하며, 위반 시 `CoreException`으로 거부한다(재사용·만료 사용 방지). 동시에 두 주문이 같은 쿠폰을 쓰는 **중복 사용**은 `version`(`@Version`) **낙관적 락**으로 막는다 — 저경합이라 커밋 시 충돌 검출이 가장 싸며, 충돌한 쪽은 주문 트랜잭션 전체가 롤백된다(재고(`Inventory`)의 비관적 락과 대비 — 쿠폰은 저경합이라 무는 비용이 거의 없는 낙관 락을 택했다; 4단계 ERD 참조).
 - **`DiscountPolicy`** (VO, `@Embeddable`) — 할인 종류(`type`)·값(`value`)과 사용 조건(`minOrderAmount`)을 묶고 **할인 계산 규칙을 캡슐화**한 불변 값 객체. `calculate(orderAmount)`는 먼저 적용 전 금액이 `minOrderAmount` 미만이면 `BAD_REQUEST`로 거부(주문 자체가 성립하지 않음, `0`이면 제한 없음)하고, 통과하면 `FIXED`면 `min(value, orderAmount)`(적용 전 금액을 넘지 않음), `RATE`면 `floor(orderAmount × value / 100)`(원 단위 절사)를 돌려준다. 어느 쪽도 적용 전 금액을 초과하지 않아 "최종 금액 ≥ 0" 불변식을 타입 안에서 지킨다. `minOrderAmount`는 사용 조건이지만 자기가 게이트하는 할인과 같은 VO에 두어, 같은 VO를 보유한 `CouponTemplate`(원형 정의)·`UserCoupon`(발급 스냅샷)에 별도 컬럼·복사 없이 함께 전파된다.
-- **불변식** — 한 (사용자, 템플릿) 쌍에 쿠폰은 최대 1장(1인 1매). `FIXED` 값 ≥ 1(원), `RATE` 값은 1~100(%), 최소 주문 금액 ≥ 0(`0`=제한 없음), 유효일수 ≥ 1. 사용 완료(`USED`) 쿠폰은 다시 사용할 수 없다.
+- **`CouponIssueRequest`** (AggregateRoot, Round 7) — **선착순 발급 "시도" 한 건의 생애주기**를 소유한다. `pending(requestId, userId, templateId)`로 접수(`PENDING`) 저장되고, 소비자가 결과로 전이시킨다: `PENDING → SUCCESS / SOLD_OUT / ALREADY_ISSUED / FAILED`(`CouponIssueStatus`). 전이는 **`PENDING`에서만** 허용되고 터미널은 되돌릴 수 없어(`markXxx()` 내부 `assertPending()`), 이 불변식이 "이미 처리된 요청의 재처리(이중발급)"를 막는다 — 덕분에 `requestId`는 클라이언트 폴링 핸들이자 **소비자 멱등 키**를 겸한다(재전달 메시지는 이미 터미널인 요청을 만나 skip). 순차 Long PK를 노출하지 않도록 `requestId`는 UUID다. `CouponTemplate`은 `templateId`로 ID 참조만 한다(다른 애그리거트).
+- **불변식** — 한 (사용자, 템플릿) 쌍에 쿠폰은 최대 1장(1인 1매). `FIXED` 값 ≥ 1(원), `RATE` 값은 1~100(%), 최소 주문 금액 ≥ 0(`0`=제한 없음), 유효일수 ≥ 1. 사용 완료(`USED`) 쿠폰은 다시 사용할 수 없다. **선착순 한도** ≥ 1(있을 때), `issuedCount`는 `issueLimit`을 넘지 않는다.
 - **만료(`EXPIRED`) 판정** — 저장하는 상태는 `AVAILABLE`/`USED` 둘뿐이다. `EXPIRED`는 **저장하지 않고** `displayStatus(now)`가 "`AVAILABLE`이면서 `expiresAt`이 지난" 쿠폰을 조회 시점에 만료로 파생한다. 배치 없이 정확한 현재 상태를 보여주는 대신, "저장된 status"와 "노출 status"가 다를 수 있음을 감수한 선택이다.
 
 > **enum 한국어 대응**
@@ -449,3 +482,98 @@ classDiagram
 > - `CardType`: 카드사(예: `SAMSUNG`/`KB`/`HYUNDAI`) — pg-simulator가 받는 카드 종류에 맞춘다.
 
 > **기법 선택(결제 동시성)** — 결제는 ⓐ 요청 중복(따닥)을 **주문 행 비관락**(예약 시 FOR UPDATE로 검사+삽입 직렬화, PG 호출 전 해제)으로, ⓑ 콜백 중복·콜백↔정산 경쟁을 **종결 no-op 가드**(값-멱등 전이 + 실제 전이 시에만 `order.pay()`)로 막는다. 재고(비관 락)·쿠폰(낙관 락)·좋아요(원자 UPDATE)에 이어, 결제 ⓑ는 **"외부 시스템과의 멱등"** 이라 결이 또 다르다 — 경합 상대가 내부 트랜잭션이 아니라 *재전송·중복 통지*이기 때문이다. 지금은 `order.pay()`가 순수 상태 전이라 ⓑ에 별도 락이 불필요하지만, `PAID`에 부작용이 붙으면 그때 낙관락(`@Version`)을 도입한다(현재 미적용). cf. ⓐ에서 멱등키(클라이언트 키 유니크) 대신 비관락을 택했다 — orderId가 이미 자연 키이고, 외부 청구가 트랜잭션 한가운데 있어 "호출 전 직렬화"가 필요하기 때문(낙관락은 commit=청구 이후 감지라 부적합).
+
+---
+
+### 이벤트 · 지표 read model — `도메인 이벤트` / `ProductMetrics` / `EventHandled` / `OutboxEvent` (Round 7)
+
+> Round 7이 더하는 타입은 **새 비즈니스 Aggregate가 아니다** — 위 9개 Aggregate에서 일어난 사실을 (a) **도메인 이벤트**로 발행하고, (b) 별도 앱(`commerce-streamer`)이 소비해 **지표 read model**(`ProductMetrics`, 이벤트 투영)로 집계하며, (c) 그 전파를 **outbox 장부**(`OutboxEvent`, 기술적 아티팩트)로 유실 없이 나른다. 도메인 행위가 얇거나(이벤트=불변 사실 record) 기술 장부(outbox)라 통합 다이어그램과 분리해 여기 둔다.
+
+```mermaid
+classDiagram
+    class ProductLikedEvent {
+        <<record>>
+        +Long userId
+        +Long productId
+        +ZonedDateTime occurredAt
+    }
+    class ProductUnlikedEvent {
+        <<record>>
+        +Long userId
+        +Long productId
+        +ZonedDateTime occurredAt
+    }
+    class PaymentCompletedEvent {
+        <<record>>
+        +Long orderId
+        +Long userId
+        +Long amount
+        +ZonedDateTime occurredAt
+    }
+    class ProductViewedEvent {
+        <<record>>
+        +Long productId
+        +Long userId
+        +ZonedDateTime occurredAt
+    }
+    class OrderPlacedEvent {
+        <<record>>
+        +Long orderId
+        +Long userId
+        +ZonedDateTime occurredAt
+    }
+
+    class ProductMetrics {
+        <<ReadModel / Projection>>
+        -Long productId
+        -long likeCount
+        -long salesCount
+        -long viewCount
+        -ZonedDateTime updatedAt
+        +of(productId)$ ProductMetrics
+        +increaseLike()
+        +decreaseLike()
+        +increaseSales(quantity)
+        +increaseView()
+    }
+    class EventHandled {
+        <<IdempotencyLedger>>
+        -EventHandledId id
+        -ZonedDateTime handledAt
+        +of(eventId, handler)$ EventHandled
+    }
+    class EventHandledId {
+        <<EmbeddedId>>
+        -String eventId
+        -String handler
+    }
+    class OutboxEvent {
+        <<Infrastructure Ledger>>
+        -Long id
+        -String eventId
+        -String aggregateId
+        -String topic
+        -String payload
+        -OutboxStatus status
+        -ZonedDateTime publishedAt
+        +pending(eventId, aggregateId, topic, payload)$ OutboxEvent
+        +markPublished()
+    }
+    class OutboxStatus {
+        <<enumeration>>
+        PENDING
+        PUBLISHED
+    }
+    EventHandled *-- EventHandledId : 복합 PK
+    OutboxEvent ..> OutboxStatus : 상태
+    note for OutboxEvent "commerce-api 소유(기술 장부). 상태변경과 같은 TX로 적재, relay가 Kafka 발행 후 PUBLISHED. eventId=소비자 멱등 기준."
+    note for ProductMetrics "commerce-streamer 소유. product_id 자연 PK, BaseEntity 상속 안 함. @DynamicUpdate=컬럼 단위 UPDATE로 다중 writer 교차 clobber 방지."
+```
+
+- **도메인 이벤트(record)** — `ProductLikedEvent`/`ProductUnlikedEvent`(좋아요), `OrderPlacedEvent`(주문 생성), `PaymentCompletedEvent`(결제 성공), `ProductViewedEvent`(조회). 각 도메인의 `event/` 패키지에 두는 **불변 사실**이라 행위가 없다. 발행 지점은 해당 사실이 확정되는 응용 서비스 한 곳이다(좋아요 등록/취소, 주문 생성, 결제 성공 확정, 상품 조회). `PaymentCompletedEvent`는 **주문 단위로 얇게**(orderId/amount) 두고, 판매량 집계에 필요한 상품 분해는 outbox 리스너가 주문 재조회로 조립한다(이벤트를 알림·로깅과 공유하므로 items로 오염시키지 않음).
+- **`ProductMetrics`** (ReadModel) — 상품별 `like`/`sales`/`view` 카운터를 모은 **이벤트 투영**이다. 도메인 Aggregate가 아니라 read model이라 `product_id`를 자연 PK로 쓰고 `BaseEntity`를 상속하지 않는다. 조회 경로의 `Product.likeCount`(정렬용·**로컬 best-effort**: `@Async` AFTER_COMMIT 원자 UPDATE라 eventual·유실 시 드리프트)와 **의도적으로 중복**한다 — 소비처와 보장 수준이 다르다(빠른 로컬 best-effort vs 느린 크로스앱 guaranteed; 둘 다 eventual이되 이쪽만 outbox+멱등으로 유실 0 수렴). **`@DynamicUpdate`** 로 변경된 컬럼만 UPDATE해, 서로 다른 collector(좋아요/조회 vs 판매)가 같은 행의 다른 컬럼을 동시에 갱신해도 교차 lost update가 없다(각 카운터는 파티션 직렬화로 단일 writer, 행은 다중 writer → 컬럼 단위 쓰기로 방어). 좋아요 수는 순서가 어긋나도 0 미만으로 내려가지 않게 막는다(`decreaseLike` floor).
+- **`EventHandled`** (IdempotencyLedger) — "이 `handler`가 이 `event_id`를 처리했는가"를 기록하는 소비자 멱등 원장. PK는 **`(eventId, handler)` 복합**(`EventHandledId` `@EmbeddedId`)이라, 하나의 원장을 여러 collector가 공유하되 **멱등 스코프는 handler별로 분리**된다(같은 이벤트를 `product-metrics`와 `product-sales`가 각각 한 번씩 처리). 멱등 판정과 집계 갱신을 한 트랜잭션으로 묶어 effectively-once를 만든다.
+- **`OutboxEvent`** (Infrastructure Ledger) — 상태변경과 **같은 트랜잭션**에 INSERT되어 "DB 커밋 + Kafka 발행"의 원자성을 DB 로컬 트랜잭션으로 환원하는 전파 장부(dual-write 회피). 도메인 Aggregate가 아니라 메시징 기술 장부라 `infrastructure`에 둔다. `aggregateId`가 Kafka 파티셔닝 키(=`productId`)이고, `eventId`는 소비자 멱등의 기준이며 payload 안에도 실려 나간다. 상태는 `PENDING → PUBLISHED` 2개뿐 — 발행 실패는 PENDING으로 남아 relay가 무한 재시도한다(`FAILED`를 두지 않아 브로커 장애 시 대량 오격리를 피함).
+
+> **왜 이 타입들은 Aggregate가 아닌가** — 도메인 불변식을 지키는 게 아니라 *이미 확정된 불변식의 결과*를 나르거나(이벤트·outbox) 투영하기(metrics) 때문이다. 그래서 `ProductMetrics`엔 도메인 검증이 거의 없고(카운터 증감 + floor), `OutboxEvent`엔 도메인 행위가 없다(상태 마킹만). 비즈니스 규칙은 상류 Aggregate(`Like`/`Order`/`Payment`)가 이미 강제한 뒤다.
+> **동시성 기법(다섯 번째)** — 재고(비관락)·쿠폰(낙관락)·좋아요(원자 UPDATE)·결제(외부 멱등 no-op)에 이어, 지표 집계는 **파티션 직렬화 + 컬럼 단위 쓰기(@DynamicUpdate)** 다 — 락을 아예 없애고 "같은 키=한 스레드"라는 Kafka 파티션 성질로 동시성을 제어하는 결이다(2단계 시퀀스 5-1·5-2).

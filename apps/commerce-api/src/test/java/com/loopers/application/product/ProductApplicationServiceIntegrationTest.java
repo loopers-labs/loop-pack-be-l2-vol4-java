@@ -75,6 +75,24 @@ class ProductApplicationServiceIntegrationTest {
         return inventoryJpaRepository.findByProductIdAndDeletedAtIsNull(productId).orElseThrow().getQuantity();
     }
 
+    /**
+     * 좋아요 집계(likeCount)가 @Async(AFTER_COMMIT)로 분리되어 eventual 이므로, DB 카운터가 기대값으로
+     * 수렴할 때까지 폴링한다(최대 ~10초). 조회는 캐시가 끼므로 수렴 확인 후 조회해야 stale 값을 안 읽는다.
+     */
+    private void awaitLikeCount(Long productId, long expected) {
+        for (int i = 0; i < 100; i++) {
+            if (productJpaRepository.findById(productId).orElseThrow().getLikeCount() == expected) {
+                return;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     @DisplayName("register 는 ")
     @Nested
     class Register {
@@ -113,6 +131,8 @@ class ProductApplicationServiceIntegrationTest {
             Product p = saveProduct(brandAId, "상품1", 1_000L, 10);
             likeApplicationService.register(100L, p.getId());
             likeApplicationService.register(101L, p.getId());
+            // 집계는 eventual → 수렴 후 조회(첫 조회라 캐시 미스, 수렴값을 읽는다).
+            awaitLikeCount(p.getId(), 2L);
 
             ProductInfo.Detail result = productApplicationService.getProduct(p.getId());
 
@@ -186,6 +206,9 @@ class ProductApplicationServiceIntegrationTest {
             likeApplicationService.register(100L, more.getId());
             likeApplicationService.register(101L, more.getId());
             likeApplicationService.register(102L, more.getId());
+            // 집계는 eventual → 정렬 키(like_count) 수렴 후 목록 조회(첫 조회라 캐시 미스).
+            awaitLikeCount(more.getId(), 3L);
+            awaitLikeCount(less.getId(), 1L);
 
             PageResult<ProductInfo.ListItem> result = productApplicationService.getAllProducts(
                     new ProductCriteria.GetAll(0, 20, null, "LIKES_DESC"));

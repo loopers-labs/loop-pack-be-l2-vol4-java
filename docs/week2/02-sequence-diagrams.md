@@ -381,3 +381,253 @@ sequenceDiagram
 > | PENDING | 레코드 없음 | 요청 미접수 | 만료·재시도 — 후속(미구현, AC-28-2) |
 > | SUCCESS | 승인됨(콜백 2회) | at-least-once | 종결 no-op 가드 |
 > | FAILED | 승인됨 | "타임아웃→실패" 단정 시 | **단정 안 함**으로 차단 |
+
+## 5. 이벤트 기반 집계·전파 (Kafka) — Round 7
+
+**시나리오 개요**
+
+- **목적**: 확정된 사실(좋아요·결제성공·조회)을 부가 효과(지표 집계)로 **비동기 전파**한다. 주요 흐름은 동기 유지, 집계는 다른 앱(`commerce-streamer`)이 소유하는 read model(`product_metrics`)에 eventual 반영.
+- **선행조건**: 각 주요 트랜잭션(좋아요/결제/조회)이 성립.
+- **관련 요구사항**: US-29 ~ US-33.
+
+**참여자**
+
+| 약어 | 정식명 | 역할 |
+|------|--------|------|
+| U | 사용자 | 좋아요/결제/조회를 일으키는 주체 |
+| A | 주요 서비스 (commerce-api) | 좋아요/결제/조회 처리 + 도메인 이벤트 발행 |
+| OB | Outbox (api) | BEFORE_COMMIT 리스너로 전파 기록 적재 + relay 폴링 발행 |
+| K | Kafka | `catalog-events` / `order-events` 토픽(+ `.DLT`) |
+| MC | 지표 collector (commerce-streamer) | 이벤트 소비 → 멱등 판정 → `product_metrics` 집계 |
+| DB | api DB | 도메인 상태 + `outbox_events` |
+| MDB | streamer read model | `product_metrics` + `event_handled` |
+
+> **경계** — 모든 전파 정합성의 뿌리는 **DB 커밋 지점과 메시지 발행 지점의 순서**다(결제의 "외부 호출 vs 커밋 순서"와 같은 뿌리). 상태 변경이 있는 전파는 **outbox에 같은 트랜잭션으로 적재**한 뒤 relay가 발행하고(유실 0), 상태 변경이 없는 전파(조회수)는 **커밋 후 직접 발행**한다(내구성 불필요).
+
+### 5-1. 좋아요 → 지표 집계 (Step 1 경계 + Step 2 outbox 전 구간)
+
+좋아요는 **주요(좋아요 행 저장)** 와 **부가(집계·전파 이벤트)** 로 갈린다. 좋아요 트랜잭션은 **좋아요 행 저장 + 이벤트 발행**만 하고, `like_count` 증감은 하지 않는다. BEFORE_COMMIT 리스너가 **같은 트랜잭션에** outbox 행을 적재한 뒤(상태변경↔전파기록 원자성) 커밋되면, 같은 이벤트를 **두 소비자**가 듣는다 — ① **`@Async` AFTER_COMMIT 리스너**가 `products.like_count`를 원자 UPDATE(**로컬·best-effort**, 정렬용), ② **relay**가 outbox를 Kafka로 밀어 collector가 멱등 판정 후 `product_metrics`에 반영(**크로스앱·guaranteed**).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant A as 좋아요 서비스 (api)
+    participant OB as Outbox (api)
+    participant DB as api DB
+    participant K as Kafka (catalog-events)
+    participant MC as 지표 collector (streamer)
+    participant MDB as streamer read model
+
+    U->>A: 좋아요 등록 {userId, productId}
+    activate A
+    Note over A,DB: [TX] 주요(좋아요 행) + 전파기록(outbox)을 한 트랜잭션으로
+    A->>DB: like INSERT (주요)
+    A->>OB: publishEvent(ProductLikedEvent)
+    Note over OB: BEFORE_COMMIT 리스너 (같은 TX 참여)
+    OB->>DB: outbox_events INSERT (PENDING, key=productId, catalog-events)
+    A->>DB: COMMIT (좋아요 행 + outbox 함께 커밋 / 롤백 시 함께 취소)
+    A-->>U: 좋아요 성공 (집계는 커밋 후 뒤따름)
+    deactivate A
+
+    Note over A,DB: ① AFTER_COMMIT @Async — 로컬 카운터 (best-effort)
+    A->>DB: products.like_count 원자 UPDATE (별도 async TX / 큐 유실 시 드리프트·재시도 없음)
+
+    Note over OB,K: ② relay @Scheduled(1s) — 커밋과 분리된 별도 발행 (guaranteed)
+    OB->>DB: SELECT PENDING
+    OB->>K: send(key=productId, payload) → broker ack
+    OB->>DB: markPublished (ack 확인 후)
+    K->>MC: consume(CatalogEventMessage)
+    activate MC
+    Note over MC,MDB: [TX] 멱등 판정 + 집계 갱신을 한 트랜잭션으로
+    MC->>MDB: event_handled 존재? (event_id, "product-metrics")
+    alt 이미 처리
+        Note over MC,MDB: skip — 재전달 중복 흡수 (effectively-once)
+    else 처음
+        MC->>MDB: product_metrics.like_count++ (@DynamicUpdate) + event_handled INSERT
+    end
+    deactivate MC
+```
+
+**해석** — 세 개의 트랜잭션 경계가 핵심이다. ① **주요(좋아요 행)+전파기록(outbox)** 을 한 TX로 묶어 dual-write를 없앤다 — 좋아요 행과 outbox가 함께 커밋/롤백되므로 "좋아요는 됐는데 전파 기록이 없다"가 구조적으로 불가능하다(BEFORE_COMMIT이라 발행 TX에 참여, AFTER_COMMIT이면 별도 TX가 되어 다시 dual-write). ② **relay는 별도**다 — 발행 실패해도 PENDING으로 남아 재시도하므로 유실이 없다(broker ack 확인 후에만 PUBLISHED). ③ **소비도 멱등 판정+집계를 한 TX**로 묶어, 재전달(at-least-once)이 와도 한 번만 반영한다(`event_handled` 원장). 같은 이벤트를 듣는 두 카운터 — `products.like_count`(**로컬·best-effort·저지연**, `@Async` 큐 유실 시 드리프트·재시도 없음)와 `product_metrics.like_count`(**크로스앱·guaranteed**, outbox+멱등으로 유실 0) — 의 **의도적 중복**은 소비처와 보장 수준이 달라서다(정렬은 작은 드리프트 허용, 분석은 정확). 둘 다 eventual이며, `like_count`는 **동기 즉시 반영이 아니라** 커밋 뒤 비동기로 뒤따른다.
+
+> **부가 리스너(Step 1)** — 알림·행동 로깅은 위 그림과 별개로 **AFTER_COMMIT**에 듣는다(커밋된 뒤에만 실행, 롤백이면 미발화). 지표 집계 이벤트를 outbox로 보내는 것과 달리, 알림/로깅은 커밋 후 처리로 충분해 phase를 나눈다.
+> **순서·동시성** — `key=productId`라 같은 상품 이벤트는 같은 파티션→단일 소비자 스레드→순차 처리다. `find→증감→save`에 락이 필요 없다(파티션 직렬화 = 동시성 제어).
+
+### 5-2. 결제 성공 → 판매량 집계 (상품별 분해)
+
+판매량은 "결제 성공" 기준이다. 결제 성공 확정(`order.pay()`) 트랜잭션에서 `PaymentCompletedEvent`(주문 단위, 얇음)를 발행하면, outbox 리스너가 **같은 TX에서 주문을 재조회해 상품별로 분해**한다 — 상품이 N개면 `order-events` 행 N개(각 `key=productId`, 수량 포함).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Pay as 결제 서비스 (api)
+    participant OB as Outbox (api)
+    participant DB as api DB
+    participant K as Kafka (order-events)
+    participant SC as 판매 collector (streamer)
+    participant MDB as streamer read model
+
+    Note over Pay,DB: [TX] 결제 성공 확정 (4-2 콜백/정산 경로)
+    Pay->>DB: payment.markSuccess() + order.pay() (CREATED→PAID)
+    Pay->>OB: publishEvent(PaymentCompletedEvent {orderId})
+    Note over OB,DB: BEFORE_COMMIT — 주문 재조회로 상품 분해
+    OB->>DB: SELECT order + items (orderId)
+    loop 주문 라인아이템마다
+        OB->>DB: outbox_events INSERT (key=productId, order-events, quantity 포함)
+    end
+    Pay->>DB: COMMIT
+
+    Note over OB,K: relay 발행 (5-1과 동일 경로)
+    OB->>K: send(key=productId, OrderEventMessage)
+    K->>SC: consume(OrderEventMessage)
+    activate SC
+    SC->>MDB: event_handled 존재? (event_id, "product-sales")
+    alt 처음
+        SC->>MDB: product_metrics.sales_count += quantity (@DynamicUpdate) + event_handled INSERT
+    end
+    deactivate SC
+```
+
+**해석** — 두 가지 설계 선택이 겹친다. ① **페이로드 조립은 outbox의 책임**: 이벤트는 `orderId`만 담아 얇게 두고, 상품 분해(재조회→라인아이템)는 BEFORE_COMMIT 리스너가 한다 — `PaymentCompletedEvent`를 알림·로깅도 듣기 때문에 items로 오염시키지 않는다(같은 TX PK 조회라 저렴). ② **상품별 productId-키 메시지로 분해**: `product_metrics`의 무락 집계는 "같은 productId=단일 writer"에 기대므로, 결제 1건도 상품별로 쪼개 각 `key=productId`로 보내야 파티션 직렬화가 유지된다(`orderId`로 묶으면 서로 다른 주문이 같은 상품을 동시 증분 → lost update).
+
+> **다중 writer 방어** — 좋아요/조회는 `product-metrics` collector가, 판매는 `product-sales` collector가 같은 `product_metrics` 행을 건드린다(다른 스레드). 각 카운터는 파티션 직렬화로 단일 writer지만 행은 다중 writer라, **`@DynamicUpdate`로 변경 컬럼만 UPDATE**(like_count vs sales_count)해 교차 lost update를 막는다. 멱등 원장의 handler도 collector별로 달라(`product-metrics` / `product-sales`) 멱등 스코프가 분리된다.
+
+### 5-3. 상품 조회 → 조회수 (직접 발행, 유실 허용)
+
+조회는 **읽기**라 DB 상태 변경이 없고, 캐시 히트 경로는 트랜잭션도 없다(커넥션 선점 회피). outbox에 묶을 대상이 없으므로 **커밋 후 직접 발행**한다(내구성 대신 성능). 발행 실패는 삼켜서 조회 응답을 막지 않는다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant P as 상품 조회 서비스 (api)
+    participant K as Kafka (catalog-events)
+    participant MC as 지표 collector (streamer)
+    participant MDB as streamer read model
+
+    U->>P: 상품 상세 조회 {productId}
+    activate P
+    Note over P: 캐시 히트(무TX) 또는 미스(개별 TX) — 상태변경 없음
+    P->>P: publishEvent(ProductViewedEvent)
+    P-->>U: 상세 응답 (즉시)
+    Note over P,K: AFTER_COMMIT + fallbackExecution=true (무TX여도 즉시 실행)
+    P-)K: send(key=productId, PRODUCT_VIEWED) — best-effort fire-and-forget
+    Note over P: 발행 실패는 whenComplete 콜백에서 로그만 (유실 허용)
+    deactivate P
+
+    K->>MC: consume(CatalogEventMessage)
+    activate MC
+    MC->>MDB: event_handled 처음? → product_metrics.view_count++ (@DynamicUpdate)
+    deactivate MC
+```
+
+**해석** — 조회수만 outbox를 쓰지 않는 게 핵심 결정이다. **outbox는 "상태변경에 종속된 전파" 전용 도구**이므로, 상태변경이 없는 조회는 outbox가 줄 게 없다(원자성으로 묶을 대상 부재). 게다가 캐시 히트는 성능을 위해 트랜잭션을 열지 않아 커밋 후 처리(AFTER_COMMIT)가 성립하지 않으므로 **`fallbackExecution=true`** 로 무TX에서도 즉시 발행한다. 조회수는 유실 허용 분석 지표라 **best-effort fire-and-forget**으로 보낸다 — `send()`는 비동기라 broker ack 실패가 반환 future 로만 오므로, "실패는 로그만"을 정확히 지키려면 **`whenComplete` 완료 콜백에서 로깅**한다(직렬화 실패 같은 동기 예외는 발행 전에 잡아 건너뜀). 어느 실패든 조회 응답을 막지 않는다 — 좋아요/판매(내구 outbox)와 급을 달리한 의도적 선택이다. 소비 쪽은 `catalog-events`를 그대로 태워 기존 collector가 `view_count`만 추가로 올린다.
+
+### 5-4. 실패 격리 (DLQ) — 공통
+
+collector가 한 메시지 처리에 실패하면 offset을 커밋하지 않아 재전달된다. 아무 장치가 없으면 poison(반드시 실패하는 메시지)이 파티션을 영구 정지시키므로, **재시도 후 DLQ 격리**로 파이프를 지킨다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant K as Kafka (<topic>)
+    participant MC as collector (streamer)
+    participant DLT as <topic>.DLT
+
+    K->>MC: consume(record)
+    activate MC
+    alt 정상
+        MC->>MC: 집계 반영 + offset 커밋
+    else 처리 실패
+        alt 결정적 실패 (필수값 누락 등)
+            Note over MC: 재시도 무의미 → 즉시 격리
+        else 일시 장애 (DB 순단 등)
+            MC->>MC: FixedBackOff 재시도 (1s × 2 = 3회)
+        end
+        MC->>DLT: 원문 + 실패 메타(원본 토픽/파티션/오프셋·예외) 재발행
+        MC->>MC: offset 전진 (뒤 메시지 계속 처리)
+    end
+    deactivate MC
+```
+
+**해석** — 두 축으로 실패를 가른다. **시간축**: 일시 장애는 backoff 재시도로 흡수하고, 소진되면 격리. **타입축**: 결정적 실패(필수값 null 등 `IllegalArgumentException` 계열, 역직렬화 불가)는 재시도해도 반드시 실패하므로 재시도 없이 즉시 DLQ로 보낸다 — 결제의 "확정 실패 vs in-doubt"와 같은 렌즈다. 격리는 **원문+실패 메타**를 보존해(DLQ는 버리는 곳이 아니라 재처리소) 운영자가 원인을 확인·재처리할 수 있고, offset을 전진시켜 poison이 파티션을 막지 않게 한다. DLT 목적지는 `원본토픽 + ".DLT"` 로 소스별 분기되어 `catalog`·`order` collector가 에러 핸들러를 공유해도 격리가 뒤섞이지 않는다.
+
+---
+
+## 6. 선착순 쿠폰 발급 (commerce-streamer · 조건부 원자 UPDATE) — Round 7 Step 3
+
+**시나리오 개요**
+
+- **목적**: 수량이 한정된 쿠폰을 폭주하는 요청 속에서도 **한도까지만** 발급한다. `commerce-api`가 요청을 접수·발행하고, **`commerce-streamer`가 소비**해 발급 슬롯을 **조건부 원자 UPDATE**(`issued_count < issue_limit`)로 확보한다.
+- **선행조건**: 로그인 상태, 한도(`issueLimit`)가 설정된 템플릿 존재.
+- **관련 요구사항**: US-34 (AC-34-1 ~ AC-34-7).
+
+**참여자**
+
+| 약어 | 정식명 | 역할 |
+|------|--------|------|
+| U | 사용자 | 발급을 요청하고, `requestId`로 결과를 **폴링**한다 |
+| A | 쿠폰 접수 (commerce-api) | 요청을 `PENDING` 저장 + outbox 적재(한 트랜잭션), `requestId` 반환. 폴링 응답(소유자 검증) |
+| OB | Outbox + Relay (api) | `coupon-issue-requests` 로 `key=templateId` 발행 |
+| K | Kafka | `coupon-issue-requests` 토픽(+ `.DLT`) |
+| CC | 발급 소비자 (commerce-streamer) | JdbcTemplate 로 멱등·중복·한도(원자 UPDATE)·발급, manual ack |
+| DB | shared MySQL | `coupon_templates` · `coupon_issue_requests` · `user_coupons` (api 소유, streamer 도 씀) |
+
+> **경계** — 발급 소비자는 **`commerce-streamer`가 호스팅**한다(Kafka consumer 앱이 실제로 처리 = 과제 요건). streamer 는 쿠폰 도메인(엔티티·불변식)을 복제하지 않고, 발급이 필요로 하는 최소 쿼리만 **JdbcTemplate 으로 같은 MySQL(shared DB)** 에 실행한다. 대가는 발급 규칙(스냅샷·만료·한도)이 SQL 로 재표현되어 api 의 `UserCoupon.issue()`/`CouponTemplate` 불변식과 **드리프트**할 수 있다는 것(컴파일러 미검출) + `user_coupons` write 소유권이 두 앱에 걸친다는 것. 그 대신 한도 강제는 조건부 원자 UPDATE 라 소비 위치와 무관하게 안전하다.
+
+### 6-1. 요청 접수 → 발급 처리 → 폴링
+
+접수는 요청 행(`PENDING`)과 outbox를 **한 트랜잭션**으로 저장하고 `requestId`를 즉시 돌려준다(US-31 원자성). relay가 `key=templateId`로 발행하면 한 템플릿의 요청이 한 파티션에 모여 streamer 소비자가 순차 처리한다. 소비자는 **요청 상태로 멱등 판정** 후, 처리 대상(`userId`·`templateId`)을 **메시지가 아니라 DB 요청 행**을 진실로 삼아 중복→한도(조건부 원자 UPDATE)→발급 순으로 결과를 확정한다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자
+    participant A as 쿠폰 접수 (api)
+    participant OB as Outbox+Relay (api)
+    participant K as Kafka (coupon-issue-requests)
+    participant CC as 발급 소비자 (streamer)
+    participant DB as shared MySQL
+
+    U->>A: 발급 요청 {templateId}
+    activate A
+    A->>DB: 템플릿 조회 (한도 있음 확인)
+    alt 템플릿 없음/삭제 or 선착순 대상 아님
+        A-->>U: 거부 (찾을 수 없음 / 선착순 아님)
+    else 한도 있는 템플릿
+        A->>DB: coupon_issue_requests INSERT (PENDING) + outbox INSERT
+        Note over A,DB: 요청 기록 ↔ 전파 기록 한 트랜잭션 (원자성)
+        A-->>U: 접수됨 {requestId} (즉시 반환)
+    end
+    deactivate A
+
+    OB->>K: publish key=templateId (PENDING outbox → PUBLISHED)
+    K->>CC: consume {requestId, ...} (한 템플릿=한 파티션=단일 스레드)
+    activate CC
+    CC->>DB: requestId 로 요청 행 조회
+    alt 이미 종결됨 (멱등)
+        Note over CC,DB: 재전달 — PENDING 아니면 skip
+    else PENDING
+        CC->>DB: (userId·templateId 는 DB 요청 행 기준) 기존 발급 조회
+        alt 이미 발급받음
+            CC->>DB: 요청 = ALREADY_ISSUED (슬롯 미소모)
+        else 미발급
+            alt 조건부 UPDATE 성공 (issued_count < issue_limit)
+                CC->>DB: issued_count+1 · user_coupons INSERT · 요청 = SUCCESS
+            else 영향 행 0 (한도 소진)
+                CC->>DB: 요청 = SOLD_OUT
+            end
+        end
+    end
+    CC->>K: ack (발급 트랜잭션 커밋 후에만 — manual ack)
+    deactivate CC
+
+    U->>A: 상태 폴링 {requestId}
+    activate A
+    A->>DB: 요청 조회 (본인 소유 확인)
+    A-->>U: status (PENDING/SUCCESS/SOLD_OUT/ALREADY_ISSUED/FAILED)
+    deactivate A
+```
+
+**해석** — 세 겹의 안전장치가 겹친다. ① **접수의 원자성**: 요청과 outbox가 한 트랜잭션이라 "접수됐는데 발행 안 됨"이 없다(US-31). ② **조건부 원자 UPDATE**: 한도 강제는 `UPDATE ... SET issued_count = issued_count + 1 WHERE issued_count < issue_limit`의 영향 행 수로 판정한다(AC-34-3) — 재고 차감과 같은 패턴이라 파티션 직렬화(순서·멱등을 돕는 `key=templateId`)가 없어도 초과 발급이 불가능하다. ③ **멱등 + DB 진실**: 요청 상태가 `PENDING`일 때만 처리하고(재전달 흡수, AC-34-5), 처리 대상을 외부 경계인 메시지가 아니라 DB 요청 행에서 읽어 "요청과 발급 결과가 갈리는" 무결성 균열을 원천 차단한다. `ack`는 발급 트랜잭션이 커밋된 뒤에만 호출하므로(manual ack), 처리 중 장애가 나면 오프셋이 전진하지 않아 재시도→DLQ로 흐른다(성공 시에만 전진 = at-least-once). 결정적 실패(템플릿 삭제/무제한)만 `FAILED`로 확정하고 일시 장애는 상태를 남기지 않는다(AC-34-7). 중복 방지의 최후 방어선은 `user_coupons (user_id, template_id)` 유니크다(US-19와 공유). 발급 규칙(스냅샷·만료·한도)은 streamer JdbcTemplate SQL 에 재표현되므로, api 의 `UserCoupon.issue()`가 바뀌면 이 SQL 도 함께 맞춰야 한다(shared DB 분리의 대가).
