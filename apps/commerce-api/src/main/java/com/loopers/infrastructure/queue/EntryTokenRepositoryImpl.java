@@ -13,8 +13,6 @@ import java.util.Optional;
 @Component
 public class EntryTokenRepositoryImpl implements EntryTokenRepository {
 
-    private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
-
     private final RedisTemplate<String, String> redisTemplate;
 
     @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
@@ -31,6 +29,6 @@ public class EntryTokenRepositoryImpl implements EntryTokenRepository {
     }
 
     private String entryTokenKey(Long userId) {
-        return ENTRY_TOKEN_KEY_PREFIX + userId;
+        return QueueRedisKeys.ENTRY_TOKEN_KEY_PREFIX + userId;
     }
 }

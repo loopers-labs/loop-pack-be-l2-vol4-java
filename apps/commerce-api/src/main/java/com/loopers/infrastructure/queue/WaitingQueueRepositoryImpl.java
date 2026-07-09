@@ -11,8 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class WaitingQueueRepositoryImpl implements WaitingQueueRepository {
 
-    private static final String WAITING_QUEUE_KEY = "queue:waiting-queue";
-
     private final RedisTemplate<String, String> redisTemplate;
 
     @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
@@ -21,17 +19,17 @@ public class WaitingQueueRepositoryImpl implements WaitingQueueRepository {
     @Override
     public Long enter(Long userId, long timestampMillis) {
         String member = String.valueOf(userId);
-        masterRedisTemplate.opsForZSet().add(WAITING_QUEUE_KEY, member, timestampMillis);
-        return masterRedisTemplate.opsForZSet().rank(WAITING_QUEUE_KEY, member);
+        masterRedisTemplate.opsForZSet().add(QueueRedisKeys.WAITING_QUEUE_KEY, member, timestampMillis);
+        return masterRedisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, member);
     }
 
     @Override
     public Long rank(Long userId) {
-        return redisTemplate.opsForZSet().rank(WAITING_QUEUE_KEY, String.valueOf(userId));
+        return redisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, String.valueOf(userId));
     }
 
     @Override
     public Long size() {
-        return redisTemplate.opsForZSet().zCard(WAITING_QUEUE_KEY);
+        return redisTemplate.opsForZSet().zCard(QueueRedisKeys.WAITING_QUEUE_KEY);
     }
 }
