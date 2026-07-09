@@ -1,9 +1,12 @@
 package com.loopers.domain.queue;
 
+import com.loopers.support.config.QueueProperties;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -11,6 +14,7 @@ public class QueueService {  // 대기열 진입·순번·입장 처리를 담�
 
     private final WaitingQueue waitingQueue;
     private final EntryTokenStore entryTokenStore;
+    private final QueueProperties queueProperties;
 
     /** 대기열 진입 후 순번(1-based)을 반환한다. 재진입해도 최초 순번을 유지한다(ZADD NX). */
     public long enter(String loginId) {
@@ -31,6 +35,22 @@ public class QueueService {  // 대기열 진입·순번·입장 처리를 담�
     /** 전체 대기 인원. */
     public long getWaitingCount() {
         return waitingQueue.size();
+    }
+
+    /**
+     * 폴링용 상태 조회. 입장한 유저는 admitNext 의 ZPOPMIN 으로 대기열에서 이미 빠지고 토큰만 보유하므로,
+     * 토큰 → 대기열 순번 → 미진입 순으로 판정한다.
+     */
+    public QueuePosition getStatus(String loginId) {
+        Optional<String> token = entryTokenStore.find(loginId);
+        if (token.isPresent()) {
+            return QueuePosition.admitted(token.get());
+        }
+        long rank = waitingQueue.rank(loginId)
+                                .orElseThrow(
+                                        () -> new CoreException(ErrorType.NOT_FOUND, "[loginId = " + loginId + "] 대기열에 진입한 이력이 없습니다.")
+                                );
+        return QueuePosition.waiting(rank + 1, queueProperties.throughputPerSecond());
     }
 
     /** 대기열 앞에서 n 명을 꺼내 각자 입장 토큰을 발급한다(스케줄러가 주기적으로 호출). */

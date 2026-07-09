@@ -141,4 +141,46 @@ class QueueServiceIntegrationTest {
         assertThat(queueService.getWaitingCount()).isEqualTo(1L);
         assertThat(queueService.getPosition("carol")).isEqualTo(1L);
     }
+
+    @DisplayName("대기 중 유저의 상태 조회는 순번(>0)·예상 대기 시간을 담고, 토큰은 없고 미입장 상태다.")
+    @Test
+    void getStatus_waitingUser_hasPositionAndEta_withoutToken() {
+        // arrange — 순번 1
+        queueService.enter("alice");
+
+        // act
+        QueuePosition status = queueService.getStatus("alice");
+
+        // assert — ceil(1 / 175) = 1
+        assertThat(status.position()).isEqualTo(1L);
+        assertThat(status.admitted()).isFalse();
+        assertThat(status.token()).isNull();
+        assertThat(status.estimatedWaitSeconds()).isEqualTo(1L);
+    }
+
+    @DisplayName("입장 토큰을 발급받은 유저의 상태 조회는 순번 0·토큰 포함·입장 완료다.")
+    @Test
+    void getStatus_admittedUser_hasTokenAndPositionZero() {
+        // arrange — 진입 후 admitNext 로 토큰 발급(대기열에서 빠짐)
+        queueService.enter("alice");
+        queueService.admitNext(1);
+
+        // act
+        QueuePosition status = queueService.getStatus("alice");
+
+        // assert
+        assertThat(status.admitted()).isTrue();
+        assertThat(status.position()).isZero();
+        assertThat(status.token()).isNotBlank();
+        assertThat(status.estimatedWaitSeconds()).isZero();
+    }
+
+    @DisplayName("대기열에 진입한 적 없는 유저의 상태 조회는 NOT_FOUND 예외다.")
+    @Test
+    void getStatus_ofNonEntrant_throwsNotFound() {
+        // act & assert
+        assertThatThrownBy(() -> queueService.getStatus("ghost"))
+                .isInstanceOf(CoreException.class)
+                .satisfies(e -> assertThat(((CoreException) e).getErrorType()).isEqualTo(ErrorType.NOT_FOUND));
+    }
 }

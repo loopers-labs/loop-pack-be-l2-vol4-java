@@ -51,6 +51,7 @@ queue:
     enabled: true      # 입장 스케줄러 활성화 (테스트는 @TestPropertySource 로 off)
   token:
     ttl: 5m            # 입장 토큰 TTL. 미사용 시 자동 만료되어 다음 유저에게 기회가 돌아감
+  throughput-per-second: 175   # 초당 처리량. 예상 대기 시간 = 순번 / 이 값 (DB 풀 50 / 주문 200ms → 250 TPS × 안전마진 70%)
 
 resilience4j:
   circuitbreaker:

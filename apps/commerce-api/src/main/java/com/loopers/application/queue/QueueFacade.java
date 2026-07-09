@@ -1,5 +1,6 @@
 package com.loopers.application.queue;
 
+import com.loopers.domain.queue.QueuePosition;
 import com.loopers.domain.queue.QueueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,14 +12,18 @@ public class QueueFacade {
     private final QueueService queueService;
 
     public QueuePositionInfo enter(String loginId) {
-        long position = queueService.enter(loginId);
+        queueService.enter(loginId);
 
-        return QueuePositionInfo.of(position, queueService.getWaitingCount());
+        QueuePosition status = queueService.getStatus(loginId);
+        long waitingCount = queueService.getWaitingCount();
+
+        return QueuePositionInfo.from(status, waitingCount);
     }
 
     public QueuePositionInfo getPosition(String loginId) {
-        long position = queueService.getPosition(loginId);
+        QueuePosition status = queueService.getStatus(loginId);
+        long waitingCount = queueService.getWaitingCount();
 
-        return QueuePositionInfo.of(position, queueService.getWaitingCount());
+        return QueuePositionInfo.from(status, waitingCount);
     }
 }

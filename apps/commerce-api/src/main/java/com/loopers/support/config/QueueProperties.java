@@ -7,7 +7,8 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "queue")
 public record QueueProperties(
         Admission admission,
-        Token token
+        Token token,
+        long throughputPerSecond   // 초당 처리량. 예상 대기 시간(= 순번 / 이 값) 산정 기준
 ) {
     public record Admission(
             long intervalMs,   // 스케줄러 실행 주기(ms). @Scheduled 은 placeholder 직접 참조
