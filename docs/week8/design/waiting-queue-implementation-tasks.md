@@ -67,7 +67,7 @@
 
 ## Phase 4 — 설정 공유 (4단계)
 
-- [ ] **4.1** `QueueProperties`
+- [x] **4.1** `QueueProperties`
   - 산출물: `infrastructure/queue/QueueProperties.java`(`@ConfigurationProperties(prefix = "queue")` record — `schedulerIntervalMs`, `throughputPerSecond`, `batchSize()`). `config/redis` 같은 공용 `config` 패키지가 아니라 `infrastructure/<domain>`에 두는 이유는 이 프로젝트에서 앱(`commerce-api`) 전용 `@ConfigurationProperties`의 기존 유일 사례인 `PaymentGatewayProperties`가 `infrastructure/payment`에 있기 때문(`config/*` 패키지는 `modules/redis`처럼 여러 앱이 공유하는 모듈에서만 쓰는 컨벤션). `commerce-api`의 `application.yml`에 `queue.scheduler-interval-ms: 100`, `queue.throughput-per-second: 70` 추가([근거](waiting-queue-capacity-planning.md#estimatedwaitseconds-계산))
   - 검증: `QueuePropertiesTest` (순수 단위 테스트, Spring 컨텍스트 없이 record 직접 생성)
     - `throughputPerSecond=70`, `schedulerIntervalMs=100`일 때 `batchSize()`가 7이다(계산식: `throughputPerSecond * schedulerIntervalMs / 1000` → 내림)
