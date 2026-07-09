@@ -91,7 +91,7 @@ class EntryTokenServiceTest {
             // then
             assertAll(
                     () -> assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN),
-                    () -> assertThat(result.getMessage()).isEqualTo("입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요.")
+                    () -> assertThat(result.getMessage()).isEqualTo("유효하지 않은 입장 토큰입니다. 대기열을 통해 다시 진입해주세요.")
             );
         }
     }

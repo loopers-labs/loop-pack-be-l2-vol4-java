@@ -21,7 +21,7 @@ public class EntryTokenService {
         String storedToken = find(userId)
                 .orElseThrow(() -> new CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요."));
         if (!storedToken.equals(token)) {
-            throw new CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요.");
+            throw new CoreException(ErrorType.FORBIDDEN, "유효하지 않은 입장 토큰입니다. 대기열을 통해 다시 진입해주세요.");
         }
     }
 
