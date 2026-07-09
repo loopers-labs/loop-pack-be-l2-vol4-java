@@ -13,4 +13,6 @@ public class CouponV1Dto {
             int value,
             String status       // AVAILABLE | USED | EXPIRED
     ) {}
+    public record IssueAcceptedResponse(String requestId, String status) {}
+    public record IssueResultResponse(String requestId, String status, String reason) {}
 }

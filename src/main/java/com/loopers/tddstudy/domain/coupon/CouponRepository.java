@@ -8,4 +8,6 @@ public interface CouponRepository {
     Optional<Coupon> findById(Long id);
     List<Coupon> findAll();
     void deleteById(Long id);
+    Optional<Coupon> findByIdWithLock(Long id);
 }
+

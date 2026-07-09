@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import org.springframework.context.ApplicationEventPublisher;
+import java.util.ArrayList;
 
 class OrderServiceTest {
 
@@ -20,6 +22,7 @@ class OrderServiceTest {
     private OrderService orderService;
     private FakeCouponRepository fakeCouponRepository;
     private FakeUserCouponRepository fakeUserCouponRepository;
+    private final List<Object> publishedEvents = new ArrayList<>();
 
     private Product product1;
     private Product product2;
@@ -31,13 +34,15 @@ class OrderServiceTest {
         fakePaymentGateway = new FakePaymentGateway();
         fakeCouponRepository = new FakeCouponRepository();
         fakeUserCouponRepository = new FakeUserCouponRepository();
+        ApplicationEventPublisher publisher = publishedEvents::add;   // 람다
 
         orderService = new OrderService(
                 fakeOrderRepository,
                 fakeProductRepository,
                 fakePaymentGateway,
                 fakeCouponRepository,
-                fakeUserCouponRepository
+                fakeUserCouponRepository,
+                publisher
         );
 
         product1 = fakeProductRepository.save(new Product("나이키 운동화", 50000, 10, 1L));

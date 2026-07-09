@@ -56,4 +56,9 @@ public class FakeCouponRepository implements CouponRepository {
     public void deleteById(Long id) {
         store.remove(id);
     }
+
+    @Override
+    public Optional<Coupon> findByIdWithLock(Long id) {
+        return findById(id);
+    }
 }

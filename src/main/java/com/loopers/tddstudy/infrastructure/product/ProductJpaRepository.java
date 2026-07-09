@@ -14,4 +14,13 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Product> findWithLockById(Long id);
+
+    // 브랜드 필터 + 좋아요 순
+    List<Product> findAllByBrandIdOrderByLikeCountDesc(Long brandId);
+
+    // 전체 + 좋아요 순
+    List<Product> findAllByOrderByLikeCountDesc();
+
+    List<Product> findTop10ByOrderByLikeCountDesc();
+
 }
