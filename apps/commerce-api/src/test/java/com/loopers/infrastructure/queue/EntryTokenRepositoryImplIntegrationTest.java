@@ -1,6 +1,9 @@
 package com.loopers.infrastructure.queue;
 
 import com.loopers.domain.queue.EntryTokenRepository;
+import com.loopers.domain.queue.EntryTokenService;
+import com.loopers.support.error.CoreException;
+import com.loopers.support.error.ErrorType;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,9 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 class EntryTokenRepositoryImplIntegrationTest {
@@ -21,6 +26,9 @@ class EntryTokenRepositoryImplIntegrationTest {
 
     @Autowired
     private EntryTokenRepository entryTokenRepository;
+
+    @Autowired
+    private EntryTokenService entryTokenService;
 
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
@@ -81,6 +89,40 @@ class EntryTokenRepositoryImplIntegrationTest {
 
             // then
             assertThat(entryTokenRepository.find(userId)).isEmpty();
+        }
+    }
+
+    @DisplayName("입장 토큰 TTL이 만료됐을 때,")
+    @Nested
+    class Expiration {
+
+        @DisplayName("설정한 TTL이 지나면 토큰이 사라져 find가 빈 값을 반환한다.")
+        @Test
+        void find_returnsEmpty_afterTtlExpires() throws InterruptedException {
+            // given
+            Long userId = 1L;
+            redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "abc-123", Duration.ofMillis(300));
+
+            // when
+            Thread.sleep(500);
+
+            // then
+            assertThat(entryTokenRepository.find(userId)).isEmpty();
+        }
+
+        @DisplayName("TTL이 만료된 토큰으로 검증을 시도하면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void verify_throwsForbidden_afterTokenExpires() throws InterruptedException {
+            // given
+            Long userId = 1L;
+            redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "abc-123", Duration.ofMillis(300));
+            Thread.sleep(500);
+
+            // when
+            CoreException result = assertThrows(CoreException.class, () -> entryTokenService.verify(userId, "abc-123"));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 }

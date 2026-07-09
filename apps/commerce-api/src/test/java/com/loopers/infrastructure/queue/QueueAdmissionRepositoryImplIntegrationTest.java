@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.Duration;
 import java.util.List;
@@ -35,6 +36,9 @@ class QueueAdmissionRepositoryImplIntegrationTest {
 
     @Autowired
     private EntryTokenRepository entryTokenRepository;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     private RedisCleanUp redisCleanUp;
@@ -62,6 +66,25 @@ class QueueAdmissionRepositoryImplIntegrationTest {
             // then
             assertThat(admitted).hasSize(3);
             admitted.forEach(entry -> assertThat(entryTokenRepository.find(entry.userId())).contains(entry.token()));
+        }
+
+        @DisplayName("발급된 토큰에는 요청한 TTL이 설정된다.")
+        @Test
+        void admitBatch_setsRequestedTtl_onIssuedTokens() {
+            // given
+            waitingQueueRepository.enter(1L, 1_000L);
+            Duration requestedTtl = Duration.ofSeconds(30);
+
+            // when
+            List<AdmittedEntry> admitted = queueAdmissionRepository.admitBatch(1, requestedTtl);
+
+            // then
+            AdmittedEntry entry = admitted.get(0);
+            Long remainingTtlSeconds = redisTemplate.getExpire(QueueRedisKeys.ENTRY_TOKEN_KEY_PREFIX + entry.userId());
+            assertAll(
+                    () -> assertThat(remainingTtlSeconds).isGreaterThan(0L),
+                    () -> assertThat(remainingTtlSeconds).isLessThanOrEqualTo(requestedTtl.toSeconds())
+            );
         }
 
         @DisplayName("발급된 유저는 대기열에서 사라진다.")

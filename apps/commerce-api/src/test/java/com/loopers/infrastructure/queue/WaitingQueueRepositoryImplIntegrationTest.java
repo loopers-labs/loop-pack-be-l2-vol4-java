@@ -10,7 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.LongStream;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest
 class WaitingQueueRepositoryImplIntegrationTest {
@@ -73,6 +80,41 @@ class WaitingQueueRepositoryImplIntegrationTest {
             // then
             assertThat(reEnteredRank.value()).isEqualTo(1L);
             assertThat(waitingQueueRepository.rank(secondUserId).value()).isZero();
+        }
+
+        @DisplayName("여러 유저가 동시에 진입해도 순번이 중복되거나 유실되지 않는다.")
+        @Test
+        void enter_assignsUniqueConsecutiveRanks_whenCalledConcurrently() throws InterruptedException {
+            // given
+            int userCount = 50;
+            int threadCount = 10;
+            ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch latch = new CountDownLatch(userCount);
+
+            // when
+            for (long userId = 1; userId <= userCount; userId++) {
+                long id = userId;
+                executorService.submit(() -> {
+                    try {
+                        waitingQueueRepository.enter(id, System.currentTimeMillis());
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
+            latch.await();
+            executorService.shutdown();
+
+            // then
+            List<Long> ranks = LongStream.rangeClosed(1, userCount)
+                    .mapToObj(userId -> waitingQueueRepository.rank(userId).value())
+                    .toList();
+            List<Long> expectedRanks = LongStream.range(0, userCount).boxed().toList();
+            assertAll(
+                    () -> assertThat(waitingQueueRepository.size()).isEqualTo((long) userCount),
+                    () -> assertThat(ranks).doesNotHaveDuplicates(),
+                    () -> assertThat(ranks).containsExactlyInAnyOrderElementsOf(expectedRanks)
+            );
         }
     }
 
