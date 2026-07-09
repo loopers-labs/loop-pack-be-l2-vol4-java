@@ -577,3 +577,42 @@ classDiagram
 
 > **왜 이 타입들은 Aggregate가 아닌가** — 도메인 불변식을 지키는 게 아니라 *이미 확정된 불변식의 결과*를 나르거나(이벤트·outbox) 투영하기(metrics) 때문이다. 그래서 `ProductMetrics`엔 도메인 검증이 거의 없고(카운터 증감 + floor), `OutboxEvent`엔 도메인 행위가 없다(상태 마킹만). 비즈니스 규칙은 상류 Aggregate(`Like`/`Order`/`Payment`)가 이미 강제한 뒤다.
 > **동시성 기법(다섯 번째)** — 재고(비관락)·쿠폰(낙관락)·좋아요(원자 UPDATE)·결제(외부 멱등 no-op)에 이어, 지표 집계는 **파티션 직렬화 + 컬럼 단위 쓰기(@DynamicUpdate)** 다 — 락을 아예 없애고 "같은 키=한 스레드"라는 Kafka 파티션 성질로 동시성을 제어하는 결이다(2단계 시퀀스 5-1·5-2).
+
+### 대기열 — `WaitingQueueRepository` / `EntryTokenRepository` / `QueuePolicy` (Round 8)
+
+> 대기열도 **새 Aggregate 가 아니다** — JPA 엔티티가 하나도 없다. 대기 순서·입장 토큰은 도메인 객체가 아니라 **Redis 자료구조 그 자체**(ZSET + TTL 키)이고, 도메인 레이어에는 그 자료구조를 도메인 언어로 추상한 **Repository 인터페이스 둘**과, 저장소 없이 계산만 하는 **정책 객체 하나**만 둔다. 상태를 가진 객체가 없으니 지킬 불변식도 없다 — 순서 보장(ZSET score)·중복 진입 방지(Set member 유일)·토큰 만료(TTL)는 전부 Redis 의 자료구조 성질에 위임된 불변식이다.
+
+```mermaid
+classDiagram
+    class WaitingQueueRepository {
+        <<interface>>
+        +enter(userId, enteredAtMillis) boolean
+        +rank(userId) Optional~Long~
+        +size() long
+        +popFront(count) List~Long~
+    }
+    class EntryTokenRepository {
+        <<interface>>
+        +issue(userId, token, ttl)
+        +find(userId) Optional~String~
+        +delete(userId)
+    }
+    class QueuePolicy {
+        <<DomainPolicy>>
+        -double issueRatePerSecond
+        -List~Band~ bands
+        -long defaultPollIntervalMs
+        +estimatedWaitSeconds(position) long
+        +pollAfterMillis(position) long
+    }
+    note for WaitingQueueRepository "구현 = Redis ZSET waiting-queue (master 고정).\nenter = ZADD NX (재진입 시 최초 진입 시각 보존 = 순번 유지),\npopFront = ZPOPMIN (원자적 배치 pop)."
+    note for EntryTokenRepository "구현 = entry-token:{userId} String + TTL.\n만료는 별도 상태 관리 없이 Redis TTL 이 자연 처리."
+    note for QueuePolicy "순수 계산 — 예상 대기 = ceil(순번 ÷ 발급 TPS),\n폴링 간격 = 순번 구간(밴드)별 조회. 발급 TPS 는\n스케줄러 설정(batch × 1000/interval)에서 유도(drift 방지)."
+```
+
+- **`WaitingQueueRepository`** — 대기열을 "진입(멱등)·내 순번·크기·앞에서 N명 꺼내기"라는 도메인 언어로 추상한다. `enter` 의 반환값(boolean)은 신규 진입 여부다 — 구현의 `ZADD NX` 가 재진입이면 score 를 갱신하지 않아, "새로고침이 곧 재진입"인 대기 화면에서 순번이 뒤로 리셋되지 않는다. `popFront` 는 `ZPOPMIN` 이라 다중 호출자여도 같은 유저가 두 번 나오지 않는다(원자성).
+- **`EntryTokenRepository`** — 입장 토큰의 발급·조회·소진. 만료 상태 기계를 두지 않고 **Redis TTL 에 위임**한다 — `EXPIRED` 같은 상태 컬럼과 만료 배치가 통째로 사라진다(쿠폰의 "조회 시점 만료 판정"과 같은 렌즈로, 상태를 저장하지 않고 유도).
+- **`QueuePolicy`** (DomainPolicy) — 예상 대기 시간과 순번 구간별 폴링 간격의 **순수 계산**만 담는다. 저장소에 의존하지 않으므로(도메인 서비스는 Repository 미의존 원칙) Spring 없이 단위 테스트된다. 발급 TPS 를 별도 설정이 아니라 스케줄러 설정에서 **유도**하는 것이 핵심 결정 — 두 값을 따로 두면 스케줄러 튜닝 때 예상 대기 계산이 조용히 어긋난다.
+
+> **조달과 오케스트레이션은 응용이** — "토큰 보유자는 재줄세우기 없이 토큰 반환", "pop→토큰 저장 찰나의 조회는 토큰 이중 확인으로 흡수", "미진입자 404" 같은 흐름 규칙은 응용 서비스(`QueueApplicationService`)가 두 Repository 와 `QueuePolicy` 를 조합해 만든다 — 도메인 객체가 없는 영역이라 응용이 유일한 조립 지점이다.
+> **왜 RDB 가 아니라 Redis 인가** — 순번 조회(`ZRANK`)가 O(log N)이라 대기 인원과 무관하게 싸고, 폭증 트래픽의 진입(INSERT 상당)이 DB 커넥션 풀을 소모하지 않으며(보호하려는 자원을 보호 장치가 쓰면 모순), 토큰 만료가 TTL 로 공짜다. 대기열 데이터는 행사가 끝나면 버리는 휘발성이라 내구성 요구도 없다(4단계 ERD "대기열 — Redis 키" 참조).
