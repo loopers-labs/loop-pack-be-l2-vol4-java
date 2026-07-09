@@ -35,7 +35,7 @@
 
 ## Phase 2 — Lua 원자성 (2단계)
 
-- [ ] **2.1** `admit-batch.lua` + `QueueAdmissionRepository` + `QueueAdmissionRepositoryImpl`
+- [x] **2.1** `admit-batch.lua` + `QueueAdmissionRepository` + `QueueAdmissionRepositoryImpl`
   - 산출물: `resources/scripts/admit-batch.lua`, `domain/queue/QueueAdmissionRepository.java`(`AdmittedEntry(Long userId, String token)` record, `admitBatch(int count, Duration tokenTtl)`), `infrastructure/queue/QueueAdmissionRepositoryImpl.java`(`DefaultRedisScript`)
   - 검증: `QueueAdmissionRepositoryImplIntegrationTest` (Testcontainers Redis)
     - N명을 `enter`시켜 둔 뒤 `admitBatch(count)` 호출 시 `min(count, 대기 인원)`명이 반환되고, 각 유저의 토큰이 `EntryTokenRepository.find`로 조회된다
