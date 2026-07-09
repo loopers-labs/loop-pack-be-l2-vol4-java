@@ -78,7 +78,7 @@
 
 ## Phase 5 — 스케줄러 (5단계)
 
-- [ ] **5.1** `QueueAdmissionScheduler` 본체 + gauge
+- [x] **5.1** `QueueAdmissionScheduler` 본체 + gauge
   - 산출물: `application/queue/QueueAdmissionScheduler.java` — `@Scheduled(fixedDelayString = "${queue.scheduler-interval-ms}")`로 `queueAdmissionRepository.admitBatch(queueProperties.batchSize(), ttl)` 호출(`OutboxRelay`와 동일하게 개별 실패는 삼키고 로그, 다음 tick에 재시도), tick 종료 시 `AtomicLong` 갱신 + `MeterRegistry.gauge("queue.scheduler.last.execution.timestamp", ...)` 등록
   - 패키지 위치 참고: 이 프로젝트의 기존 스케줄러 두 개는 위치가 갈린다 — `OutboxRelay`는 `application/outbox`(도메인 계층인 `OutboxService`/`OutboxEventHandler`만 호출), `PaymentReconciliationScheduler`는 `infrastructure/payment`(도메인 `PaymentService`뿐 아니라 상위 계층인 `PaymentFacade`까지 호출). `QueueAdmissionScheduler`는 도메인 인터페이스(`QueueAdmissionRepository`)만 호출하고 상위 계층(Facade)엔 의존하지 않으므로, 의존 방향이 더 깨끗한 `OutboxRelay` 쪽 배치(`application/queue`)를 따른다. 팀 컨벤션상 `infrastructure/queue`를 선호한다면 이 결정은 뒤집어도 무방하다.
   - 검증: `QueueAdmissionSchedulerIntegrationTest` (Testcontainers Redis) — `@Scheduled` 주기(100ms)에 의존하는 비결정적 테스트를 피하기 위해 스케줄러의 실행 메서드를 테스트에서 **직접 호출**한다.
@@ -86,7 +86,7 @@
     - 실행 후 gauge 값(`queue.scheduler.last.execution.timestamp`)이 실행 시각 근접 값으로 갱신된다(`MeterRegistry`에서 직접 조회하거나 Actuator `/actuator/metrics/...` 엔드포인트로 확인)
   - 의존: 2.1(`QueueAdmissionRepository`), 4.1(`QueueProperties`)
 
-- [ ] **5.2** 스레드풀 경합 예방
+- [x] **5.2** 스레드풀 경합 예방
   - 산출물: `application.yml`에 `spring.task.scheduling.pool.size: 4` 추가([근거](waiting-queue-runbook.md#스케줄러-장애-감지--스레드풀-경합-예방--헬스체크-지표))
   - 검증: **선택/수동** — 설정값 자체는 단위 테스트로 검증할 대상이 없다. `OutboxRelay`(1s)·`PaymentReconciliationScheduler`(5s)·대기열 스케줄러(100ms) 세 스케줄러가 동시에 기동된 상태에서 로그 또는 Actuator로 100ms 주기가 밀리지 않는지 수동 확인한다.
   - 의존: 없음(다른 태스크와 독립적으로 언제든 적용 가능)
@@ -102,7 +102,7 @@
     - `forPosition`은 전달된 값이 그대로 채워진다
   - 의존: 없음
 
-- [ ] **6.2** `QueueFacade`
+- [x] **6.2** `QueueFacade`
   - 산출물: `application/queue/QueueFacade.java` — `enter(String loginId, String loginPw)`, `getPosition(String loginId, String loginPw)`
   - 검증: `QueueFacadeIntegrationTest` (Testcontainers Redis+MySQL, `@AfterEach`에서 `RedisCleanUp.truncateAll()` + `DatabaseCleanUp.truncateAllTables()`)
     - 실제 유저로 `enter` 호출 시 첫 진입자의 `position`이 0이다
@@ -111,7 +111,7 @@
     - 토큰이 없으면 `getPosition().token()`이 `null`이고, `EntryTokenRepository`에 직접 토큰을 세팅해두면 `getPosition().token()`에 그 값이 채워진다
   - 의존: 3.1, 3.2, 4.1
 
-- [ ] **6.3** `QueueV1Controller` + `QueueV1Dto` + `QueueV1ApiSpec`
+- [x] **6.3** `QueueV1Controller` + `QueueV1Dto` + `QueueV1ApiSpec`
   - 산출물: `interfaces/api/queue/QueueV1Controller.java`, `QueueV1Dto.java`(`EnterResponse`, `PositionResponse` — [DTO 설계](waiting-queue-architecture.md#dto-설계) 그대로), `QueueV1ApiSpec.java`
   - 검증: `QueueV1ApiE2ETest` (`@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate`)
     - `POST /api/v1/queue/enter` — 200 + `position` 필드
@@ -119,7 +119,7 @@
     - 필수 인증 헤더(`X-Loopers-LoginId`/`X-Loopers-LoginPw`) 누락 시 400
   - 의존: 6.2
 
-- [ ] **6.4** 수동 검증
+- [x] **6.4** 수동 검증
   - 산출물: `http/commerce-api/queue.http`
   - 검증: **선택/수동** — `enter` → `position` polling → 스케줄러가 토큰을 발급하는 것까지 눈으로 확인. 자동화된 테스트 대상이 아니다.
   - 의존: 6.3, 5.1
@@ -138,21 +138,24 @@
   - 검증: **선택** — Redis 컨테이너 자체를 테스트에서 끄는 것보다, `@MockBean`으로 대체한 `RedisTemplate`(또는 Repository 구현체)이 `DataAccessException`을 던지도록 설정한 뒤 `QueueV1Controller`/`OrderV1Controller` 호출이 503 + `SERVICE_UNAVAILABLE` 코드로 응답하는지 확인하는 슬라이스 테스트로 작성한다.
   - 의존: 7.1
 
-- [ ] **7.3** `OrderFacade`에 `EntryTokenService` 연동
-  - 산출물: `OrderFacade`에 `EntryTokenService` 의존 추가 — `createOrder` 진입 전 `entryTokenService.verify(user.getId())`, 성공 후 `entryTokenService.consume(user.getId())`
+- [x] **7.3** `OrderFacade`에 `EntryTokenService` 연동
+  - 산출물: `OrderFacade`에 `EntryTokenService` 의존 추가 — `createOrder` 진입 전 `entryTokenService.verify(user.getId(), entryToken)`, 성공 후 `entryTokenService.consume(user.getId())`
+  - 구현 주의(초기 구현 이후 수정됨): 최초 구현은 `verify(userId)`로 "토큰 존재 여부"만 확인했는데, `OrderV1Controller`가 헤더로 받은 `entryToken` 값을 `OrderFacade`에 아예 전달하지 않아 클라이언트가 아무 문자열을 보내도 통과하는 결함이 있었다. `verify(userId, token)`으로 시그니처를 바꿔 저장된 토큰과 값이 일치하는지까지 비교하도록 수정했다(커밋 `1732532`).
   - 검증: 기존 `OrderFacadeIntegrationTest`에 케이스 추가(Testcontainers Redis+MySQL 필요 — 클래스 레벨 Import 확장)
     - 토큰을 미리 세팅해둔 유저는 주문에 성공하고, 성공 후 `EntryTokenRepository.find`로 재조회하면 토큰이 사라져 있다(소비 확인)
     - 토큰이 없는 유저는 `CoreException`이 발생하며 `errorType`이 `FORBIDDEN`이다
+    - 저장된 토큰과 다른 값을 보내면 `errorType`이 `FORBIDDEN`이다
   - 의존: 3.2, 기존 `OrderFacadeIntegrationTest`
 
-- [ ] **7.4** `OrderV1Controller` 헤더 추가
-  - 산출물: `OrderV1Controller.createOrder`에 `@RequestHeader(AuthHeaders.ENTRY_TOKEN) String entryToken` 파라미터 추가, `AuthHeaders`에 `ENTRY_TOKEN = "X-Loopers-EntryToken"` 상수 추가
+- [x] **7.4** `OrderV1Controller` 헤더 추가
+  - 산출물: `OrderV1Controller.createOrder`에 `@RequestHeader(AuthHeaders.ENTRY_TOKEN) String entryToken` 파라미터 추가, `AuthHeaders`에 `ENTRY_TOKEN = "X-Loopers-EntryToken"` 상수 추가. 이 값을 `orderFacade.createOrder(...)`에 실제로 전달한다(7.3 참고).
   - 검증: 기존 `OrderV1ApiE2ETest`에 케이스 추가
     - 헤더 자체가 없으면 400(`MissingRequestHeaderException`)
     - 헤더는 있지만 토큰이 없거나 만료됐으면 403
+    - 헤더 값이 저장된 토큰과 다르면 403
   - 의존: 7.3
 
-- [ ] **7.5** 전체 플로우 E2E
+- [x] **7.5** 전체 플로우 E2E
   - 산출물: 없음(테스트 전용 태스크)
   - 검증: `QueueV1ApiE2ETest` 또는 별도 `WaitingQueueOrderFlowE2ETest` — `enter` → `position` polling → 토큰 발급 → `POST /orders` 전체 플로우가 200으로 완결된다.
     - 토큰 발급 단계는 `@Scheduled` 타이밍에 의존하지 않도록 **`QueueAdmissionRepository.admitBatch`를 테스트에서 직접 호출**해 결정론적으로 발급시키는 방식을 권장한다. 실제 스케줄러 타이밍까지 검증하려면 Awaitility 도입이 필요하지만 현재 프로젝트엔 미도입 상태이므로 이번 스코프에서는 다루지 않는다.
@@ -164,19 +167,19 @@
 
 핵심 기능(Phase 1~7)이 전부 통과한 뒤에만 시작한다. 설계 문서 스스로 "실측 데이터 없이는 정밀 튜닝 불가"를 명시하고 있어([근거](waiting-queue-runbook.md#장애-감지-및-복구)), 아래 태스크들은 기본값 채택 + 배선(wiring) 확인 수준에 머문다.
 
-- [ ] **8.1** Resilience4j Circuit Breaker
-  - 산출물: `application.yml`에 `resilience4j.circuitbreaker.instances.<redis용 인스턴스명>` 블록(기존 `paymentRequest`/`paymentQuery` 패턴 참고), Redis 호출부(Repository 구현체)에 `@CircuitBreaker` 적용
-  - 검증: **선택** — 파라미터 자체는 실측 전이라 기본값을 채택하므로 정밀 검증 대상이 아니다. 배선 확인 수준으로, 장애를 유도해(예: mock으로 연속 실패) Open 상태 전환 시 `CallNotPermittedException`이 발생하고 7.2 핸들러가 이를 503으로 변환하는지 정도만 확인한다.
+- [x] **8.1** Resilience4j Circuit Breaker
+  - 산출물: `application.yml`에 `resilience4j.circuitbreaker.instances.redis` 블록(기존 `paymentRequest`/`paymentQuery` 패턴 참고, `record-exceptions: DataAccessException`만 지정하고 threshold/window/wait-duration은 실측 전까지 라이브러리 기본값 채택), `WaitingQueueRepositoryImpl`/`EntryTokenRepositoryImpl`/`QueueAdmissionRepositoryImpl`의 Redis 호출 메서드에 `@CircuitBreaker(name = "redis")` 적용. `ApiControllerAdvice`에 `CallNotPermittedException` → 503 핸들러 추가(런북에서 이미 예고된 항목).
+  - 검증: `ApiControllerAdviceServiceUnavailableTest`에 `returnsServiceUnavailable_whenCircuitBreakerIsOpen` 케이스 추가 — `QueueFacade`가 `CallNotPermittedException`을 던지도록 슬라이스 테스트로 확인.
   - 의존: 1.1, 1.2, 2.1, 7.2
 
-- [ ] **8.2** 주문 API Rate Limit
-  - 산출물: `OrderV1Controller` 또는 필터 레벨에 Resilience4j `RateLimiter`(문턱값 150 TPS) 적용
-  - 검증: **선택/수동** — 짧은 시간 창에 임계치를 초과하는 요청을 보내 초과분이 거부되는지 확인하는 부하성 테스트는 이 테스트 스위트(직렬 실행, Testcontainers 공유)로 안정적으로 재현하기 어렵다. 로컬에서 수동 부하 도구로 확인하는 것을 권장한다.
+- [x] **8.2** 주문 API Rate Limit
+  - 산출물: `application.yml`에 `resilience4j.ratelimiter.instances.orderCreate`(문턱값 150 TPS, `limit-refresh-period: 1s`, `timeout-duration: 0s` — 초과분은 대기 없이 즉시 거부) 추가, `OrderV1Controller.createOrder`에 `@RateLimiter(name = "orderCreate")` 적용. 거부 시 응답을 위해 `ErrorType.TOO_MANY_REQUESTS`(429) 추가하고 `ApiControllerAdvice`에 `RequestNotPermitted` → 429 핸들러 추가.
+  - 검증: `ApiControllerAdviceRateLimitTest` — `OrderFacade`가 `RequestNotPermitted`를 던지도록 슬라이스 테스트로 429/TOO_MANY_REQUESTS 확인. 실제로 150 TPS를 쏟아부어 초과분이 거부되는 부하 테스트는 여전히 **선택/수동**(로컬 부하 도구 권장).
   - 의존: 없음(기능적으로는 8단계 소속이지만 코드 변경은 독립적)
 
-- [ ] **8.3** Prometheus 알림 규칙 + Grafana 대시보드
-  - 산출물: 알림 규칙("마지막 성공 실행으로부터 5~10초 경과"), Grafana 대시보드 정의
-  - 검증: 코드 테스트 대상이 아니다. Prometheus/Grafana에 5.1의 gauge 지표가 스크레이핑되는지 수동 확인한다.
+- [x] **8.3** Prometheus 알림 규칙 + Grafana 대시보드
+  - 산출물: `docker/grafana/rules/queue-scheduler-alerts.yml`(알림 규칙 `QueueSchedulerStalled` — `time() - queue_scheduler_last_execution_timestamp/1000 > 10`), `docker/grafana/prometheus.yml`에 `rule_files` 추가, `docker/monitoring-compose.yml`에 rules 디렉터리 마운트 추가, `docker/grafana/provisioning/dashboards/`에 대시보드 프로비저닝 설정 + `queue-scheduler-dashboard.json`(경과 시간 stat 패널 + raw gauge timeseries 패널), datasource에 고정 `uid: prometheus` 부여.
+  - 검증: **선택/수동** — 코드 테스트 대상이 아니다. `docker-compose -f docker/monitoring-compose.yml up -d` 후 Prometheus `/alerts`에 `QueueSchedulerStalled` 규칙이 로드되는지, Grafana(`localhost:3000`)에 "Waiting Queue Scheduler" 대시보드가 뜨고 5.1의 gauge 지표가 채워지는지 수동 확인 필요(미실행).
   - 의존: 5.1(gauge 지표 존재)
 
 ---
