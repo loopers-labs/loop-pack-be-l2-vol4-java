@@ -2,6 +2,7 @@ package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.queue.QueueAdmissionRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -28,6 +29,7 @@ public class QueueAdmissionRepositoryImpl implements QueueAdmissionRepository {
 
     @Override
     @SuppressWarnings("unchecked")
+    @CircuitBreaker(name = "redis")
     public List<AdmittedEntry> admitBatch(int count, Duration tokenTtl) {
         if (count <= 0) {
             return List.of();

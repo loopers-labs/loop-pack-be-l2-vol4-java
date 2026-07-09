@@ -2,6 +2,7 @@ package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.queue.EntryTokenRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,13 @@ public class EntryTokenRepositoryImpl implements EntryTokenRepository {
     }
 
     @Override
+    @CircuitBreaker(name = "redis")
     public Optional<String> find(Long userId) {
         return Optional.ofNullable(redisTemplate.opsForValue().get(entryTokenKey(userId)));
     }
 
     @Override
+    @CircuitBreaker(name = "redis")
     public void delete(Long userId) {
         masterRedisTemplate.delete(entryTokenKey(userId));
     }

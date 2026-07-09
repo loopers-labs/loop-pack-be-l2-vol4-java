@@ -4,6 +4,7 @@ import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.OrderInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.user.AuthHeaders;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,6 +28,7 @@ public class OrderV1Controller {
     private final OrderFacade orderFacade;
 
     @PostMapping
+    @RateLimiter(name = "orderCreate")
     public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
             @RequestHeader(AuthHeaders.LOGIN_ID) String loginId,
             @RequestHeader(AuthHeaders.LOGIN_PW) String loginPw,

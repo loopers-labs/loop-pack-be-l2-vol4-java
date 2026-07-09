@@ -75,6 +75,19 @@ resilience4j:
         minimum-number-of-calls: 10
         failure-rate-threshold: 60
         wait-duration-in-open-state: 10s
+      redis:                             # 대기열 Redis 호출부(WaitingQueue/EntryToken/QueueAdmission) 공통
+        # 실측 데이터(정상 상태 에러율·실제 Redis 호출 TPS·failover 소요 시간)가 아직 없어(waiting-queue-runbook.md)
+        # threshold/window/wait-duration 등은 라이브러리 기본값을 그대로 채택한다. 실측 확보 후 재튜닝.
+        record-exceptions:
+          - org.springframework.dao.DataAccessException
+  ratelimiter:
+    instances:
+      orderCreate:                       # POST /api/v1/orders — 대기열 계산이 어긋난 상황에 대한 최종 백스톱
+        # 목표 TPS(70)가 아니라 이론적 최대 TPS(150, 안전마진 미적용)를 문턱값으로 사용
+        # (근거: waiting-queue-architecture.md#thundering-herd-완화-전략)
+        limit-for-period: 150
+        limit-refresh-period: 1s
+        timeout-duration: 0s             # 대기 없이 즉시 거부 — 초과 요청을 큐잉하지 않는다
   retry:
     instances:
       paymentRequest:
