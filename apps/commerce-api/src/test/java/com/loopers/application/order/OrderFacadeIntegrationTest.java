@@ -15,6 +15,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.domain.user.Gender;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,6 +48,7 @@ class OrderFacadeIntegrationTest {
 
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Password1!";
+    private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
 
     @Autowired
     private OrderFacade orderFacade;
@@ -81,6 +84,12 @@ class OrderFacadeIntegrationTest {
     private ProductStatsRepository productStatsRepository;
 
     @Autowired
+    private EntryTokenRepository entryTokenRepository;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -92,8 +101,20 @@ class OrderFacadeIntegrationTest {
         redisCleanUp.truncateAll();
     }
 
+    // createOrder는 입장 토큰을 요구하므로(7.3), 기본 saveUser()는 토큰까지 발급해 기존 시나리오(주문 로직 자체 검증)가
+    // 토큰 부재로 인한 FORBIDDEN에 우연히 막히지 않게 한다. 토큰 부재 자체를 검증하는 테스트는 saveUserWithoutToken()을 쓴다.
     private UserModel saveUser() {
+        UserModel user = saveUserWithoutToken();
+        issueEntryToken(user.getId());
+        return user;
+    }
+
+    private UserModel saveUserWithoutToken() {
         return userRepository.save(new UserModel(LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
+    }
+
+    private void issueEntryToken(Long userId) {
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, "test-token");
     }
 
     private ProductModel saveProduct(String name, BigDecimal price) {
@@ -304,6 +325,48 @@ class OrderFacadeIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
+    }
+
+    @DisplayName("입장 토큰을 검증할 때,")
+    @Nested
+    class EntryToken {
+
+        @DisplayName("토큰을 미리 세팅해둔 유저는 주문에 성공하고, 성공 후에는 토큰이 소비되어 사라진다.")
+        @Test
+        void consumesEntryToken_whenOrderSucceeds() {
+            // given
+            UserModel user = saveUser();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+
+            // then
+            assertThat(entryTokenRepository.find(user.getId())).isEmpty();
+        }
+
+        @DisplayName("토큰이 없는 유저는 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenEntryTokenDoesNotExist() {
+            // given
+            saveUserWithoutToken();
+            ProductModel product = saveProduct("상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 1L)
+            );
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
+        }
     }
 
     @DisplayName("주문 목록을 조회할 때,")
@@ -571,6 +634,7 @@ class OrderFacadeIntegrationTest {
                     new OrderFacade.OrderItemDto(product.getId(), 1L)
             );
             orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, issued.getId());
+            issueEntryToken(user.getId()); // 첫 주문에서 소비된 토큰을 재발급해, 이번 검증이 FORBIDDEN이 아닌 CONFLICT에서 막히게 한다.
 
             // when
             CoreException result = assertThrows(CoreException.class,
