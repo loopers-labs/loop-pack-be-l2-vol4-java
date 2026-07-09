@@ -104,7 +104,7 @@ class ConcurrencyTest {
         stockJpaRepository.save(new StockModel(savedProduct, 100));
 
         CouponModel coupon = couponJpaRepository.save(
-            new CouponModel("10% 할인", CouponType.RATE, 10, null, ZonedDateTime.now().plusDays(30))
+            new CouponModel("10% 할인", CouponType.RATE, 10, null, ZonedDateTime.now().plusDays(30), null)
         );
         long userId = 1L;
         UserCouponModel userCoupon = userCouponJpaRepository.save(new UserCouponModel(userId, coupon));
@@ -149,7 +149,7 @@ class ConcurrencyTest {
     @Test
     void concurrentCouponIssuance_onlyOneSucceeds() throws InterruptedException {
         CouponModel coupon = couponJpaRepository.save(
-            new CouponModel("동시발급테스트", CouponType.FIXED, 1_000, null, ZonedDateTime.now().plusDays(30))
+            new CouponModel("동시발급테스트", CouponType.FIXED, 1_000, null, ZonedDateTime.now().plusDays(30), null)
         );
         long userId = 42L;
 
@@ -187,6 +187,55 @@ class ConcurrencyTest {
             .findAllByCouponId(coupon.getId(), PageRequest.of(0, 100))
             .getTotalElements();
         assertThat(dbCount).isEqualTo(1);
+    }
+
+    @DisplayName("선착순 수량 제한 쿠폰에 여러 사용자가 동시에 발급 요청해도 수량을 초과해 발급되지 않는다.")
+    @Test
+    void concurrentLimitedCouponIssuance_neverExceedsQuantity() throws InterruptedException {
+        int totalQuantity = 3;
+        CouponModel coupon = couponJpaRepository.save(
+            new CouponModel("선착순쿠폰", CouponType.FIXED, 1_000, null, ZonedDateTime.now().plusDays(30), totalQuantity)
+        );
+
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger conflictCount = new AtomicInteger();
+
+        for (long userId = 1; userId <= threadCount; userId++) {
+            final long uid = userId;
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    userCouponService.issue(uid, coupon.getId());
+                    successCount.incrementAndGet();
+                } catch (CoreException e) {
+                    if (e.getErrorType() == ErrorType.CONFLICT) {
+                        conflictCount.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        doneLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertThat(successCount.get()).isEqualTo(totalQuantity);
+        assertThat(conflictCount.get()).isEqualTo(threadCount - totalQuantity);
+
+        long dbCount = userCouponJpaRepository
+            .findAllByCouponId(coupon.getId(), PageRequest.of(0, 100))
+            .getTotalElements();
+        assertThat(dbCount).isEqualTo(totalQuantity);
+
+        CouponModel updated = couponJpaRepository.findById(coupon.getId()).orElseThrow();
+        assertThat(updated.getIssuedQuantity()).isEqualTo(totalQuantity);
     }
 
     @DisplayName("동일한 상품에 여러 주문이 동시에 요청되어도 재고 이상으로 주문이 성공하지 않는다.")

@@ -10,9 +10,10 @@ public record CouponCreateCommand(
     CouponType type,
     int value,
     Integer minOrderAmount,
-    ZonedDateTime expiredAt
+    ZonedDateTime expiredAt,
+    Integer totalQuantity
 ) {
     public CouponModel toDomain() {
-        return new CouponModel(name, type, value, minOrderAmount, expiredAt);
+        return new CouponModel(name, type, value, minOrderAmount, expiredAt, totalQuantity);
     }
 }

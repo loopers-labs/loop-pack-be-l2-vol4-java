@@ -42,7 +42,11 @@ class UserCouponServiceIntegrationTest {
     }
 
     private CouponModel saveActiveCoupon() {
-        return couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10, null, FUTURE));
+        return couponJpaRepository.save(new CouponModel("10% 할인", CouponType.RATE, 10, null, FUTURE, null));
+    }
+
+    private CouponModel saveLimitedCoupon(int totalQuantity) {
+        return couponJpaRepository.save(new CouponModel("선착순쿠폰", CouponType.RATE, 10, null, FUTURE, totalQuantity));
     }
 
     @DisplayName("issue()를 호출할 때,")
@@ -97,7 +101,7 @@ class UserCouponServiceIntegrationTest {
         void throwsBadRequest_whenCouponIsExpired() {
             // arrange
             CouponModel expiredCoupon = couponJpaRepository.save(
-                new CouponModel("만료쿠폰", CouponType.FIXED, 1_000, null, PAST));
+                new CouponModel("만료쿠폰", CouponType.FIXED, 1_000, null, PAST, null));
 
             // act
             CoreException result = assertThrows(CoreException.class,
@@ -121,6 +125,35 @@ class UserCouponServiceIntegrationTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         }
+
+        @DisplayName("선착순 수량이 소진된 쿠폰 발급 시도 시 CONFLICT 예외가 발생한다.")
+        @Test
+        void throwsConflict_whenQuantityExhausted() {
+            // arrange
+            CouponModel coupon = saveLimitedCoupon(1);
+            userCouponService.issue(USER_ID, coupon.getId());
+
+            // act
+            CoreException result = assertThrows(CoreException.class,
+                () -> userCouponService.issue(2L, coupon.getId()));
+
+            // assert
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+
+        @DisplayName("선착순 수량이 남아있으면 정상 발급되고 issuedQuantity가 증가한다.")
+        @Test
+        void issuesCoupon_whenQuantityRemains() {
+            // arrange
+            CouponModel coupon = saveLimitedCoupon(2);
+
+            // act
+            userCouponService.issue(USER_ID, coupon.getId());
+
+            // assert
+            CouponModel updated = couponJpaRepository.findById(coupon.getId()).orElseThrow();
+            assertThat(updated.getIssuedQuantity()).isEqualTo(1);
+        }
     }
 
     @DisplayName("getMyCoupons()를 호출할 때,")
@@ -133,7 +166,7 @@ class UserCouponServiceIntegrationTest {
             // arrange
             CouponModel couponA = saveActiveCoupon();
             CouponModel couponB = couponJpaRepository.save(
-                new CouponModel("정액쿠폰", CouponType.FIXED, 5_000, null, FUTURE));
+                new CouponModel("정액쿠폰", CouponType.FIXED, 5_000, null, FUTURE, null));
             userCouponService.issue(USER_ID, couponA.getId());
             userCouponService.issue(USER_ID, couponB.getId());
 
@@ -165,7 +198,7 @@ class UserCouponServiceIntegrationTest {
         void returnsExpiredStatus_whenCouponIsExpired() {
             // arrange — 만료된 쿠폰을 직접 저장 (issue()는 만료 쿠폰을 거부하므로)
             CouponModel expiredCoupon = couponJpaRepository.save(
-                new CouponModel("만료쿠폰", CouponType.FIXED, 1_000, null, PAST));
+                new CouponModel("만료쿠폰", CouponType.FIXED, 1_000, null, PAST, null));
             userCouponJpaRepository.save(new UserCouponModel(USER_ID, expiredCoupon));
 
             // act
@@ -183,7 +216,7 @@ class UserCouponServiceIntegrationTest {
             userCouponService.issue(USER_ID, coupon.getId());
 
             CouponModel anotherCoupon = couponJpaRepository.save(
-                new CouponModel("타인쿠폰", CouponType.FIXED, 1_000, null, FUTURE));
+                new CouponModel("타인쿠폰", CouponType.FIXED, 1_000, null, FUTURE, null));
             userCouponService.issue(99L, anotherCoupon.getId());
 
             // act

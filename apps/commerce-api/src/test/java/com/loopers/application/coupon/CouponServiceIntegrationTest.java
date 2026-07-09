@@ -39,7 +39,7 @@ class CouponServiceIntegrationTest {
     }
 
     private CouponModel saveCoupon(String name, CouponType type, int value) {
-        return couponJpaRepository.save(new CouponModel(name, type, value, null, FUTURE));
+        return couponJpaRepository.save(new CouponModel(name, type, value, null, FUTURE, null));
     }
 
     @DisplayName("create()를 호출할 때,")
@@ -50,7 +50,7 @@ class CouponServiceIntegrationTest {
         @Test
         void savesCoupon_whenValidCommandProvided() {
             // arrange
-            CouponCreateCommand command = new CouponCreateCommand("신규가입 10% 할인", CouponType.RATE, 10, 5_000, FUTURE);
+            CouponCreateCommand command = new CouponCreateCommand("신규가입 10% 할인", CouponType.RATE, 10, 5_000, FUTURE, null);
 
             // act
             CouponInfo result = couponService.create(command);

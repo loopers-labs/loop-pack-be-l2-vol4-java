@@ -6,6 +6,8 @@ import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.event.PaymentCompletedEvent;
+import com.loopers.domain.payment.event.PaymentFailedEvent;
 import com.loopers.infrastructure.pg.PgCallbackPayload;
 import com.loopers.infrastructure.pg.PgPaymentClient;
 import com.loopers.infrastructure.pg.PgPaymentRequest;
@@ -18,10 +20,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -34,6 +38,7 @@ public class PaymentFacade {
     private final PgPaymentClient pgPaymentClient;
     private final TransactionTemplate transactionTemplate;
     private final CircuitBreaker pgPaymentCircuitBreaker;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${pg.callback-url}")
     private String callbackUrl;
@@ -86,6 +91,8 @@ public class PaymentFacade {
             finishPaymentSuccess(payment);
         } else {
             payment.markFailed(payload.reason());
+            eventPublisher.publishEvent(
+                new PaymentFailedEvent(payment.getId(), payment.getOrderId(), payment.getUserId(), payment.getFailureCode()));
         }
     }
 
@@ -119,6 +126,9 @@ public class PaymentFacade {
                 payment.applyPgResult(pg.transactionKey(), pg.status(), pg.reason());
                 if (payment.getStatus() == PaymentStatus.SUCCESS) {
                     confirmOrderFor(payment);
+                } else if (payment.getStatus() == PaymentStatus.FAILED) {
+                    eventPublisher.publishEvent(
+                        new PaymentFailedEvent(payment.getId(), payment.getOrderId(), payment.getUserId(), payment.getFailureCode()));
                 }
             });
             return PaymentInfo.from(paymentRepository.save(payment));
@@ -165,6 +175,12 @@ public class PaymentFacade {
         OrderModel order = orderRepository.findById(payment.getOrderId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "주문을 찾을 수 없습니다."));
         order.confirm();
+
+        List<PaymentCompletedEvent.Item> items = order.getItems().stream()
+            .map(item -> new PaymentCompletedEvent.Item(item.getProductId(), item.getQuantity()))
+            .toList();
+        eventPublisher.publishEvent(
+            new PaymentCompletedEvent(payment.getId(), payment.getOrderId(), payment.getUserId(), items));
     }
 
     /** CB Fallback — OPEN 또는 예외 발생 시 호출 */

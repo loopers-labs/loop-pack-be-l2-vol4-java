@@ -3,6 +3,8 @@ package com.loopers.application.like;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.like.event.ProductLikedEvent;
+import com.loopers.domain.like.event.ProductUnlikedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -36,6 +39,7 @@ class LikeServiceTest {
 
     @Mock private LikeRepository likeRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
@@ -56,9 +60,9 @@ class LikeServiceTest {
     @Nested
     class Like {
 
-        @DisplayName("존재하는 활성 상품에 좋아요 시 LikeModel이 저장되고 likeCount가 증가한다.")
+        @DisplayName("존재하는 활성 상품에 좋아요 시 LikeModel이 저장되고 ProductLikedEvent가 발행된다.")
         @Test
-        void savesLikeAndIncrementsCount_whenProductIsActiveAndNotYetLiked() {
+        void savesLikeAndPublishesEvent_whenProductIsActiveAndNotYetLiked() {
             // arrange
             given(productRepository.findById(PRODUCT_ID)).willReturn(Optional.of(activeProduct));
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(false);
@@ -68,12 +72,12 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should().save(any(LikeModel.class));
-            then(productRepository).should().incrementLikeCount(PRODUCT_ID);
+            then(eventPublisher).should().publishEvent(new ProductLikedEvent(USER_ID, PRODUCT_ID));
         }
 
-        @DisplayName("이미 좋아요한 상품에 재요청 시 저장 없이 정상 처리된다 (멱등).")
+        @DisplayName("이미 좋아요한 상품에 재요청 시 저장 및 이벤트 발행 없이 정상 처리된다 (멱등).")
         @Test
-        void doesNotSaveOrIncrement_whenAlreadyLiked() {
+        void doesNotSaveOrPublishEvent_whenAlreadyLiked() {
             // arrange
             given(productRepository.findById(PRODUCT_ID)).willReturn(Optional.of(activeProduct));
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(true);
@@ -83,7 +87,7 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should(never()).save(any());
-            then(productRepository).should(never()).incrementLikeCount(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
 
         @DisplayName("존재하지 않는 상품에 좋아요 시 NOT_FOUND 예외가 발생한다.")
@@ -100,7 +104,7 @@ class LikeServiceTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             then(likeRepository).should(never()).save(any());
-            then(productRepository).should(never()).incrementLikeCount(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
 
         @DisplayName("삭제된 상품에 좋아요 시 BAD_REQUEST 예외가 발생한다.")
@@ -117,7 +121,7 @@ class LikeServiceTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             then(likeRepository).should(never()).save(any());
-            then(productRepository).should(never()).incrementLikeCount(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
     }
 
@@ -125,9 +129,9 @@ class LikeServiceTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요가 존재하면 삭제되고 likeCount가 감소한다.")
+        @DisplayName("좋아요가 존재하면 삭제되고 ProductUnlikedEvent가 발행된다.")
         @Test
-        void deletesLikeAndDecrementsCount_whenLikeExists() {
+        void deletesLikeAndPublishesEvent_whenLikeExists() {
             // arrange
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(true);
 
@@ -136,12 +140,12 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should().deleteByUserIdAndProductId(USER_ID, PRODUCT_ID);
-            then(productRepository).should().decrementLikeCount(PRODUCT_ID);
+            then(eventPublisher).should().publishEvent(new ProductUnlikedEvent(USER_ID, PRODUCT_ID));
         }
 
-        @DisplayName("이미 취소된 상태에서 재요청 시 삭제 없이 정상 처리된다 (멱등).")
+        @DisplayName("이미 취소된 상태에서 재요청 시 삭제 및 이벤트 발행 없이 정상 처리된다 (멱등).")
         @Test
-        void doesNotDeleteOrDecrement_whenLikeDoesNotExist() {
+        void doesNotDeleteOrPublishEvent_whenLikeDoesNotExist() {
             // arrange
             given(likeRepository.existsByUserIdAndProductId(USER_ID, PRODUCT_ID)).willReturn(false);
 
@@ -150,7 +154,7 @@ class LikeServiceTest {
 
             // assert
             then(likeRepository).should(never()).deleteByUserIdAndProductId(any(), any());
-            then(productRepository).should(never()).decrementLikeCount(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
     }
 

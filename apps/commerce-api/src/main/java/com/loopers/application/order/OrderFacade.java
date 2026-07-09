@@ -5,12 +5,14 @@ import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.order.event.OrderPlacedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -43,6 +45,7 @@ public class OrderFacade {
     private final StockRepository stockRepository;
     private final OrderDomainService orderDomainService;
     private final UserCouponRepository userCouponRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * FR-O-01. 주문 생성
@@ -108,7 +111,9 @@ public class OrderFacade {
         }
 
         // 6. 영속화 (CascadeType.ALL — 주문항목 한 번에 저장)
-        return OrderInfo.from(orderRepository.save(order));
+        OrderModel savedOrder = orderRepository.save(order);
+        eventPublisher.publishEvent(new OrderPlacedEvent(savedOrder.getId(), savedOrder.getUserId()));
+        return OrderInfo.from(savedOrder);
     }
 
     /**

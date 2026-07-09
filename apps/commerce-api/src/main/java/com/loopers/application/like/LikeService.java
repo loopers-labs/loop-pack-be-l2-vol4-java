@@ -3,12 +3,15 @@ package com.loopers.application.like;
 import com.loopers.config.CacheConfig;
 import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.like.event.ProductLikedEvent;
+import com.loopers.domain.like.event.ProductUnlikedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +25,14 @@ public class LikeService {
 
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * FR-L-01. 좋아요 등록 (멱등)
      * - 존재하지 않는 상품 → 404
      * - 삭제된 상품 → 400 (ProductDomainService 위임)
      * - 이미 좋아요한 상품 → 정상 응답 (멱등)
-     * - 신규 좋아요 → products.like_count atomic 증가
+     * - 신규 좋아요 → ProductLikedEvent 발행, products.like_count 집계는 커밋 후 리스너가 반영 (eventual consistency)
      */
     @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
@@ -41,13 +45,13 @@ public class LikeService {
             return; // 이미 좋아요 — 멱등 처리
         }
         likeRepository.save(new LikeModel(userId, productId));
-        productRepository.incrementLikeCount(productId);
+        eventPublisher.publishEvent(new ProductLikedEvent(userId, productId));
     }
 
     /**
      * FR-L-02. 좋아요 취소 (멱등)
      * - 이미 취소된 상태에서 재요청해도 정상 처리
-     * - 좋아요 취소 → products.like_count atomic 감소 (0 미만 방지)
+     * - 좋아요 취소 → ProductUnlikedEvent 발행, products.like_count 집계는 커밋 후 리스너가 반영 (0 미만 방지는 리스너 측 UPDATE 쿼리에서 처리)
      */
     @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#productId")
     @Transactional
@@ -56,7 +60,7 @@ public class LikeService {
             return; // 이미 취소 상태 — 멱등 처리
         }
         likeRepository.deleteByUserIdAndProductId(userId, productId);
-        productRepository.decrementLikeCount(productId);
+        eventPublisher.publishEvent(new ProductUnlikedEvent(userId, productId));
     }
 
     /**

@@ -77,7 +77,7 @@ class OrderFacadeIntegrationTest {
 
     private UserCouponModel saveUserCoupon(Long userId, CouponType type, int value) {
         CouponModel coupon = couponJpaRepository.save(
-            new CouponModel("테스트쿠폰", type, value, null, FUTURE));
+            new CouponModel("테스트쿠폰", type, value, null, FUTURE, null));
         return userCouponJpaRepository.save(new UserCouponModel(userId, coupon));
     }
 
@@ -277,7 +277,7 @@ class OrderFacadeIntegrationTest {
         void throwsBadRequest_whenCouponIsExpired() {
             // arrange — 만료된 쿠폰을 직접 저장
             CouponModel expiredCoupon = couponJpaRepository.save(
-                new CouponModel("만료쿠폰", CouponType.RATE, 10, null, PAST));
+                new CouponModel("만료쿠폰", CouponType.RATE, 10, null, PAST, null));
             UserCouponModel userCoupon = userCouponJpaRepository.save(
                 new UserCouponModel(USER_ID, expiredCoupon));
 

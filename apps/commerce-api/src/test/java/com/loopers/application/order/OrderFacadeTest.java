@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderDomainService;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.order.event.OrderPlacedEvent;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockRepository;
@@ -19,6 +20,7 @@ import com.loopers.domain.coupon.UserCouponRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -45,6 +47,7 @@ class OrderFacadeTest {
     @Mock private StockRepository stockRepository;
     @Mock private OrderDomainService orderDomainService;
     @Mock private UserCouponRepository userCouponRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
@@ -80,6 +83,7 @@ class OrderFacadeTest {
             // assert
             then(stockRepository).should().decreaseStock(PRODUCT_ID, 2);
             then(orderDomainService).should().buildOrder(eq(USER_ID), any(), any());
+            then(eventPublisher).should().publishEvent(any(OrderPlacedEvent.class));
             assertAll(
                 () -> assertThat(result.userId()).isEqualTo(USER_ID),
                 () -> assertThat(result.status()).isEqualTo(OrderStatus.PENDING)
@@ -101,6 +105,7 @@ class OrderFacadeTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
             then(orderRepository).should(never()).save(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
 
         @DisplayName("재고가 부족한 경우 (affected = 0) BAD_REQUEST 예외가 발생한다.")
@@ -119,6 +124,7 @@ class OrderFacadeTest {
             // assert
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
             then(orderRepository).should(never()).save(any());
+            then(eventPublisher).should(never()).publishEvent(any());
         }
 
         @DisplayName("주문 항목이 비어있으면 BAD_REQUEST 예외가 발생한다.")

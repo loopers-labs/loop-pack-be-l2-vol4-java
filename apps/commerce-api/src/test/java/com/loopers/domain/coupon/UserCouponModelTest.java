@@ -18,11 +18,11 @@ class UserCouponModelTest {
     private static final ZonedDateTime PAST = ZonedDateTime.now().minusDays(1);
 
     private CouponModel activeCoupon() {
-        return new CouponModel("10% 할인", CouponType.RATE, 10, null, FUTURE);
+        return new CouponModel("10% 할인", CouponType.RATE, 10, null, FUTURE, null);
     }
 
     private CouponModel expiredCoupon() {
-        return new CouponModel("만료쿠폰", CouponType.RATE, 10, null, PAST);
+        return new CouponModel("만료쿠폰", CouponType.RATE, 10, null, PAST, null);
     }
 
     @DisplayName("UserCouponModel 생성 시,")

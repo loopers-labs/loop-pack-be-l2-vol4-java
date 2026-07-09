@@ -2,8 +2,10 @@ package com.loopers.interfaces.api.coupon;
 
 import com.loopers.application.coupon.CouponCreateCommand;
 import com.loopers.application.coupon.CouponInfo;
+import com.loopers.application.coupon.CouponIssueRequestInfo;
 import com.loopers.application.coupon.CouponUpdateCommand;
 import com.loopers.application.coupon.UserCouponInfo;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponStatus;
 import jakarta.validation.constraints.Min;
@@ -19,10 +21,11 @@ public class CouponV1Dto {
         @NotNull CouponType type,
         @Min(1) int value,
         @Min(0) Integer minOrderAmount,
-        @NotNull ZonedDateTime expiredAt
+        @NotNull ZonedDateTime expiredAt,
+        @Min(1) Integer totalQuantity
     ) {
         public CouponCreateCommand toCommand() {
-            return new CouponCreateCommand(name, type, value, minOrderAmount, expiredAt);
+            return new CouponCreateCommand(name, type, value, minOrderAmount, expiredAt, totalQuantity);
         }
     }
 
@@ -45,12 +48,15 @@ public class CouponV1Dto {
         int value,
         Integer minOrderAmount,
         ZonedDateTime expiredAt,
+        Integer totalQuantity,
+        int issuedQuantity,
         ZonedDateTime createdAt
     ) {
         public static CouponResponse from(CouponInfo info) {
             return new CouponResponse(
                 info.id(), info.name(), info.type(), info.value(),
-                info.minOrderAmount(), info.expiredAt(), info.createdAt()
+                info.minOrderAmount(), info.expiredAt(),
+                info.totalQuantity(), info.issuedQuantity(), info.createdAt()
             );
         }
     }
@@ -67,6 +73,24 @@ public class CouponV1Dto {
                 info.id(), info.userId(),
                 CouponResponse.from(info.coupon()),
                 info.status(),
+                info.createdAt()
+            );
+        }
+    }
+
+    public record IssueRequestResponse(
+        Long id,
+        Long userId,
+        Long couponId,
+        CouponIssueRequestStatus status,
+        String failureReason,
+        Long userCouponId,
+        ZonedDateTime createdAt
+    ) {
+        public static IssueRequestResponse from(CouponIssueRequestInfo info) {
+            return new IssueRequestResponse(
+                info.id(), info.userId(), info.couponId(),
+                info.status(), info.failureReason(), info.userCouponId(),
                 info.createdAt()
             );
         }

@@ -12,6 +12,8 @@ public record CouponInfo(
     int value,
     Integer minOrderAmount,
     ZonedDateTime expiredAt,
+    Integer totalQuantity,
+    int issuedQuantity,
     ZonedDateTime createdAt
 ) {
     public static CouponInfo from(CouponModel model) {
@@ -22,6 +24,8 @@ public record CouponInfo(
             model.getValue(),
             model.getMinOrderAmount(),
             model.getExpiredAt(),
+            model.getTotalQuantity(),
+            model.getIssuedQuantity(),
             model.getCreatedAt()
         );
     }

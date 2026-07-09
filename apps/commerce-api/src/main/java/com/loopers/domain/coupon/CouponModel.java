@@ -34,16 +34,27 @@ public class CouponModel extends BaseEntity {
     @Column(name = "expired_at", nullable = false)
     private ZonedDateTime expiredAt;
 
+    // null이면 수량 제한 없음(무제한 발급). 값이 있으면 선착순 발급 한도.
+    @Column(name = "total_quantity")
+    private Integer totalQuantity;
+
+    @Column(name = "issued_quantity", nullable = false)
+    private int issuedQuantity;
+
     protected CouponModel() {}
 
-    public CouponModel(String name, CouponType type, int value, Integer minOrderAmount, ZonedDateTime expiredAt) {
+    public CouponModel(String name, CouponType type, int value, Integer minOrderAmount, ZonedDateTime expiredAt,
+                        Integer totalQuantity) {
         validate(name, type, value, expiredAt);
         validateMinOrderAmount(minOrderAmount);
+        validateTotalQuantity(totalQuantity);
         this.name = name;
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
+        this.totalQuantity = totalQuantity;
+        this.issuedQuantity = 0;
     }
 
     public void update(String name, CouponType type, int value, Integer minOrderAmount, ZonedDateTime expiredAt) {
@@ -83,6 +94,12 @@ public class CouponModel extends BaseEntity {
     private static void validateMinOrderAmount(Integer minOrderAmount) {
         if (minOrderAmount != null && minOrderAmount <= 0) {
             throw new CoreException(ErrorType.BAD_REQUEST, "최소 주문 금액은 0보다 커야 합니다.");
+        }
+    }
+
+    private static void validateTotalQuantity(Integer totalQuantity) {
+        if (totalQuantity != null && totalQuantity <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "발급 수량 제한은 0보다 커야 합니다.");
         }
     }
 

@@ -1,5 +1,6 @@
 package com.loopers.application.payment;
 
+import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderStatus;
@@ -7,6 +8,8 @@ import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
 import com.loopers.domain.payment.PaymentStatus;
+import com.loopers.domain.payment.event.PaymentCompletedEvent;
+import com.loopers.domain.payment.event.PaymentFailedEvent;
 import com.loopers.infrastructure.pg.PgCallbackPayload;
 import com.loopers.infrastructure.pg.PgPaymentClient;
 import com.loopers.infrastructure.pg.PgPaymentResult;
@@ -24,11 +27,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -52,6 +57,7 @@ class PaymentFacadeTest {
     @Mock private PgPaymentClient pgPaymentClient;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CircuitBreaker pgPaymentCircuitBreaker;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private static final Long USER_ID  = 1L;
     private static final Long ORDER_ID  = 10L;
@@ -235,6 +241,27 @@ class PaymentFacadeTest {
             // assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+            then(eventPublisher).should().publishEvent(new PaymentCompletedEvent(PAYMENT_ID, ORDER_ID, USER_ID, List.of()));
+        }
+
+        @Test
+        @DisplayName("주문에 상품이 포함된 경우 PaymentCompletedEvent에 상품별 수량이 함께 전달된다.")
+        void publishesEventWithItems_whenOrderHasItems() {
+            // arrange
+            PaymentModel payment = createPaymentWithStatus(PaymentStatus.IN_PROGRESS);
+            OrderModel order = createOrder();
+            order.addItem(new OrderItemModel(order, 1L, "상품A", 5_000, "브랜드", 2));
+            order.addItem(new OrderItemModel(order, 2L, "상품B", 3_000, "브랜드", 1));
+
+            given(paymentRepository.findByPgTransactionId("TX-EXISTING")).willReturn(Optional.of(payment));
+            given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
+
+            // act
+            paymentFacade.handleCallback(new PgCallbackPayload("TX-EXISTING", null, "SUCCESS", null));
+
+            // assert
+            then(eventPublisher).should().publishEvent(new PaymentCompletedEvent(PAYMENT_ID, ORDER_ID, USER_ID,
+                List.of(new PaymentCompletedEvent.Item(1L, 2), new PaymentCompletedEvent.Item(2L, 1))));
         }
 
         @Test
@@ -250,6 +277,7 @@ class PaymentFacadeTest {
             // assert
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
             assertThat(payment.getFailureCode()).isEqualTo("LIMIT_EXCEEDED");
+            then(eventPublisher).should().publishEvent(new PaymentFailedEvent(PAYMENT_ID, ORDER_ID, USER_ID, "LIMIT_EXCEEDED"));
         }
 
         @Test
@@ -306,6 +334,27 @@ class PaymentFacadeTest {
             // assert
             assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+            then(eventPublisher).should().publishEvent(new PaymentCompletedEvent(PAYMENT_ID, ORDER_ID, USER_ID, List.of()));
+        }
+
+        @Test
+        @DisplayName("IN_PROGRESS 상태에서 PG FAILED 응답 수신 시 FAILED로 전환되고 PaymentFailedEvent가 발행된다.")
+        void transitionsToFailed_whenInProgressAndPgFails() {
+            // arrange
+            PaymentModel payment = createPaymentWithStatus(PaymentStatus.IN_PROGRESS);
+
+            given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+            given(paymentRepository.save(any())).willReturn(payment);
+            given(pgPaymentClient.getStatus("TX-EXISTING", USER_ID))
+                .willReturn(Optional.of(new PgTransactionResponse("TX-EXISTING", "FAILED", "LIMIT_EXCEEDED")));
+
+            // act
+            PaymentInfo result = paymentFacade.syncPayment(PAYMENT_ID, USER_ID);
+
+            // assert
+            assertThat(result.status()).isEqualTo(PaymentStatus.FAILED);
+            then(orderRepository).should(never()).findById(any());
+            then(eventPublisher).should().publishEvent(new PaymentFailedEvent(PAYMENT_ID, ORDER_ID, USER_ID, "LIMIT_EXCEEDED"));
         }
 
         @Test

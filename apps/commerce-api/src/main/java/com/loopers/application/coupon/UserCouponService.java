@@ -37,6 +37,10 @@ public class UserCouponService {
             throw new CoreException(ErrorType.CONFLICT, "이미 발급받은 쿠폰입니다.");
         }
 
+        if (couponRepository.incrementIssuedQuantity(couponId) == 0) {
+            throw new CoreException(ErrorType.CONFLICT, "쿠폰이 모두 소진되었습니다.");
+        }
+
         try {
             return UserCouponInfo.from(userCouponRepository.save(new UserCouponModel(userId, coupon)));
         } catch (DataIntegrityViolationException e) {
