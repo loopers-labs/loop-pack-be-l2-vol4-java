@@ -13,7 +13,7 @@
 
 ## Phase 1 — Redis 연산 계층 (1단계)
 
-- [ ] **1.1** `WaitingQueueRepository` + `WaitingQueueRepositoryImpl`
+- [x] **1.1** `WaitingQueueRepository` + `WaitingQueueRepositoryImpl`
   - 산출물: `domain/queue/WaitingQueueRepository.java`(`enter`, `rank`, `size`), `infrastructure/queue/WaitingQueueRepositoryImpl.java`
   - 구현 주의: [Redis 키·연산 매핑](waiting-queue-architecture.md#redis-키연산-매핑)에 따르면 `enter()`는 Master 템플릿으로 `ZADD` 실행 직후 같은 Master 템플릿으로 `ZRANK`까지 조회해 그 순번(`Long`)을 반환해야 한다(read-your-own-write). `enter`의 반환형 옆 주석(`// ZADD`)을 "ZADD 원시 반환값(추가된 개수)"으로 오독하지 않도록 주의 — 실제로는 `ZADD` 실행 후 `ZRANK`까지 마친 결과다.
   - 검증: `WaitingQueueRepositoryImplIntegrationTest` (Testcontainers Redis)
@@ -23,7 +23,7 @@
     - `size()`가 `ZCARD`와 일치한다
   - 의존: 없음 (`:modules:redis` testFixtures의 `RedisTestContainersConfig`/`RedisCleanUp` 존재 확인만 선행)
 
-- [ ] **1.2** `EntryTokenRepository` + `EntryTokenRepositoryImpl`
+- [x] **1.2** `EntryTokenRepository` + `EntryTokenRepositoryImpl`
   - 산출물: `domain/queue/EntryTokenRepository.java`(`find`, `delete`), `infrastructure/queue/EntryTokenRepositoryImpl.java`
   - 검증: `EntryTokenRepositoryImplIntegrationTest` (Testcontainers Redis) — 이 시점엔 발급(`issue`) 로직이 아직 없으므로(Phase 2에서 `QueueAdmissionRepository`가 전담) 테스트에서 `RedisTemplate.opsForValue().set(...)`으로 토큰을 직접 세팅한다.
     - 세팅된 토큰이 `find`로 조회된다
