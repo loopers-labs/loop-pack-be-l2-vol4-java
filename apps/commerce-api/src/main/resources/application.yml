@@ -93,4 +93,4 @@ spring:
 
 queue:
   scheduler:
-    interval-ms: 3600000
+    enabled: false
