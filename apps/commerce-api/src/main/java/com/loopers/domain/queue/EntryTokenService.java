@@ -18,7 +18,7 @@ public class EntryTokenService {
     }
 
     public void verify(Long userId) {
-        entryTokenRepository.find(userId)
+        find(userId)
                 .orElseThrow(() -> new CoreException(ErrorType.FORBIDDEN, "입장 토큰이 없거나 만료되었습니다. 대기열을 통해 다시 진입해주세요."));
     }
 
