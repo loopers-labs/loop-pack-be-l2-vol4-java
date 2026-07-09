@@ -35,6 +35,10 @@ payment-gateway:
   callback-url: http://localhost:8080/api/v1/payments/callback
   user-id: loopers                                            # PG 는 X-USER-ID 헤더만 요구 — 모든 호출에 동일 값 사용(조회 일관성)
 
+queue:
+  scheduler-interval-ms: 100  # 스케줄러 실행 주기 (waiting-queue-capacity-planning.md 산정치)
+  throughput-per-second: 70   # 목표 TPS — estimatedWaitSeconds 계산과 공유
+
 # Feign 타임아웃 (Connect/Read) — 자동 재시도는 끄고(Retryer.NEVER_RETRY) resilience4j 로 일원화
 feign:
   client:
