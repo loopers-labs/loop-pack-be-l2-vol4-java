@@ -2,21 +2,25 @@ package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.queue.EntryTokenRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-@RequiredArgsConstructor
 @Component
 public class EntryTokenRepositoryImpl implements EntryTokenRepository {
 
     private final RedisTemplate<String, String> redisTemplate;
-
-    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private final RedisTemplate<String, String> masterRedisTemplate;
+
+    public EntryTokenRepositoryImpl(
+            RedisTemplate<String, String> redisTemplate,
+            @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> masterRedisTemplate
+    ) {
+        this.redisTemplate = redisTemplate;
+        this.masterRedisTemplate = masterRedisTemplate;
+    }
 
     @Override
     public Optional<String> find(Long userId) {

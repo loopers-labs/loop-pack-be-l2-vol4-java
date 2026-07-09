@@ -2,19 +2,23 @@ package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.queue.WaitingQueueRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-@RequiredArgsConstructor
 @Component
 public class WaitingQueueRepositoryImpl implements WaitingQueueRepository {
 
     private final RedisTemplate<String, String> redisTemplate;
-
-    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private final RedisTemplate<String, String> masterRedisTemplate;
+
+    public WaitingQueueRepositoryImpl(
+            RedisTemplate<String, String> redisTemplate,
+            @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> masterRedisTemplate
+    ) {
+        this.redisTemplate = redisTemplate;
+        this.masterRedisTemplate = masterRedisTemplate;
+    }
 
     @Override
     public Long enter(Long userId, long timestampMillis) {

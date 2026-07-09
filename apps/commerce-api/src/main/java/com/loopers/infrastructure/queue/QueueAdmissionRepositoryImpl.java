@@ -2,7 +2,6 @@ package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.queue.QueueAdmissionRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -14,14 +13,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@RequiredArgsConstructor
 @Component
 public class QueueAdmissionRepositoryImpl implements QueueAdmissionRepository {
 
     private static final DefaultRedisScript<List> ADMIT_BATCH_SCRIPT = loadScript();
 
-    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private final RedisTemplate<String, String> masterRedisTemplate;
+
+    public QueueAdmissionRepositoryImpl(
+            @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> masterRedisTemplate
+    ) {
+        this.masterRedisTemplate = masterRedisTemplate;
+    }
 
     @Override
     @SuppressWarnings("unchecked")
