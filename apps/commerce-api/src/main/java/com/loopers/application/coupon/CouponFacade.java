@@ -28,6 +28,14 @@ public class CouponFacade {
         return userCouponService.save(new UserCouponModel(memberId, templateId));
     }
 
+    public CouponTemplateModel validateTemplate(Long templateId) {
+        var template = couponTemplateService.getById(templateId);
+        if (!template.canIssue()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "발급할 수 없는 쿠폰입니다.");
+        }
+        return template;
+    }
+
     public List<UserCouponInfo> getMyCoupons(Long memberId) {
         return userCouponService.getMyCoupons(memberId);
     }

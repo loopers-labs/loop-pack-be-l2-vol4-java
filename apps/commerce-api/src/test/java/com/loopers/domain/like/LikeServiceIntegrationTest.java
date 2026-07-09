@@ -1,6 +1,7 @@
 package com.loopers.domain.like;
 
 import com.loopers.application.like.LikeService;
+import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductLikeViewModel;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -22,6 +23,9 @@ class LikeServiceIntegrationTest {
     private LikeService likeService;
 
     @Autowired
+    private LikeRepository likeRepository;
+
+    @Autowired
     private ProductJpaRepository productJpaRepository;
 
     @Autowired
@@ -39,9 +43,9 @@ class LikeServiceIntegrationTest {
     @Nested
     class Like {
 
-        @DisplayName("likeCount 증가가 DB에 실제로 반영된다.")
+        @DisplayName("Like가 DB에 저장된다.")
         @Test
-        void like_incrementsLikeCount_atDbLevel() {
+        void like_savesLike_atDbLevel() {
             // arrange
             ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
             productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
@@ -51,8 +55,7 @@ class LikeServiceIntegrationTest {
             likeService.like(memberId, product.getId());
 
             // assert
-            ProductLikeViewModel updated = productLikeViewJpaRepository.findById(product.getId()).orElseThrow();
-            assertThat(updated.getLikeCount()).isEqualTo(1);
+            assertThat(likeRepository.findByMemberIdAndProductId(memberId, product.getId())).isPresent();
         }
     }
 
@@ -60,9 +63,9 @@ class LikeServiceIntegrationTest {
     @Nested
     class Unlike {
 
-        @DisplayName("likeCount 감소가 DB에 실제로 반영된다.")
+        @DisplayName("Like가 DB에서 삭제된다.")
         @Test
-        void unlike_decrementsLikeCount_atDbLevel() {
+        void unlike_deletesLike_atDbLevel() {
             // arrange
             ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, 1L));
             productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
@@ -73,8 +76,7 @@ class LikeServiceIntegrationTest {
             likeService.unlike(memberId, product.getId());
 
             // assert
-            ProductLikeViewModel updated = productLikeViewJpaRepository.findById(product.getId()).orElseThrow();
-            assertThat(updated.getLikeCount()).isZero();
+            assertThat(likeRepository.findByMemberIdAndProductId(memberId, product.getId())).isEmpty();
         }
     }
 }

@@ -12,6 +12,8 @@ import com.loopers.domain.product.ProductSort;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,25 +36,26 @@ class LikeServiceTest {
     private FakeLikeRepository fakeLikeRepository;
     private FakeProductRepository fakeProductRepository;
     private FakeProductLikeViewRepository fakeProductLikeViewRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
         fakeLikeRepository = new FakeLikeRepository();
         fakeProductRepository = new FakeProductRepository();
         fakeProductLikeViewRepository = new FakeProductLikeViewRepository();
-        likeService = new LikeService(fakeLikeRepository, fakeProductRepository, fakeProductLikeViewRepository);
+        eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
+        likeService = new LikeService(fakeLikeRepository, fakeProductRepository, fakeProductLikeViewRepository, eventPublisher);
     }
 
     @DisplayName("좋아요를 등록할 때,")
     @Nested
     class Like {
 
-        @DisplayName("좋아요 등록 시, Like가 저장되고 likeCount가 1 증가한다.")
+        @DisplayName("좋아요 등록 시, Like가 저장된다.")
         @Test
-        void like_savesLike_andIncrementsLikeCount() {
+        void like_savesLike_whenCalled() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
-            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
 
             // act
@@ -60,15 +63,13 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.existsByMemberIdAndProductId(memberId, product.getId())).isTrue();
-            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
         }
 
-        @DisplayName("이미 좋아요한 상품에 재등록 시, 멱등 처리되어 likeCount가 변하지 않는다.")
+        @DisplayName("이미 좋아요한 상품에 재등록 시, 멱등 처리된다.")
         @Test
-        void like_returnsOk_whenAlreadyLiked() {
+        void like_isIdempotent_whenAlreadyLiked() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
-            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product.getId());
 
@@ -77,7 +78,6 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.countByMemberIdAndProductId(memberId, product.getId())).isEqualTo(1);
-            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
         }
     }
 
@@ -85,12 +85,11 @@ class LikeServiceTest {
     @Nested
     class Unlike {
 
-        @DisplayName("좋아요 취소 시, Like가 삭제되고 likeCount가 1 감소한다.")
+        @DisplayName("좋아요 취소 시, Like가 삭제된다.")
         @Test
-        void unlike_deletesLike_andDecrementsLikeCount() {
+        void unlike_deletesLike_whenCalled() {
             // arrange
             ProductModel product = fakeProductRepository.save(new ProductModel("에어포스1", 139000L, 1L));
-            fakeProductLikeViewRepository.save(new ProductLikeViewModel(product.getId()));
             Long memberId = 1L;
             likeService.like(memberId, product.getId());
 
@@ -99,7 +98,6 @@ class LikeServiceTest {
 
             // assert
             assertThat(fakeLikeRepository.existsByMemberIdAndProductId(memberId, product.getId())).isFalse();
-            assertThat(fakeProductLikeViewRepository.findByProductId(product.getId()).orElseThrow().getLikeCount()).isZero();
         }
 
         @DisplayName("좋아요하지 않은 상품을 취소하면, NOT_FOUND 예외가 발생한다.")

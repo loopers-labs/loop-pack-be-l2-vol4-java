@@ -7,9 +7,12 @@ import com.loopers.domain.product.ProductLikeViewModel;
 import com.loopers.domain.product.ProductLikeViewRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.interfaces.event.like.LikedEvent;
+import com.loopers.interfaces.event.like.UnlikedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class LikeService {
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
     private final ProductLikeViewRepository productLikeViewRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void like(Long memberId, Long productId) {
@@ -42,9 +46,7 @@ public class LikeService {
         } catch (DataIntegrityViolationException e) {
             return;
         }
-        ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
-            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
-        view.increment();
+        eventPublisher.publishEvent(new LikedEvent(memberId, productId));
     }
 
     @Transactional
@@ -56,6 +58,18 @@ public class LikeService {
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 상품을 찾을 수 없습니다."));
 
         likeRepository.delete(like);
+        eventPublisher.publishEvent(new UnlikedEvent(memberId, productId));
+    }
+
+    @Transactional
+    public void incrementLikeCount(Long productId) {
+        ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
+        view.increment();
+    }
+
+    @Transactional
+    public void decrementLikeCount(Long productId) {
         ProductLikeViewModel view = productLikeViewRepository.findByProductIdForUpdate(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "[productId = " + productId + "] 좋아요 수 정보를 찾을 수 없습니다."));
         view.decrement();

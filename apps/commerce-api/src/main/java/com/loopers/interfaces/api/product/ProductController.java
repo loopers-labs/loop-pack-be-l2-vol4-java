@@ -4,8 +4,10 @@ import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.event.product.ProductViewedEvent;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import java.util.List;
 public class ProductController {
 
     private final ProductFacade productFacade;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ─── Public API ───────────────────────────────────────────
 
@@ -38,8 +41,12 @@ public class ProductController {
     }
 
     @GetMapping("/api/v1/products/{productId}")
-    public ApiResponse<ProductDto.ProductResponse> getProduct(@PathVariable Long productId) {
+    public ApiResponse<ProductDto.ProductResponse> getProduct(
+        @PathVariable Long productId,
+        @RequestAttribute(value = "userId", required = false) Long userId
+    ) {
         ProductInfo info = productFacade.getProduct(productId);
+        eventPublisher.publishEvent(new ProductViewedEvent(productId, userId));
         return ApiResponse.success(ProductDto.ProductResponse.from(info));
     }
 

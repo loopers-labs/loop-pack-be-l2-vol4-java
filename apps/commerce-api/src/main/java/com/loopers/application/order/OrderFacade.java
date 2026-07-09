@@ -8,9 +8,11 @@ import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.order.OrderItemModel;
 import com.loopers.domain.order.OrderModel;
+import com.loopers.interfaces.event.order.OrderCreatedEvent;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class OrderFacade {
     private final UserCouponService userCouponService;
     private final CouponTemplateService couponTemplateService;
     private final CouponDomainService couponDomainService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo createOrder(Long memberId, List<OrderItemCommand> items, Long couponId) {
@@ -49,6 +52,7 @@ public class OrderFacade {
         long discountAmount = couponDomainService.calculateDiscount(template, originalAmount);
         var order = orderService.create(memberId, items, couponId, originalAmount, discountAmount);
         var orderItems = orderService.getItemsByOrderId(order.getId());
+        eventPublisher.publishEvent(OrderCreatedEvent.from(order, orderItems));
         return OrderInfo.of(order, orderItems);
     }
 

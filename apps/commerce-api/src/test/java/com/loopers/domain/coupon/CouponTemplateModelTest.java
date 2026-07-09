@@ -188,6 +188,67 @@ class CouponTemplateModelTest {
         }
     }
 
+    @DisplayName("선착순 수량을 설정할 때,")
+    @Nested
+    class TotalCount {
+
+        @DisplayName("totalCount가 null이면 수량 제한 없이 생성된다.")
+        @Test
+        void create_nullTotalCount_unlimited() {
+            CouponTemplateModel template = new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), null
+            );
+            assertThat(template.getTotalCount()).isNull();
+        }
+
+        @DisplayName("totalCount가 양수이면 정상 생성된다.")
+        @Test
+        void create_positiveTotalCount_success() {
+            CouponTemplateModel template = new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), 100L
+            );
+            assertThat(template.getTotalCount()).isEqualTo(100L);
+        }
+
+        @DisplayName("totalCount가 0 이하이면 BAD_REQUEST 예외가 발생한다.")
+        @Test
+        void create_zeroOrNegativeTotalCount_throwsBadRequest() {
+            assertThatThrownBy(() -> new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), 0L
+            ))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("발급된 수량이 totalCount 미만이면 isSoldOut()이 false를 반환한다.")
+        @Test
+        void isSoldOut_underLimit_returnsFalse() {
+            CouponTemplateModel template = new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), 100L
+            );
+            assertThat(template.isSoldOut(99L)).isFalse();
+        }
+
+        @DisplayName("발급된 수량이 totalCount 이상이면 isSoldOut()이 true를 반환한다.")
+        @Test
+        void isSoldOut_atOrOverLimit_returnsTrue() {
+            CouponTemplateModel template = new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), 100L
+            );
+            assertThat(template.isSoldOut(100L)).isTrue();
+        }
+
+        @DisplayName("totalCount가 null(무제한)이면 isSoldOut()이 항상 false를 반환한다.")
+        @Test
+        void isSoldOut_unlimitedTotalCount_alwaysFalse() {
+            CouponTemplateModel template = new CouponTemplateModel(
+                "쿠폰", CouponType.FIXED, 1000L, null, LocalDateTime.now().plusDays(7), null
+            );
+            assertThat(template.isSoldOut(999999L)).isFalse();
+        }
+    }
+
     @DisplayName("발급 가능 여부를 확인할 때,")
     @Nested
     class CanIssue {

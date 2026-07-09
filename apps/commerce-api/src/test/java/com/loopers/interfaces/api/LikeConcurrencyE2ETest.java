@@ -90,6 +90,7 @@ class LikeConcurrencyE2ETest {
             f.get();
         }
         executor.shutdown();
+        Thread.sleep(3000); // wait for async event handlers to complete
 
         // assert
         ProductLikeViewModel result = productLikeViewJpaRepository.findById(savedProduct.getId()).orElseThrow();
@@ -128,6 +129,7 @@ class LikeConcurrencyE2ETest {
             f.get();
         }
         executor.shutdown();
+        Thread.sleep(3000); // wait for async event handlers to complete
 
         // assert
         ProductLikeViewModel result = productLikeViewJpaRepository.findById(savedProduct.getId()).orElseThrow();

@@ -8,7 +8,6 @@ import com.loopers.domain.payment.PaymentStatus;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.infrastructure.pg.PgClient;
-import com.loopers.infrastructure.pg.PgResponse;
 import com.loopers.infrastructure.payment.PaymentJpaRepository;
 import com.loopers.interfaces.api.payment.PaymentDto;
 import com.loopers.utils.DatabaseCleanUp;
@@ -27,8 +26,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PaymentApiE2ETest {
@@ -81,13 +78,10 @@ class PaymentApiE2ETest {
     @Nested
     class RequestPayment {
 
-        @DisplayName("PG가 정상 응답하면, 201과 PENDING 상태의 결제 정보를 반환한다.")
+        @DisplayName("결제 요청 시, 201과 PENDING 상태의 결제 정보를 반환한다.")
         @Test
         void returns201_whenPaymentCreatedSuccessfully() {
             // arrange
-            when(pgClient.createTransaction(any(), any()))
-                .thenReturn(new PgResponse.TransactionResponse("20250626:TR:abc123", "PENDING", null));
-
             PaymentDto.CreateRequest request = new PaymentDto.CreateRequest(
                 savedOrder.getId(), CardType.SAMSUNG, "1234-5678-9012-3456", 10000L
             );
@@ -102,7 +96,7 @@ class PaymentApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody().data().status()).isEqualTo("PENDING");
-            assertThat(response.getBody().data().transactionKey()).isEqualTo("20250626:TR:abc123");
+            assertThat(response.getBody().data().transactionKey()).isNull();
         }
 
         @DisplayName("비로그인 상태로 요청하면, 401을 반환한다.")

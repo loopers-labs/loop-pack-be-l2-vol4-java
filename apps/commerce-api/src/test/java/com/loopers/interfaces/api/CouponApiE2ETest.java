@@ -75,9 +75,9 @@ class CouponApiE2ETest {
     @Nested
     class IssueCoupon {
 
-        @DisplayName("발급 가능한 템플릿으로 요청하면 201과 userCouponId가 반환된다.")
+        @DisplayName("발급 가능한 템플릿으로 요청하면 202가 반환된다.")
         @Test
-        void returns201_whenTemplateCanIssue() {
+        void returns202_whenTemplateCanIssue() {
             // arrange
             var template = couponTemplateJpaRepository.save(
                 new com.loopers.domain.coupon.CouponTemplateModel("10% 할인", CouponType.RATE, 10L, null, LocalDateTime.now().plusDays(7)));
@@ -86,38 +86,12 @@ class CouponApiE2ETest {
             var response = testRestTemplate.exchange(
                 ISSUE_URL, HttpMethod.POST,
                 new HttpEntity<>(userHeaders),
-                new ParameterizedTypeReference<ApiResponse<CouponDto.IssueResponse>>() {},
+                new ParameterizedTypeReference<ApiResponse<Void>>() {},
                 template.getId()
             );
 
             // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-            assertThat(response.getBody().data().userCouponId()).isNotNull();
-        }
-
-        @DisplayName("같은 템플릿을 중복 발급하면 409가 반환된다.")
-        @Test
-        void returns409_whenDuplicateIssue() {
-            // arrange
-            var template = couponTemplateJpaRepository.save(
-                new com.loopers.domain.coupon.CouponTemplateModel("10% 할인", CouponType.RATE, 10L, null, LocalDateTime.now().plusDays(7)));
-            testRestTemplate.exchange(
-                ISSUE_URL, HttpMethod.POST,
-                new HttpEntity<>(userHeaders),
-                new ParameterizedTypeReference<ApiResponse<CouponDto.IssueResponse>>() {},
-                template.getId()
-            );
-
-            // act
-            var response = testRestTemplate.exchange(
-                ISSUE_URL, HttpMethod.POST,
-                new HttpEntity<>(userHeaders),
-                new ParameterizedTypeReference<ApiResponse<CouponDto.IssueResponse>>() {},
-                template.getId()
-            );
-
-            // assert
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         }
 
         @DisplayName("isActive=false 템플릿으로 발급하면 400이 반환된다.")

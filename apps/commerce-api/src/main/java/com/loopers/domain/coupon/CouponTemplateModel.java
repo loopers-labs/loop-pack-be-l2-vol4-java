@@ -37,9 +37,16 @@ public class CouponTemplateModel extends BaseEntity {
     @Column(name = "is_blocked", nullable = false)
     private boolean isBlocked;
 
+    @Column(name = "total_count")
+    private Long totalCount;
+
     protected CouponTemplateModel() {}
 
     public CouponTemplateModel(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt) {
+        this(name, type, value, minOrderAmount, expiredAt, null);
+    }
+
+    public CouponTemplateModel(String name, CouponType type, Long value, Long minOrderAmount, LocalDateTime expiredAt, Long totalCount) {
         if (name == null || name.isBlank()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 이름은 필수입니다.");
         }
@@ -58,12 +65,21 @@ public class CouponTemplateModel extends BaseEntity {
         if (!expiredAt.isAfter(LocalDateTime.now())) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료 일시는 현재 시각 이후여야 합니다.");
         }
+        if (totalCount != null && totalCount <= 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "발급 수량은 0보다 커야 합니다.");
+        }
         this.name = name;
         this.type = type;
         this.value = value;
         this.minOrderAmount = minOrderAmount;
         this.expiredAt = expiredAt;
         this.isActive = true;
+        this.totalCount = totalCount;
+    }
+
+    public boolean isSoldOut(long issuedCount) {
+        if (totalCount == null) return false;
+        return issuedCount >= totalCount;
     }
 
     public void update(String name, boolean isActive) {
@@ -109,5 +125,9 @@ public class CouponTemplateModel extends BaseEntity {
 
     public boolean isActive() {
         return isActive;
+    }
+
+    public Long getTotalCount() {
+        return totalCount;
     }
 }

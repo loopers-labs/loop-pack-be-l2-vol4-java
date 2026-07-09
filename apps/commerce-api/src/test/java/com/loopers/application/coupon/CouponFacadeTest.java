@@ -136,6 +136,16 @@ class CouponFacadeTest {
             throw new UnsupportedOperationException();
         }
 
+        @Override
+        public long countByTemplateId(Long templateId) {
+            return store.values().stream().filter(uc -> uc.getTemplateId().equals(templateId)).count();
+        }
+
+        @Override
+        public boolean existsByMemberIdAndTemplateId(Long memberId, Long templateId) {
+            return store.values().stream().anyMatch(uc -> uc.getMemberId().equals(memberId) && uc.getTemplateId().equals(templateId));
+        }
+
         private void setId(UserCouponModel model, long id) {
             try {
                 var field = com.loopers.domain.BaseEntity.class.getDeclaredField("id");
