@@ -31,13 +31,13 @@ class WaitingQueueServiceTest {
         void returnsRepositoryRank_whenUserEnters() {
             // given
             Long userId = 1L;
-            Long expectedRank = 42L;
+            WaitingQueueRank expectedRank = new WaitingQueueRank(42L);
             // enter()가 내부에서 Instant.now()를 캡처해 넘기므로 타임스탬프 값은 테스트에서 미리 알 수 없다 —
             // 이 위치에만 예외적으로 matcher를 쓴다(BrandServiceTest의 save(any(BrandModel.class))와 동일한 이유)
             when(waitingQueueRepository.enter(eq(userId), anyLong())).thenReturn(expectedRank);
 
             // when
-            Long result = waitingQueueService.enter(userId);
+            WaitingQueueRank result = waitingQueueService.enter(userId);
 
             // then
             assertThat(result).isEqualTo(expectedRank);
@@ -53,11 +53,11 @@ class WaitingQueueServiceTest {
         void returnsRepositoryRank_whenRankIsRequested() {
             // given
             Long userId = 1L;
-            Long expectedRank = 7L;
+            WaitingQueueRank expectedRank = new WaitingQueueRank(7L);
             when(waitingQueueRepository.rank(userId)).thenReturn(expectedRank);
 
             // when
-            Long result = waitingQueueService.getRank(userId);
+            WaitingQueueRank result = waitingQueueService.getRank(userId);
 
             // then
             assertThat(result).isEqualTo(expectedRank);

@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.queue;
 
+import com.loopers.domain.queue.WaitingQueueRank;
 import com.loopers.domain.queue.WaitingQueueRepository;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -36,10 +37,10 @@ class WaitingQueueRepositoryImplIntegrationTest {
             Long userId = 1L;
 
             // when
-            Long rank = waitingQueueRepository.enter(userId, 1_000L);
+            WaitingQueueRank rank = waitingQueueRepository.enter(userId, 1_000L);
 
             // then
-            assertThat(rank).isZero();
+            assertThat(rank.value()).isZero();
         }
 
         @DisplayName("먼저 진입한 유저의 순번이 나중에 진입한 유저보다 작다.")
@@ -50,11 +51,11 @@ class WaitingQueueRepositoryImplIntegrationTest {
             Long secondUserId = 2L;
 
             // when
-            Long firstRank = waitingQueueRepository.enter(firstUserId, 1_000L);
-            Long secondRank = waitingQueueRepository.enter(secondUserId, 2_000L);
+            WaitingQueueRank firstRank = waitingQueueRepository.enter(firstUserId, 1_000L);
+            WaitingQueueRank secondRank = waitingQueueRepository.enter(secondUserId, 2_000L);
 
             // then
-            assertThat(firstRank).isLessThan(secondRank);
+            assertThat(firstRank.value()).isLessThan(secondRank.value());
         }
 
         @DisplayName("이미 대기열에 있는 유저가 재진입하면, 최신 시각 기준으로 순번이 뒤로 밀린다.")
@@ -67,11 +68,11 @@ class WaitingQueueRepositoryImplIntegrationTest {
             waitingQueueRepository.enter(secondUserId, 2_000L);
 
             // when
-            Long reEnteredRank = waitingQueueRepository.enter(firstUserId, 3_000L);
+            WaitingQueueRank reEnteredRank = waitingQueueRepository.enter(firstUserId, 3_000L);
 
             // then
-            assertThat(reEnteredRank).isEqualTo(1L);
-            assertThat(waitingQueueRepository.rank(secondUserId)).isZero();
+            assertThat(reEnteredRank.value()).isEqualTo(1L);
+            assertThat(waitingQueueRepository.rank(secondUserId).value()).isZero();
         }
     }
 

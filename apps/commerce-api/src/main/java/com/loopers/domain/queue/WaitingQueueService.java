@@ -11,12 +11,12 @@ public class WaitingQueueService {
 
     private final WaitingQueueRepository waitingQueueRepository;
 
-    public Long enter(Long userId) {
+    public WaitingQueueRank enter(Long userId) {
         long timestampMillis = Instant.now().toEpochMilli();
         return waitingQueueRepository.enter(userId, timestampMillis);
     }
 
-    public Long getRank(Long userId) {
+    public WaitingQueueRank getRank(Long userId) {
         return waitingQueueRepository.rank(userId);
     }
 

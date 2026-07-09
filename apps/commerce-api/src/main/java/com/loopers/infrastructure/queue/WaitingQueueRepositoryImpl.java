@@ -1,6 +1,7 @@
 package com.loopers.infrastructure.queue;
 
 import com.loopers.config.redis.RedisConfig;
+import com.loopers.domain.queue.WaitingQueueRank;
 import com.loopers.domain.queue.WaitingQueueRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -21,15 +22,17 @@ public class WaitingQueueRepositoryImpl implements WaitingQueueRepository {
     }
 
     @Override
-    public Long enter(Long userId, long timestampMillis) {
+    public WaitingQueueRank enter(Long userId, long timestampMillis) {
         String member = String.valueOf(userId);
         masterRedisTemplate.opsForZSet().add(QueueRedisKeys.WAITING_QUEUE_KEY, member, timestampMillis);
-        return masterRedisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, member);
+        Long rank = masterRedisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, member);
+        return rank == null ? null : new WaitingQueueRank(rank);
     }
 
     @Override
-    public Long rank(Long userId) {
-        return redisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, String.valueOf(userId));
+    public WaitingQueueRank rank(Long userId) {
+        Long rank = redisTemplate.opsForZSet().rank(QueueRedisKeys.WAITING_QUEUE_KEY, String.valueOf(userId));
+        return rank == null ? null : new WaitingQueueRank(rank);
     }
 
     @Override
