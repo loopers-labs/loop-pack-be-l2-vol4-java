@@ -61,4 +61,45 @@ class ProductStockRepositoryIntegrationTest {
         assertThat(found).isPresent();
         assertThat(found.get().getQuantity()).isEqualTo(50);
     }
+
+    @Test
+    @DisplayName("decreaseStock 는 재고가 충분하면 1을 반환하고 수량을 차감한다")
+    void givenEnoughStock_whenDecreaseStock_thenReturnsOneAndDecrements() {
+        productStockRepository.save(ProductStock.create(1L, 50));
+
+        int affected = productStockRepository.decreaseStock(1L, 30);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(productStockRepository.findByProductId(1L).orElseThrow().getQuantity()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("decreaseStock 는 재고와 같은 수량이면 정확히 0까지 차감한다")
+    void givenStockEqualToQty_whenDecreaseStock_thenDecrementsToZero() {
+        productStockRepository.save(ProductStock.create(1L, 5));
+
+        int affected = productStockRepository.decreaseStock(1L, 5);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(productStockRepository.findByProductId(1L).orElseThrow().getQuantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("decreaseStock 는 재고가 부족하면 0을 반환하고 수량을 그대로 둔다")
+    void givenInsufficientStock_whenDecreaseStock_thenReturnsZeroAndKeepsQuantity() {
+        productStockRepository.save(ProductStock.create(1L, 5));
+
+        int affected = productStockRepository.decreaseStock(1L, 10);
+
+        assertThat(affected).isZero();
+        assertThat(productStockRepository.findByProductId(1L).orElseThrow().getQuantity()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("decreaseStock 는 존재하지 않는 상품이면 0을 반환한다")
+    void givenNonExistingProduct_whenDecreaseStock_thenReturnsZero() {
+        int affected = productStockRepository.decreaseStock(999L, 1);
+
+        assertThat(affected).isZero();
+    }
 }
