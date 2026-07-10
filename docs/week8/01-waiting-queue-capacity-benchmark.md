@@ -24,6 +24,15 @@
 - `management.server.port=0`이므로 management 서버도 충돌 없는 임의 포트를 사용한다.
 - Redis 테스트 픽스처는 현재 고정 버전이 아닌 mutable `redis:latest` 이미지를 사용한다. 이미지가 바뀐 시점의 결과끼리는 직접 비교하지 않는 편이 안전하다.
 
+## 운영 적용 범위와 P1 이연 위험
+
+이 벤치마크는 운영 scheduler를 끄고 단일 JUnit pacing harness로 입장시킨다. 따라서 다음 운영 장애·다중 인스턴스 위험은 측정하지 않는다.
+
+- `ZPOPMIN`과 사용자별 입장 토큰 `SET`은 별도 명령이다. 두 명령 사이에 프로세스가 종료되면 사용자가 대기열에서는 제거되고 토큰은 발급받지 못할 수 있다.
+- 모든 API 인스턴스가 scheduler를 실행한다. `ZPOPMIN`이 동일 사용자의 중복 pop은 막지만, 전체 입장 속도는 API 인스턴스 수에 따라 증가한다.
+
+현재 과제 경로는 P0인 FIFO 공정성과 입장 토큰 재사용 방지를 먼저 해결한다. 위 항목은 Round 8에서 의도적으로 이연한 P1이며, 이번 벤치마크로 해결 또는 검증을 완료한 것으로 보지 않는다. 대안과 향후 검증 기준은 [`02-waiting-queue-benchmark-results.md`](./02-waiting-queue-benchmark-results.md#의도적으로-이연한-p1-운영-리스크)에 기록한다.
+
 ## 실행 명령
 
 ### 기본 실험
