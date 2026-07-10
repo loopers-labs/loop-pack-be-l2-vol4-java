@@ -1,6 +1,6 @@
 # 대기열 시스템 — 용량 산정
 
-> 이 문서는 `waiting-queue-design.md`(원본, 통합본)를 단일 책임 원칙 관점에서 3개로 분리한 것 중 **"용량 산정"** 파트입니다. 코드 구조가 아니라 **수치(TPS, 배치 크기, 안전 마진)** 중심이라, 실측 데이터가 들어올 때마다 이 문서만 갱신하면 되도록 분리했습니다.
+> 대기열 설계 논의를 단일 책임 원칙 관점에서 3개 문서로 나눈 것 중 **"용량 산정"** 파트입니다. 코드 구조가 아니라 **수치(TPS, 배치 크기, 안전 마진)** 중심이라, 실측 데이터가 들어올 때마다 이 문서만 갱신하면 되도록 분리했습니다.
 >
 > - 아키텍처·API·코드 구조: [waiting-queue-architecture.md](waiting-queue-architecture.md)
 > - 장애 대응·운영: [waiting-queue-runbook.md](waiting-queue-runbook.md)
@@ -59,7 +59,11 @@ queue:
 
 ```java
 @ConfigurationProperties(prefix = "queue")
-public record QueueProperties(long schedulerIntervalMs, long throughputPerSecond) {
+public record QueueProperties(
+        long schedulerIntervalMs,
+        long throughputPerSecond,
+        @DefaultValue("true") boolean schedulerEnabled
+) {
     public int batchSize() {
         return (int) (throughputPerSecond * schedulerIntervalMs / 1000);
     }
@@ -68,6 +72,7 @@ public record QueueProperties(long schedulerIntervalMs, long throughputPerSecond
 
 - 스케줄러: `@Scheduled(fixedDelayString = "${queue.scheduler-interval-ms}")` + `queueProperties.batchSize()`로 N을 매번 파생 계산(하드코딩하지 않음)
 - `QueueFacade.getPosition()`: `queueProperties.throughputPerSecond()`로 나눠 ETA 계산(코드는 [설계 문서: application/queue](waiting-queue-architecture.md#applicationqueue--queuefacade가-필요한-이유) 참고)
+- `schedulerEnabled`(기본값 `true`)는 배치 크기·ETA 계산과는 무관한 설정으로, `test` 프로필에서만 `false`로 오버라이드해 테스트 중 자동 tick을 끈다(근거는 [설계 문서: 테스트에서 자동 tick을 끄는 방법](waiting-queue-architecture.md#테스트에서-자동-tick을-끄는-방법--프로퍼티-vs-개별-mock) 참고) — 이 문서가 다루는 "TPS/배치 크기 산정"과는 다른 관심사이므로 값 자체의 산정 근거는 없다
 
 ---
 

@@ -84,6 +84,7 @@
   - 검증: `QueueAdmissionSchedulerIntegrationTest` (Testcontainers Redis) — `@Scheduled` 주기(100ms)에 의존하는 비결정적 테스트를 피하기 위해 스케줄러의 실행 메서드를 테스트에서 **직접 호출**한다.
     - N명을 `enter`시켜 둔 뒤 실행 메서드를 호출하면 `batchSize()`만큼만 토큰이 발급되고 대기열에서 빠진다
     - 실행 후 gauge 값(`queue.scheduler.last.execution.timestamp`)이 실행 시각 근접 값으로 갱신된다(`MeterRegistry`에서 직접 조회하거나 Actuator `/actuator/metrics/...` 엔드포인트로 확인)
+  - 구현 주의(초기 구현 이후 수정됨): 직접 호출만으로는 부족했다 — 100ms 자동 tick이 테스트 중에도 그대로 살아있어, 이 테스트를 포함한 큐 관련 테스트 4개(`QueueAdmissionSchedulerIntegrationTest`, `QueueFacadeIntegrationTest`, `QueueV1ApiE2ETest`, `WaitingQueueOrderFlowE2ETest`)에 `@MockitoBean(name = "taskScheduler")`로 자동 tick을 개별 무력화하는 방식으로 시작했다. 그런데 이 mock 조합이 Spring 테스트 컨텍스트 캐시에서 이 4개만 별도 컨텍스트로 격리시켰고, mock하지 않은 나머지 수십 개의 `@SpringBootTest`는 진짜 스케줄러가 살아있는 컨텍스트를 공유했다. `RedisTestContainersConfig`의 Redis 컨테이너가 `static final`로 테스트 JVM 전체에 공유되다 보니, `./gradlew test`로 전체 스위트를 돌릴 때만 그 살아있는 스케줄러가 공유 Redis의 대기열 상태를 실제로 건드려 큐 테스트가 비결정적으로 실패했다(개별 실행하면 통과). `QueueProperties.schedulerEnabled`(`test` 프로필에서 `false`)로 자동 tick 자체를 프로퍼티로 끄고 개별 mock 4개를 모두 제거해 해결했다 — 자세한 배경은 [설계 문서: 테스트에서 자동 tick을 끄는 방법](waiting-queue-architecture.md#테스트에서-자동-tick을-끄는-방법--프로퍼티-vs-개별-mock) 참고.
   - 의존: 2.1(`QueueAdmissionRepository`), 4.1(`QueueProperties`)
 
 - [x] **5.2** 스레드풀 경합 예방
@@ -213,3 +214,4 @@ graph LR
 ## 다음 논의 항목 (TODO)
 
 - [ ] 실측 데이터(정상 상태 에러율·실제 Redis 호출 TPS·failover 소요 시간) 확보 후 Phase 8 파라미터 재튜닝
+- [ ] 실제 부하테스트로 Rate Limit 문턱값(150 TPS) 초과 시 거부 동작 검증(현재는 8.2 슬라이스 테스트로 429 변환 로직만 확인)

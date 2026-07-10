@@ -1,6 +1,6 @@
 # 대기열 시스템 — 운영 Runbook
 
-> 이 문서는 `waiting-queue-design.md`(원본, 통합본)를 단일 책임 원칙 관점에서 3개로 분리한 것 중 **"운영 Runbook"** 파트입니다. 장애 대응·모니터링·알림처럼 **온콜 상황에서 빠르게 훑어봐야 하는 내용**을 모읍니다. "왜 이렇게 만들었는가"보다 "지금 뭘 해야 하는가"에 최적화합니다.
+> 대기열 설계 논의를 단일 책임 원칙 관점에서 3개 문서로 나눈 것 중 **"운영 Runbook"** 파트입니다. 장애 대응·모니터링·알림처럼 **온콜 상황에서 빠르게 훑어봐야 하는 내용**을 모읍니다. "왜 이렇게 만들었는가"보다 "지금 뭘 해야 하는가"에 최적화합니다.
 >
 > - 아키텍처·API·코드 구조: [waiting-queue-architecture.md](waiting-queue-architecture.md)
 > - 용량·수치 계산: [waiting-queue-capacity-planning.md](waiting-queue-capacity-planning.md)
@@ -69,7 +69,7 @@ SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILAB
 
 ### 장애 감지 및 복구
 
-Spring Boot Actuator의 Redis `HealthIndicator`를 기반으로, Resilience4j Circuit Breaker로 Redis 호출부를 감싸는 방향을 검토한다 — Redis 응답 없음을 빠르게 감지해 즉시 차단 응답을 주고, 복구가 감지되면 자동으로 정상 흐름을 재개한다.
+Spring Boot Actuator의 Redis `HealthIndicator`에 더해, Resilience4j Circuit Breaker(`@CircuitBreaker(name = "redis")`)로 `WaitingQueueRepositoryImpl`/`EntryTokenRepositoryImpl`/`QueueAdmissionRepositoryImpl`의 Redis 호출부를 감쌌다 — Redis 응답 없음을 빠르게 감지해 즉시 차단 응답(`ErrorType.SERVICE_UNAVAILABLE`, 아래 참고)을 주고, 복구가 감지되면 자동으로 정상 흐름을 재개한다.
 
 **Circuit Breaker 파라미터(`failureRateThreshold`, `slidingWindowSize`, `waitDurationInOpenState` 등)를 정하는 근거**: 이런 값들은 표준값을 그대로 가져다 쓰는 게 아니라 보통 세 가지 실측 데이터에서 역산한다.
 
@@ -79,10 +79,24 @@ Spring Boot Actuator의 Redis `HealthIndicator`를 기반으로, Resilience4j Ci
 
 **오탐 vs 미탐 트레이드오프**: 셋 다 공통으로, 오탐(너무 예민해서 멀쩡한데 차단)과 미탐(너무 둔감해서 진짜 장애를 못 잡음) 중 뭘 더 감수할지 정해야 하는데, [p95 대신 p99를 쓴 이유](waiting-queue-capacity-planning.md#스케줄러-실행-주기--배치-크기n-산정)와 같은 논리로 **미탐 쪽 비용(장애를 못 잡아 DB까지 부하가 번짐)이 오탐 쪽 비용(멀쩡한데 살짝 일찍 차단)보다 훨씬 크므로, 더 예민한(sensitive) 쪽으로 기울인다.**
 
-**결정**: 위 세 가지 근거를 뒷받침할 실측 데이터(정상 상태 에러율, 실제 Redis 호출 TPS, 실제 failover 소요 시간)가 이 프로젝트엔 아직 없다. 그래서 **실측 전까지는 Resilience4j 기본값을 채택**하고, 운영 중 관찰되는 실제 에러율·호출량으로 추후 튜닝한다.
+**결정 및 적용 상태**: 위 세 가지 근거를 뒷받침할 실측 데이터(정상 상태 에러율, 실제 Redis 호출 TPS, 실제 failover 소요 시간)가 이 프로젝트엔 아직 없다. 그래서 **실측 전까지는 Resilience4j 기본값을 채택**했다 — `application.yml`의 `resilience4j.circuitbreaker.instances.redis`에는 `record-exceptions: DataAccessException`만 지정하고 `failureRateThreshold`/`slidingWindowSize`/`waitDurationInOpenState` 등은 라이브러리 기본값 그대로다. 운영 중 관찰되는 실제 에러율·호출량으로 추후 튜닝한다.
+
+---
+
+## 주문 API Rate Limit — 429
+
+`POST /api/v1/orders`에 `@RateLimiter(name = "orderCreate")`를 적용했다. 대기열이 아무리 정확해도 스케줄러 로직 버그나 대기열 대상이 아닌 다른 엔드포인트發 pool 고갈은 대기열 쪽에서 막을 수 없어서, 주문 API 자체에 거는 최종 백스톱이다(채택 근거는 [설계 문서: Thundering Herd 완화 전략](waiting-queue-architecture.md#thundering-herd-완화-전략--3가지-후보-중-선택) 참고).
+
+**설정**: `limit-for-period: 150`(목표 TPS 70이 아니라 이론적 최대 TPS — 정상 트래픽에서는 발동하지 않도록 여유를 둠), `limit-refresh-period: 1s`, `timeout-duration: 0s`(대기 없이 즉시 거부, 초과 요청을 큐잉하지 않음). 거부되면 `RequestNotPermitted`가 발생하고 `ApiControllerAdvice`가 `ErrorType.TOO_MANY_REQUESTS`(429)로 변환한다.
+
+**온콜에서 429 급증을 봤을 때 확인 순서**:
+1. 정상 트래픽 범위(목표 TPS 70 근처)인데 429가 보이면 이 Rate Limit이 아니라 대기열/스케줄러 로직 버그를 먼저 의심한다 — 정상 트래픽에서 발동하도록 설계된 게 아니다.
+2. 스케줄러 헬스체크 gauge(`queue.scheduler.last.execution.timestamp`)가 정상 갱신 중인지 확인한다 — 스케줄러가 멈추면 대기열이 안 빠지고 쌓이다 한꺼번에 몰려 429가 튈 수 있다.
+3. 정말 트래픽이 폭증한 상황이라면 429는 설계대로 동작하는 것 — 알림 임계치를 낮추기보다 배치 크기(N)·목표 TPS 재산정을 검토한다([용량 산정 문서](waiting-queue-capacity-planning.md) 참고).
 
 ---
 
 ## 다음 논의 항목 (TODO)
 
 - [ ] 실측 데이터(정상 상태 에러율·실제 Redis 호출 TPS·failover 소요 시간) 확보 후 Circuit Breaker 파라미터 재튜닝 — [용량 산정 문서](waiting-queue-capacity-planning.md)의 TPS 실측치와 함께 갱신
+- [ ] 실제 부하테스트로 Rate Limit 문턱값(150 TPS) 초과 시 거부 동작 검증(현재는 슬라이스 테스트로 429 변환 로직만 확인, 실제 부하는 미검증)

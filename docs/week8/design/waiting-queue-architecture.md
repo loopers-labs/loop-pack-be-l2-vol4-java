@@ -1,6 +1,6 @@
 # 대기열 시스템 — 아키텍처 & 상세 설계
 
-> 이 문서는 `waiting-queue-design.md`(원본, 통합본)를 단일 책임 원칙 관점에서 3개로 분리한 것 중 **"설계 문서"** 파트입니다. 아키텍처 결정 · API 계약 · 코드 구조(도메인 모델, Redis 매핑)처럼 **구현을 이해/진행하는 개발자**가 읽는 내용을 모읍니다.
+> 대기열 설계 논의를 단일 책임 원칙 관점에서 3개 문서로 나눈 것 중 **"설계 문서"** 파트입니다. 아키텍처 결정 · API 계약 · 코드 구조(도메인 모델, Redis 매핑)처럼 **구현을 이해/진행하는 개발자**가 읽는 내용을 모읍니다.
 >
 > - 용량·수치 계산: [waiting-queue-capacity-planning.md](waiting-queue-capacity-planning.md)
 > - 장애 대응·운영: [waiting-queue-runbook.md](waiting-queue-runbook.md)
@@ -79,7 +79,7 @@
 | `GET /api/v1/queue/position` | 신규 | 순번 조회 (polling) |
 | `POST /api/v1/orders` | 기존 수정 | 입장 토큰 헤더 검증 추가 |
 
-스케줄러(대기열에서 N명씩 꺼내 토큰 발급)는 API가 아니라 내부 배치(`@Scheduled`)이며, `PaymentReconciliationScheduler`/`OutboxRelay`와 동일한 `fixedDelay` + 예외 격리 패턴을 따를 예정이다.
+스케줄러(대기열에서 N명씩 꺼내 토큰 발급)는 API가 아니라 내부 배치(`@Scheduled`)이며, `PaymentReconciliationScheduler`/`OutboxRelay`와 동일한 `fixedDelay` + 예외 격리 패턴을 따른다(`QueueAdmissionScheduler`).
 
 ---
 
@@ -246,10 +246,11 @@ Redis의 두 자료구조(ZSET, String+TTL)가 서로 다른 생명주기를 가
 
 ```
 domain/queue/
+  WaitingQueueRank (record)  — long value (0-based rank). 생성자에서 음수 방어(CoreException/BAD_REQUEST)
   WaitingQueueRepository (interface)  — queue:waiting-queue ZSET
-    Long enter(Long userId, long timestampMillis)  // ZADD
-    Long rank(Long userId)                          // ZRANK
-    Long size()                                     // ZCARD
+    WaitingQueueRank enter(Long userId, long timestampMillis)  // ZADD 직후 같은 Master 템플릿으로 ZRANK까지 조회
+    WaitingQueueRank rank(Long userId)                          // ZRANK
+    Long size()                                                 // ZCARD
   WaitingQueueService (@Component)
 
   EntryTokenRepository (interface)    — queue:entry-token:{userId} String+TTL
@@ -270,32 +271,38 @@ domain/queue/
 
 `POST /queue/enter`, `GET /queue/position` 모두 `X-Loopers-LoginId`/`X-Loopers-LoginPw` → `UserService.getLoginUser()`로 userId를 확인하는 과정이 선행되어야 한다(`OrderFacade.createOrder`와 동일 패턴). 즉 두 엔드포인트 모두 `user` 도메인과 `queue` 도메인(`WaitingQueueService`, `EntryTokenService`)을 조합하는 유스케이스이므로, Facade 없이 Controller가 domain Service를 직접 호출하는 방식(예: `CouponAdminV1Controller`가 단순 CRUD에 `CouponTemplateService`를 직접 쓰는 경우)은 적용할 수 없다.
 
-```
-application/queue/
-  QueueFacade (@Component)
+```java
+// application/queue/QueueFacade.java (실제 소스 그대로)
+public class QueueFacade {
+
     private final UserService userService;
     private final WaitingQueueService waitingQueueService;
     private final EntryTokenService entryTokenService;
     private final QueueProperties queueProperties;
 
-    QueueInfo enter(String loginId, String loginPw) {
+    public QueueInfo enter(String loginId, String loginPw) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
-        Long rank = waitingQueueService.enter(user.getId());
-        return QueueInfo.forEnter(rank);
+        WaitingQueueRank rank = waitingQueueService.enter(user.getId());
+        return QueueInfo.forEnter(rank.value());
     }
 
-    QueueInfo getPosition(String loginId, String loginPw) {
+    public QueueInfo getPosition(String loginId, String loginPw) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
-        Long rank = waitingQueueService.getRank(user.getId());
+        WaitingQueueRank rank = waitingQueueService.getRank(user.getId());
         Long size = waitingQueueService.size();
         String token = entryTokenService.find(user.getId()).orElse(null);
-        // estimatedWaitSeconds 계산식은 용량 산정 문서의 estimatedWaitSeconds 계산 섹션 참고
-        Long estimatedWaitSeconds = (long) Math.ceil((double) rank / queueProperties.throughputPerSecond());
-        return QueueInfo.forPosition(rank, size, estimatedWaitSeconds, token);
-    }
 
-  QueueInfo (record) — position, totalWaiting(nullable), estimatedWaitSeconds(nullable), token(nullable)
+        // 이미 발급받아 대기열(ZSET)에서 빠진 유저는 rank가 null이다 — 더 이상 기다릴 필요가 없으므로 position 0으로 취급한다.
+        long position = rank != null ? rank.value() : 0L;
+        long estimatedWaitSeconds = (long) Math.ceil((double) position / queueProperties.throughputPerSecond());
+        return QueueInfo.forPosition(position, size, estimatedWaitSeconds, token);
+    }
+}
 ```
+
+`getRank()`가 반환하는 `WaitingQueueRank`는 스케줄러가 이미 `admitBatch`로 꺼내가 대기열(ZSET)에 더 이상 없는 유저에 대해서는 `null`이다 — 이 케이스를 `position = 0`으로 명시적으로 처리하지 않으면 `estimatedWaitSeconds` 계산에서 `NullPointerException`이 난다.
+
+`application/queue/QueueInfo` (record) — position, totalWaiting(nullable), estimatedWaitSeconds(nullable), token(nullable)
 
 `QueueProperties`(`@ConfigurationProperties`)와 `estimatedWaitSeconds` 계산식 자체의 근거는 [용량 산정 문서](waiting-queue-capacity-planning.md)에서 다룬다 — 이 값이 실측 데이터로 갱신될 때 코드 구조(이 문서)를 안 건드리고 숫자만 바꿀 수 있도록 분리했다.
 
@@ -363,3 +370,26 @@ Redis 전용 domain interface + infrastructure impl 패턴은 이 프로젝트�
 **해결**: `admit-batch.lua` 스크립트로 `ZPOPMIN`+`SET ... EX`를 하나의 원자적 실행으로 묶는다(`QueueAdmissionRepository.admitBatch`, 자세한 구조는 [도메인 모델 설계](#domainqueue-패키지-구성) 참고). Redis는 싱글 스레드라 스크립트 실행 중에는 다른 클라이언트의 어떤 명령도 끼어들 수 없어서, 외부에서 관측 가능한 상태는 "대기 중(토큰 없음)" 또는 "빠져나감+토큰 있음" 둘 중 하나뿐이다. 네트워크 관점에서도 앱→Redis 왕복이 1번으로 줄어, 스크립트가 Redis에 도달해 실행되면 반드시 끝까지 완료되고(중간에 네트워크가 개입할 지점이 없음), 애초에 도달하지 못하면 `ZPOPMIN`도 실행되지 않아 대기열이 원래 그대로 유지된다.
 
 이 원자성 덕분에 "토큰 발급 실패 시 원래 score로 재-ZADD해 복귀시킨다"는 별도의 보정 로직이 필요 없어진다 — 실패 자체가 전부(all) 아니면 전무(nothing)이기 때문이다. (Lua 스크립트 자체의 로직 버그로 인한 부분 실행은 예외 — 이건 네트워크 장애가 아니라 테스트로 예방해야 할 별개의 리스크)
+
+### 테스트에서 자동 tick을 끄는 방법 — 프로퍼티 vs 개별 mock
+
+**문제**: 100ms 주기 스케줄러가 테스트 실행 중에도 그대로 살아있으면, 테스트가 대기열에 넣어둔 유저를 assertion 전에 스케줄러가 먼저 발급/제거해버려 비결정적으로 실패할 수 있다. 처음에는 이 문제를 겪는 개별 테스트 클래스마다 `@MockitoBean(name = "taskScheduler")`로 `TaskScheduler` 빈을 mock해 `@Scheduled` 등록 자체를 무력화했다.
+
+**그런데 이 개별 mock 방식이 새로운 문제를 만들었다**: Spring 테스트 컨텍스트 캐시는 `@MockitoBean` 같은 빈 오버라이드 조합이 다르면 별도의 `ApplicationContext`를 새로 만든다. `taskScheduler`를 mock한 큐 테스트 4개만 별도 컨텍스트로 격리됐고, mock하지 않은 나머지 수십 개의 `@SpringBootTest`는 진짜 스케줄러가 살아있는 컨텍스트를 공유했다. `modules/redis`의 `RedisTestContainersConfig`는 Redis 컨테이너를 `static final`로 테스트 JVM 전체가 공유하므로, 그 "진짜 스케줄러가 있는" 컨텍스트가 캐시에 남아있는 동안 100ms마다 실제로 `admitBatch`를 실행해 공유 Redis의 대기열 상태를 건드렸다 — `./gradlew test`로 전체 스위트를 돌릴 때만 큐 테스트가 비결정적으로 실패하고 개별 실행하면 통과하는 원인이었다.
+
+**해결**: 개별 mock 대신 `queue.scheduler-enabled` 프로퍼티(기본값 `true`)로 자동 tick 자체를 끈다. `application.yml`의 `test` 프로필 전용 블록에서만 `false`로 오버라이드한다(`local` 프로필은 실제 개발 확인을 위해 그대로 켜둠). 이를 위해 `@Scheduled` 트리거와 비즈니스 로직을 분리한다.
+
+```java
+@Scheduled(fixedDelayString = "${queue.scheduler-interval-ms}")
+public void scheduledAdmit() {
+    if (queueProperties.schedulerEnabled()) {
+        admit();
+    }
+}
+
+public void admit() {
+    // 기존 배치 발급 로직 — 테스트가 직접 호출하는 대상은 이 메서드
+}
+```
+
+모든 `@SpringBootTest`가 test 프로필에서 동일하게 자동 tick이 꺼지므로, 큐 테스트 4개의 `@MockitoBean(name = "taskScheduler")`는 더 이상 필요 없어 제거했다. 그 결과 이 테스트들도 다른 통합/E2E 테스트와 동일한 컨텍스트 시그니처를 갖게 되어, 불필요하게 격리돼 있던 컨텍스트도 함께 사라졌다.
