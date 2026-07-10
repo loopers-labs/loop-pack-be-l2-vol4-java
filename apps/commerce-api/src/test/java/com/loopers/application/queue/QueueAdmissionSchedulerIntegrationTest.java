@@ -12,22 +12,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-// 실제 taskScheduler 빈을 @MockitoBean으로 무력화해 @Scheduled(fixedDelayString = "${queue.scheduler-interval-ms}")의
-// 백그라운드 자동 실행을 막는다. 이 테스트는 admit()을 직접 호출해 검증하므로, 100ms 주기의 자동 실행과
-// 경합하면 given 단계에서 채운 대기열이 assertion 전에 이미 소비되어 비결정적으로 실패할 수 있다.
+// test 프로필에서는 queue.scheduler-enabled=false 로 자동 tick 이 꺼져 있다(application.yml).
+// 이 테스트는 admit()을 직접 호출해 검증하므로 자동 실행과 경합할 일이 없다.
 @SpringBootTest
 class QueueAdmissionSchedulerIntegrationTest {
-
-    @MockitoBean(name = "taskScheduler")
-    private TaskScheduler taskScheduler;
 
     @Autowired
     private QueueAdmissionScheduler queueAdmissionScheduler;

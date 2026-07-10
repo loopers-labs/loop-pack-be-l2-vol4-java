@@ -21,22 +21,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// taskScheduler를 @MockitoBean으로 무력화해 실제 QueueAdmissionScheduler(100ms 주기)가 이 테스트가
-// 대기열에 넣어둔 유저를 assertion 전에 먼저 발급/제거하지 않게 한다.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class QueueV1ApiE2ETest {
 
     private static final String LOGIN_PW = "Password1!";
-
-    @MockitoBean(name = "taskScheduler")
-    private TaskScheduler taskScheduler;
 
     private final TestRestTemplate testRestTemplate;
     private final UserRepository userRepository;

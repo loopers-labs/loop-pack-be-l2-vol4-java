@@ -14,21 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// taskScheduler를 @MockitoBean으로 무력화해 실제 QueueAdmissionScheduler(100ms 주기)가 이 테스트가
-// 대기열에 넣어둔 유저를 assertion 전에 먼저 발급/제거하지 않게 한다.
 @SpringBootTest
 class QueueFacadeIntegrationTest {
 
     private static final String LOGIN_PW = "Password1!";
     private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
-
-    @MockitoBean(name = "taskScheduler")
-    private TaskScheduler taskScheduler;
 
     @Autowired
     private QueueFacade queueFacade;

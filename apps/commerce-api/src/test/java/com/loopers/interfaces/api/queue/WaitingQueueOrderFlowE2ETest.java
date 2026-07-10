@@ -28,8 +28,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -41,16 +39,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // enter -> position polling -> 토큰 발급 -> POST /orders 전체 플로우가 200으로 완결되는지 검증한다(7.5).
 // 실제 스케줄러(@Scheduled) 타이밍에 의존하지 않도록 QueueAdmissionRepository.admitBatch를 직접 호출해 토큰 발급을
-// 결정론적으로 재현하고, taskScheduler를 @MockitoBean으로 무력화해 실제 자동 발급과 경합하지 않게 한다.
+// 결정론적으로 재현한다. test 프로필에서는 queue.scheduler-enabled=false 로 자동 tick 도 꺼져 있다.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class WaitingQueueOrderFlowE2ETest {
 
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Password1!";
     private static final Duration TOKEN_TTL = Duration.ofMinutes(5);
-
-    @MockitoBean(name = "taskScheduler")
-    private TaskScheduler taskScheduler;
 
     @Autowired
     private TestRestTemplate testRestTemplate;
