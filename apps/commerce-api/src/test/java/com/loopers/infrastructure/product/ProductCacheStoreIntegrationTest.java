@@ -56,34 +56,6 @@ class ProductCacheStoreIntegrationTest {
             assertThat(result).contains(info);
         }
 
-        @DisplayName("삭제하면 더 이상 조회되지 않는다.")
-        @Test
-        void returnsEmpty_afterEviction() {
-            // given
-            productCacheStore.putProduct(2L, sampleProductInfo(2L));
-
-            // when
-            productCacheStore.evictProduct(2L);
-
-            // then
-            assertThat(productCacheStore.findProduct(2L)).isEmpty();
-        }
-
-        @DisplayName("evictAll로 여러 건을 한 번에 삭제하면 모두 조회되지 않는다.")
-        @Test
-        void evictsAllGivenProducts_whenEvictAllIsCalled() {
-            // given
-            productCacheStore.putProduct(3L, sampleProductInfo(3L));
-            productCacheStore.putProduct(4L, sampleProductInfo(4L));
-
-            // when
-            productCacheStore.evictAll(List.of(3L, 4L));
-
-            // then
-            assertThat(productCacheStore.findProduct(3L)).isEmpty();
-            assertThat(productCacheStore.findProduct(4L)).isEmpty();
-        }
-
         @DisplayName("저장하면 5분 TTL이 설정된다.")
         @Test
         void setsFiveMinuteTtl_whenProductIsCached() {

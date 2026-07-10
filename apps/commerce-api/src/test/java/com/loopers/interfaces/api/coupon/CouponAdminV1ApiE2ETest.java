@@ -60,7 +60,8 @@ class CouponAdminV1ApiE2ETest {
                 type,
                 value,
                 BigDecimal.valueOf(10000),
-                ZonedDateTime.now().plusDays(30)
+                ZonedDateTime.now().plusDays(30),
+                100
         ));
     }
 
@@ -214,7 +215,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.RATE,
                     BigDecimal.valueOf(10),
                     BigDecimal.valueOf(10000),
-                    expiredAt
+                    expiredAt,
+                    100
             );
 
             // when
@@ -231,6 +233,7 @@ class CouponAdminV1ApiE2ETest {
                     () -> assertThat(response.getBody().data().type()).isEqualTo(CouponAdminV1Dto.CouponTypeDto.RATE),
                     () -> assertThat(response.getBody().data().value()).isEqualByComparingTo(BigDecimal.valueOf(10)),
                     () -> assertThat(response.getBody().data().minOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
+                    () -> assertThat(response.getBody().data().totalQuantity()).isEqualTo(100),
                     () -> assertThat(persisted.getName()).isEqualTo("신규가입 10% 할인"),
                     () -> assertThat(persisted.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(10))
             );
@@ -245,7 +248,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.RATE,
                     BigDecimal.valueOf(10),
                     null,
-                    ZonedDateTime.now().plusDays(30)
+                    ZonedDateTime.now().plusDays(30),
+                    100
             );
 
             // when
@@ -267,7 +271,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.RATE,
                     BigDecimal.valueOf(10),
                     null,
-                    ZonedDateTime.now().plusDays(30)
+                    ZonedDateTime.now().plusDays(30),
+                    100
             );
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -297,7 +302,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.FIXED,
                     BigDecimal.valueOf(5000),
                     BigDecimal.valueOf(20000),
-                    newExpiredAt
+                    newExpiredAt,
+                    200
             );
 
             // when
@@ -316,6 +322,7 @@ class CouponAdminV1ApiE2ETest {
                     () -> assertThat(response.getBody().data().type()).isEqualTo(CouponAdminV1Dto.CouponTypeDto.FIXED),
                     () -> assertThat(response.getBody().data().value()).isEqualByComparingTo(BigDecimal.valueOf(5000)),
                     () -> assertThat(response.getBody().data().minOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
+                    () -> assertThat(response.getBody().data().totalQuantity()).isEqualTo(200),
                     () -> assertThat(persisted.getName()).isEqualTo("여름 시즌 5000원 할인"),
                     () -> assertThat(persisted.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(5000))
             );
@@ -330,7 +337,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.FIXED,
                     BigDecimal.valueOf(5000),
                     BigDecimal.valueOf(20000),
-                    ZonedDateTime.now().plusDays(60)
+                    ZonedDateTime.now().plusDays(60),
+                    200
             );
 
             // when
@@ -350,7 +358,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.FIXED,
                     BigDecimal.valueOf(5000),
                     null,
-                    ZonedDateTime.now().plusDays(60)
+                    ZonedDateTime.now().plusDays(60),
+                    100
             );
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -372,7 +381,8 @@ class CouponAdminV1ApiE2ETest {
                     CouponAdminV1Dto.CouponTypeDto.FIXED,
                     BigDecimal.valueOf(5000),
                     null,
-                    ZonedDateTime.now().plusDays(60)
+                    ZonedDateTime.now().plusDays(60),
+                    100
             );
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

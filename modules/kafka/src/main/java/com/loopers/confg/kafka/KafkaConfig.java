@@ -2,6 +2,8 @@ package com.loopers.confg.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -43,6 +45,17 @@ public class KafkaConfig {
 
     @Bean
     public KafkaTemplate<Object, Object> kafkaTemplate(ProducerFactory<Object, Object> producerFactory) {
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    // outbox payload는 이미 JSON 직렬화된 문자열이다. 기본 kafkaTemplate은 JsonSerializer를 쓰기 때문에
+    // 문자열을 그대로 넣으면 이중 인코딩된다 - outbox 릴레이 전용으로 String 값을 그대로 보내는 템플릿을 분리한다.
+    // acks=all/enable.idempotence는 kafkaProperties.buildProducerProperties()로 그대로 상속된다.
+    @Bean
+    public KafkaTemplate<String, String> stringKafkaTemplate(KafkaProperties kafkaProperties) {
+        Map<String, Object> props = new HashMap<>(kafkaProperties.buildProducerProperties());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        ProducerFactory<String, String> producerFactory = new DefaultKafkaProducerFactory<>(props);
         return new KafkaTemplate<>(producerFactory);
     }
 

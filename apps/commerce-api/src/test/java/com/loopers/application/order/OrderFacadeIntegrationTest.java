@@ -1,7 +1,5 @@
 package com.loopers.application.order;
 
-import com.loopers.application.product.ProductFacade;
-import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.coupon.CouponTemplateModel;
@@ -10,6 +8,9 @@ import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.IssuedCouponModel;
 import com.loopers.domain.coupon.IssuedCouponRepository;
 import com.loopers.domain.order.OrderRepository;
+import com.loopers.domain.outbox.OutboxModel;
+import com.loopers.domain.outbox.OutboxRepository;
+import com.loopers.domain.outbox.OutboxStatus;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
@@ -50,9 +51,6 @@ class OrderFacadeIntegrationTest {
     private OrderFacade orderFacade;
 
     @Autowired
-    private ProductFacade productFacade;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -66,6 +64,9 @@ class OrderFacadeIntegrationTest {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private OutboxRepository outboxRepository;
 
     @Autowired
     private CouponTemplateRepository couponTemplateRepository;
@@ -106,7 +107,7 @@ class OrderFacadeIntegrationTest {
 
     private CouponTemplateModel saveTemplate(BigDecimal minOrderAmount, ZonedDateTime expiredAt) {
         return couponTemplateRepository.save(
-                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt));
+                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt, 100));
     }
 
     private IssuedCouponModel saveIssuedCoupon(Long couponTemplateId, Long userId) {
@@ -142,6 +143,30 @@ class OrderFacadeIntegrationTest {
                     () -> assertThat(result.items().get(0).productName()).isEqualTo("테스트 상품"),
                     () -> assertThat(result.items().get(0).productPrice()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
                     () -> assertThat(stock.getQuantity()).isEqualTo(3L)
+            );
+        }
+
+        @DisplayName("주문이 생성되면 ORDER_CREATED 아웃박스가 PENDING 상태로 기록된다.")
+        @Test
+        void recordsOrderCreatedOutbox_whenOrderIsCreated() {
+            // given
+            saveUser();
+            ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
+            saveStock(product.getId(), 5L);
+            List<OrderFacade.OrderItemDto> commands = List.of(
+                    new OrderFacade.OrderItemDto(product.getId(), 2L)
+            );
+
+            // when
+            OrderInfo result = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
+
+            // then
+            List<OutboxModel> pending = outboxRepository.findAllByStatusOrderByIdAsc(OutboxStatus.PENDING);
+            assertAll(
+                    () -> assertThat(pending).hasSize(1),
+                    () -> assertThat(pending.get(0).getEventType()).isEqualTo("ORDER_CREATED"),
+                    () -> assertThat(pending.get(0).getAggregateType()).isEqualTo("Order"),
+                    () -> assertThat(pending.get(0).getAggregateId()).isEqualTo(String.valueOf(result.id()))
             );
         }
 
@@ -279,27 +304,6 @@ class OrderFacadeIntegrationTest {
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("주문 전에 캐시된 상품이라도 주문(재고 차감) 후 조회하면 최신 inStock이 반영된다.")
-        @Test
-        void invalidatesProductCache_whenStockIsDecreasedByOrder() {
-            // given
-            saveUser();
-            ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
-            productStatsRepository.save(new ProductStatsModel(product));
-            saveStock(product.getId(), 1L);
-            productFacade.getProduct(product.getId());
-
-            List<OrderFacade.OrderItemDto> commands = List.of(
-                    new OrderFacade.OrderItemDto(product.getId(), 1L)
-            );
-
-            // when
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, commands, null);
-            ProductInfo result = productFacade.getProduct(product.getId());
-
-            // then
-            assertThat(result.inStock()).isFalse();
-        }
     }
 
     @DisplayName("주문 목록을 조회할 때,")

@@ -4,7 +4,6 @@ import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponTemplateService;
 import com.loopers.domain.coupon.IssuedCouponModel;
 import com.loopers.domain.coupon.IssuedCouponService;
-import com.loopers.application.product.ProductCacheEvictEvent;
 import com.loopers.domain.order.OrderItemData;
 import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
@@ -14,7 +13,6 @@ import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +33,6 @@ public class OrderFacade {
     private final OrderService orderService;
     private final IssuedCouponService issuedCouponService;
     private final CouponTemplateService couponTemplateService;
-    private final ApplicationEventPublisher eventPublisher;
 
     public record OrderItemDto(Long productId, Long quantity) {
     }
@@ -74,8 +71,6 @@ public class OrderFacade {
                 .forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
 
         OrderModel saved = orderService.create(user.getId(), itemDataList, discountAmount);
-
-        eventPublisher.publishEvent(new ProductCacheEvictEvent(productIds));
 
         return OrderInfo.from(saved);
     }

@@ -287,26 +287,6 @@ class ProductFacadeIntegrationTest {
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
-
-        @DisplayName("캐시에 적재된 상품을 수정하면 이후 조회 시 갱신된 값이 반환된다.")
-        @Test
-        void returnsUpdatedValue_whenCachedProductIsUpdated() {
-            // given
-            BrandModel brand = saveBrand("Nike");
-            ProductModel product = saveProduct(brand.getId(), "기존 상품", BigDecimal.valueOf(100000));
-            saveStock(product.getId(), 10L);
-            productFacade.getProduct(product.getId());
-
-            // when
-            productFacade.updateProductForAdmin(product.getId(), "수정 상품", BigDecimal.valueOf(200000), 20L);
-            ProductInfo result = productFacade.getProduct(product.getId());
-
-            // then
-            assertAll(
-                    () -> assertThat(result.name()).isEqualTo("수정 상품"),
-                    () -> assertThat(result.price()).isEqualByComparingTo(BigDecimal.valueOf(200000))
-            );
-        }
     }
 
     @DisplayName("상품을 삭제할 때,")
@@ -349,24 +329,6 @@ class ProductFacadeIntegrationTest {
 
             // then - @SQLRestriction으로 인해 soft delete된 stats는 조회되지 않음
             assertThat(productStatsRepository.findByProduct(product)).isEmpty();
-        }
-
-        @DisplayName("캐시에 적재된 상품을 삭제하면 이후 조회 시 NOT_FOUND 예외가 발생한다.")
-        @Test
-        void throwsNotFoundException_whenCachedProductIsDeleted() {
-            // given
-            BrandModel brand = saveBrand("Nike");
-            ProductModel product = saveProduct(brand.getId(), "상품", BigDecimal.valueOf(100000));
-            saveStock(product.getId(), 10L);
-            productFacade.getProduct(product.getId());
-
-            // when
-            productFacade.deleteProduct(product.getId());
-
-            // then
-            CoreException result = assertThrows(CoreException.class,
-                    () -> productFacade.getProduct(product.getId()));
-            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
     }
 

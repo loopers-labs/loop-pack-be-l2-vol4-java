@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.application.outbox.OutboxRelay;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
@@ -36,7 +37,7 @@ class LikeConcurrencyIntegrationTest {
     private LikeFacade likeFacade;
 
     @Autowired
-    private LikeOutboxProcessor likeOutboxProcessor;
+    private OutboxRelay outboxRelay;
 
     @Autowired
     private BrandRepository brandRepository;
@@ -99,7 +100,7 @@ class LikeConcurrencyIntegrationTest {
         startGate.countDown();
         done.await();
         executor.shutdown();
-        likeOutboxProcessor.process();
+        outboxRelay.relay();
 
         // then
         Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();
@@ -128,7 +129,7 @@ class LikeConcurrencyIntegrationTest {
         for (String loginId : loginIds) {
             likeFacade.like(loginId, LOGIN_PW, productId);
         }
-        likeOutboxProcessor.process();
+        outboxRelay.relay();
 
         // when
         CountDownLatch startGate = new CountDownLatch(1);
@@ -150,7 +151,7 @@ class LikeConcurrencyIntegrationTest {
         startGate.countDown();
         done.await();
         executor.shutdown();
-        likeOutboxProcessor.process();
+        outboxRelay.relay();
 
         // then
         Long likeCount = productStatsRepository.findByProduct(product).orElseThrow().getLikeCount();

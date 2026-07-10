@@ -100,7 +100,7 @@ class OrderV1ApiE2ETest {
 
     private CouponTemplateModel saveTemplate(BigDecimal minOrderAmount, ZonedDateTime expiredAt) {
         return couponTemplateRepository.save(
-                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt));
+                new CouponTemplateModel("테스트 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000), minOrderAmount, expiredAt, 100));
     }
 
     private IssuedCouponModel saveIssuedCoupon(Long couponTemplateId, Long userId) {

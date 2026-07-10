@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
@@ -19,6 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CouponTemplateModelTest {
+
+    private static void setIssuedQuantity(CouponTemplateModel template, int issuedQuantity) throws Exception {
+        Field field = CouponTemplateModel.class.getDeclaredField("issuedQuantity");
+        field.setAccessible(true);
+        field.set(template, issuedQuantity);
+    }
 
     @DisplayName("쿠폰 템플릿을 생성할 때,")
     @Nested
@@ -33,7 +40,7 @@ class CouponTemplateModelTest {
 
             // when
             CouponTemplateModel template = new CouponTemplateModel(
-                    name, CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt);
+                    name, CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt, 100);
 
             // then
             assertAll(
@@ -41,7 +48,9 @@ class CouponTemplateModelTest {
                     () -> assertThat(template.getDiscountPolicy().type()).isEqualTo(CouponType.RATE),
                     () -> assertThat(template.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(10)),
                     () -> assertThat(template.getMinOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
-                    () -> assertThat(template.getExpiredAt()).isEqualTo(expiredAt)
+                    () -> assertThat(template.getExpiredAt()).isEqualTo(expiredAt),
+                    () -> assertThat(template.getTotalQuantity()).isEqualTo(100),
+                    () -> assertThat(template.getIssuedQuantity()).isEqualTo(0)
             );
         }
 
@@ -53,7 +62,7 @@ class CouponTemplateModelTest {
             // when
             CoreException result = assertThrows(CoreException.class,
                     () -> new CouponTemplateModel(
-                            name, CouponType.RATE, BigDecimal.valueOf(10), null, ZonedDateTime.now().plusDays(30)));
+                            name, CouponType.RATE, BigDecimal.valueOf(10), null, ZonedDateTime.now().plusDays(30), 100));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -66,7 +75,21 @@ class CouponTemplateModelTest {
             // when
             CoreException result = assertThrows(CoreException.class,
                     () -> new CouponTemplateModel(
-                            "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null, expiredAt));
+                            "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null, expiredAt, 100));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("발급 가능 수량이 0 이하이면 쿠폰 템플릿을 생성할 수 없다.")
+        @ValueSource(ints = {0, -1})
+        @ParameterizedTest
+        void couponTemplateCannotBeCreated_whenTotalQuantityIsNotPositive(int totalQuantity) {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> new CouponTemplateModel(
+                            "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
+                            ZonedDateTime.now().plusDays(30), totalQuantity));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -77,18 +100,18 @@ class CouponTemplateModelTest {
     @Nested
     class Update {
 
-        @DisplayName("정상 입력으로 수정하면 이름·할인 정책·최소 주문 금액·만료일이 새 값으로 변경된다.")
+        @DisplayName("정상 입력으로 수정하면 이름·할인 정책·최소 주문 금액·만료일·발급 가능 수량이 새 값으로 변경된다.")
         @Test
         void couponTemplateIsUpdated_withNewValues() {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000),
-                    ZonedDateTime.now().plusDays(30));
+                    ZonedDateTime.now().plusDays(30), 100);
             ZonedDateTime newExpiredAt = ZonedDateTime.now().plusDays(60);
 
             // when
             template.update("여름 시즌 5000원 할인", CouponType.FIXED, BigDecimal.valueOf(5000),
-                    BigDecimal.valueOf(20000), newExpiredAt);
+                    BigDecimal.valueOf(20000), newExpiredAt, 200);
 
             // then
             assertAll(
@@ -96,7 +119,8 @@ class CouponTemplateModelTest {
                     () -> assertThat(template.getDiscountPolicy().type()).isEqualTo(CouponType.FIXED),
                     () -> assertThat(template.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(5000)),
                     () -> assertThat(template.getMinOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
-                    () -> assertThat(template.getExpiredAt()).isEqualTo(newExpiredAt)
+                    () -> assertThat(template.getExpiredAt()).isEqualTo(newExpiredAt),
+                    () -> assertThat(template.getTotalQuantity()).isEqualTo(200)
             );
         }
 
@@ -108,12 +132,12 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
-                    ZonedDateTime.now().plusDays(30));
+                    ZonedDateTime.now().plusDays(30), 100);
 
             // when
             CoreException result = assertThrows(CoreException.class,
                     () -> template.update(name, CouponType.FIXED, BigDecimal.valueOf(5000),
-                            null, ZonedDateTime.now().plusDays(60)));
+                            null, ZonedDateTime.now().plusDays(60), 100));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -126,12 +150,47 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
-                    ZonedDateTime.now().plusDays(30));
+                    ZonedDateTime.now().plusDays(30), 100);
 
             // when
             CoreException result = assertThrows(CoreException.class,
                     () -> template.update("여름 시즌 5000원 할인", CouponType.FIXED, BigDecimal.valueOf(5000),
-                            null, expiredAt));
+                            null, expiredAt, 100));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("발급 가능 수량이 0 이하이면 수정할 수 없다.")
+        @Test
+        void couponTemplateCannotBeUpdated_whenTotalQuantityIsNotPositive() {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
+                    ZonedDateTime.now().plusDays(30), 100);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> template.update("신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
+                            null, ZonedDateTime.now().plusDays(30), 0));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        }
+
+        @DisplayName("이미 발급된 수량보다 적은 수량으로는 수정할 수 없다.")
+        @Test
+        void couponTemplateCannotBeUpdated_whenTotalQuantityIsBelowIssuedQuantity() throws Exception {
+            // given
+            CouponTemplateModel template = new CouponTemplateModel(
+                    "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
+                    ZonedDateTime.now().plusDays(30), 100);
+            setIssuedQuantity(template, 50);
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> template.update("신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
+                            null, ZonedDateTime.now().plusDays(30), 49));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
@@ -148,7 +207,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
-                    BigDecimal.valueOf(5000), ZonedDateTime.now().plusDays(1));
+                    BigDecimal.valueOf(5000), ZonedDateTime.now().plusDays(1), 100);
 
             // when & then
             assertDoesNotThrow(() -> template.validateApplicability(BigDecimal.valueOf(10000)));
@@ -160,7 +219,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
-                    null, ZonedDateTime.now().plusDays(1));
+                    null, ZonedDateTime.now().plusDays(1), 100);
 
             // when & then
             assertDoesNotThrow(() -> template.validateApplicability(BigDecimal.valueOf(1000)));
@@ -172,7 +231,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "만료 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
-                    null, ZonedDateTime.now().minusDays(1));
+                    null, ZonedDateTime.now().minusDays(1), 100);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -188,7 +247,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "할인 쿠폰", CouponType.FIXED, BigDecimal.valueOf(1000),
-                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(1));
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(1), 100);
 
             // when
             CoreException result = assertThrows(CoreException.class,
@@ -209,7 +268,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
-                    ZonedDateTime.now().plusDays(1));
+                    ZonedDateTime.now().plusDays(1), 100);
 
             // when / then
             assertThat(template.isExpired()).isFalse();
@@ -221,7 +280,7 @@ class CouponTemplateModelTest {
             // given
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), null,
-                    ZonedDateTime.now().minusDays(1));
+                    ZonedDateTime.now().minusDays(1), 100);
 
             // when / then
             assertThat(template.isExpired()).isTrue();

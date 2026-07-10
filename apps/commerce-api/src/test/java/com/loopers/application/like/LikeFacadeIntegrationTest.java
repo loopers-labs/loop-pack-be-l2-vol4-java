@@ -1,5 +1,6 @@
 package com.loopers.application.like;
 
+import com.loopers.application.outbox.OutboxRelay;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
@@ -42,7 +43,7 @@ class LikeFacadeIntegrationTest {
     private LikeFacade likeFacade;
 
     @Autowired
-    private LikeOutboxProcessor likeOutboxProcessor;
+    private OutboxRelay outboxRelay;
 
     @Autowired
     private ProductRepository productRepository;
@@ -167,7 +168,7 @@ class LikeFacadeIntegrationTest {
 
             // when
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(1L);
@@ -179,11 +180,11 @@ class LikeFacadeIntegrationTest {
             // given
             Long productId = createProduct();
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // when
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(1L);
@@ -215,11 +216,11 @@ class LikeFacadeIntegrationTest {
             // given
             Long productId = createProduct();
             likeFacade.like(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // when
             likeFacade.unlike(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(0L);
@@ -233,7 +234,7 @@ class LikeFacadeIntegrationTest {
 
             // when
             likeFacade.unlike(LOGIN_ID, LOGIN_PW, productId);
-            likeOutboxProcessor.process();
+            outboxRelay.relay();
 
             // then
             assertThat(likeCountOf(productId)).isEqualTo(0L);

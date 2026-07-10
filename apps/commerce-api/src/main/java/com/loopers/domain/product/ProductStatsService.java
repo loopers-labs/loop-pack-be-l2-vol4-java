@@ -29,13 +29,13 @@ public class ProductStatsService {
         productStatsRepository.save(stats);
     }
 
-    // @Modifying UPDATE는 활성 트랜잭션이 필수 — LikeOutboxProcessor처럼 트랜잭션 없는 호출자도 안전하게 사용할 수 있도록 추가
+    // @Modifying UPDATE는 활성 트랜잭션이 필수 — LikeCountReflector 등 반영 로직의 트랜잭션에 합류하도록 추가
     @Transactional
     public void increaseLikeCount(Long productId) {
         productStatsRepository.increaseLikeCount(productId);
     }
 
-    // @Modifying UPDATE는 활성 트랜잭션이 필수 — LikeOutboxProcessor처럼 트랜잭션 없는 호출자도 안전하게 사용할 수 있도록 추가
+    // @Modifying UPDATE는 활성 트랜잭션이 필수 — LikeCountReflector 등 반영 로직의 트랜잭션에 합류하도록 추가
     @Transactional
     public void decreaseLikeCount(Long productId) {
         productStatsRepository.decreaseLikeCount(productId);

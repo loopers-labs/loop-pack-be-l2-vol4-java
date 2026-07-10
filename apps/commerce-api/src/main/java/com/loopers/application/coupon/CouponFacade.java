@@ -1,5 +1,7 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueRequestModel;
+import com.loopers.domain.coupon.CouponIssueRequestService;
 import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponTemplateService;
 import com.loopers.domain.coupon.IssuedCouponModel;
@@ -24,6 +26,7 @@ public class CouponFacade {
 
     private final CouponTemplateService couponTemplateService;
     private final IssuedCouponService issuedCouponService;
+    private final CouponIssueRequestService couponIssueRequestService;
     private final UserService userService;
 
     public Page<IssuedCouponInfo> getIssuedCouponsByTemplateId(Long couponTemplateId, Pageable pageable) {
@@ -45,13 +48,21 @@ public class CouponFacade {
                 .toList();
     }
 
-    public IssuedCouponInfo issue(String loginId, String loginPw, Long couponId) {
+    // API는 발급 요청만 만들고 Kafka에 발행한다 - 실제 발급은 컨슈머(CouponIssueProcessor)가 비동기로 처리한다.
+    public CouponIssueRequestInfo requestIssue(String loginId, String loginPw, Long couponId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
         CouponTemplateModel template = couponTemplateService.getById(couponId);
         if (template.isExpired()) {
             throw new CoreException(ErrorType.BAD_REQUEST, "만료된 쿠폰입니다.");
         }
-        IssuedCouponModel issued = issuedCouponService.issue(template.getId(), user.getId());
-        return IssuedCouponInfo.from(issued);
+        CouponIssueRequestModel request = couponIssueRequestService.requestIssue(template.getId(), user.getId());
+        return CouponIssueRequestInfo.from(request);
+    }
+
+    public CouponIssueRequestInfo getIssueRequestStatus(String loginId, String loginPw, String requestId) {
+        UserModel user = userService.getLoginUser(loginId, loginPw);
+        CouponIssueRequestModel request = couponIssueRequestService.getByRequestId(requestId);
+        request.validateRequester(user.getId());
+        return CouponIssueRequestInfo.from(request);
     }
 }

@@ -17,11 +17,13 @@ class LikeServiceTest {
 
     private LikeService likeService;
     private LikeRepository likeRepository;
+    private LikeEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
         likeRepository = mock(LikeRepository.class);
-        likeService = new LikeService(likeRepository);
+        eventPublisher = mock(LikeEventPublisher.class);
+        likeService = new LikeService(likeRepository, eventPublisher);
     }
 
     @DisplayName("좋아요한 상품 ID 목록을 조회할 때,")

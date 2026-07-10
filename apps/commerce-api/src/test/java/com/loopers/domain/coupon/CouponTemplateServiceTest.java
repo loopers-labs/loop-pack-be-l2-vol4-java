@@ -53,7 +53,8 @@ class CouponTemplateServiceTest {
                     CouponType.RATE,
                     BigDecimal.valueOf(10),
                     BigDecimal.valueOf(10000),
-                    ZonedDateTime.now().plusDays(30)
+                    ZonedDateTime.now().plusDays(30),
+                    100
             );
             when(couponTemplateRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(template)));
 
@@ -79,7 +80,8 @@ class CouponTemplateServiceTest {
                     CouponType.RATE,
                     BigDecimal.valueOf(10),
                     BigDecimal.valueOf(10000),
-                    ZonedDateTime.now().plusDays(30)
+                    ZonedDateTime.now().plusDays(30),
+                    100
             );
             when(couponTemplateRepository.findById(couponTemplateId)).thenReturn(Optional.of(template));
 
@@ -116,10 +118,10 @@ class CouponTemplateServiceTest {
             // given
             CouponTemplateModel template1 = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
-                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30));
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30), 100);
             CouponTemplateModel template2 = new CouponTemplateModel(
                     "여름 시즌 5000원 할인", CouponType.FIXED, BigDecimal.valueOf(5000),
-                    BigDecimal.valueOf(20000), ZonedDateTime.now().plusDays(30));
+                    BigDecimal.valueOf(20000), ZonedDateTime.now().plusDays(30), 100);
             setId(template1, 1L);
             setId(template2, 2L);
             Set<Long> ids = Set.of(1L, 2L);
@@ -166,7 +168,7 @@ class CouponTemplateServiceTest {
             // when
             CouponTemplateModel result = couponTemplateService.createTemplate(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
-                    BigDecimal.valueOf(10000), expiredAt);
+                    BigDecimal.valueOf(10000), expiredAt, 100);
 
             // then
             assertAll(
@@ -174,7 +176,8 @@ class CouponTemplateServiceTest {
                     () -> assertThat(result.getDiscountPolicy().type()).isEqualTo(CouponType.RATE),
                     () -> assertThat(result.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(10)),
                     () -> assertThat(result.getMinOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(10000)),
-                    () -> assertThat(result.getExpiredAt()).isEqualTo(expiredAt)
+                    () -> assertThat(result.getExpiredAt()).isEqualTo(expiredAt),
+                    () -> assertThat(result.getTotalQuantity()).isEqualTo(100)
             );
         }
     }
@@ -190,7 +193,7 @@ class CouponTemplateServiceTest {
             Long couponTemplateId = 1L;
             CouponTemplateModel existing = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
-                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30));
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30), 100);
             ZonedDateTime newExpiredAt = ZonedDateTime.now().plusDays(60);
             when(couponTemplateRepository.findById(couponTemplateId)).thenReturn(Optional.of(existing));
             when(couponTemplateRepository.save(any(CouponTemplateModel.class)))
@@ -199,7 +202,7 @@ class CouponTemplateServiceTest {
             // when
             CouponTemplateModel result = couponTemplateService.updateTemplate(
                     couponTemplateId, "여름 시즌 5000원 할인", CouponType.FIXED,
-                    BigDecimal.valueOf(5000), BigDecimal.valueOf(20000), newExpiredAt);
+                    BigDecimal.valueOf(5000), BigDecimal.valueOf(20000), newExpiredAt, 200);
 
             // then
             assertAll(
@@ -207,7 +210,8 @@ class CouponTemplateServiceTest {
                     () -> assertThat(result.getDiscountPolicy().type()).isEqualTo(CouponType.FIXED),
                     () -> assertThat(result.getDiscountPolicy().value()).isEqualByComparingTo(BigDecimal.valueOf(5000)),
                     () -> assertThat(result.getMinOrderAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000)),
-                    () -> assertThat(result.getExpiredAt()).isEqualTo(newExpiredAt)
+                    () -> assertThat(result.getExpiredAt()).isEqualTo(newExpiredAt),
+                    () -> assertThat(result.getTotalQuantity()).isEqualTo(200)
             );
         }
 
@@ -222,7 +226,7 @@ class CouponTemplateServiceTest {
             CoreException exception = assertThrows(CoreException.class,
                     () -> couponTemplateService.updateTemplate(
                             couponTemplateId, "여름 시즌 5000원 할인", CouponType.FIXED,
-                            BigDecimal.valueOf(5000), null, ZonedDateTime.now().plusDays(60)));
+                            BigDecimal.valueOf(5000), null, ZonedDateTime.now().plusDays(60), 100));
 
             // then
             assertThat(exception.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
@@ -240,7 +244,7 @@ class CouponTemplateServiceTest {
             Long couponTemplateId = 1L;
             CouponTemplateModel template = new CouponTemplateModel(
                     "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10),
-                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30));
+                    BigDecimal.valueOf(10000), ZonedDateTime.now().plusDays(30), 100);
             when(couponTemplateRepository.findById(couponTemplateId)).thenReturn(Optional.of(template));
             when(couponTemplateRepository.save(template)).thenReturn(template);
 

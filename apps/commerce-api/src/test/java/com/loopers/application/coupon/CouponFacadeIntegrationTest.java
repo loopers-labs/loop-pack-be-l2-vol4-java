@@ -1,5 +1,8 @@
 package com.loopers.application.coupon;
 
+import com.loopers.domain.coupon.CouponIssueRequestModel;
+import com.loopers.domain.coupon.CouponIssueRequestRepository;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponTemplateRepository;
@@ -7,7 +10,6 @@ import com.loopers.domain.coupon.CouponTemplateService;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.IssuedCouponModel;
 import com.loopers.domain.coupon.IssuedCouponRepository;
-import com.loopers.application.coupon.MyIssuedCouponInfo;
 import com.loopers.domain.user.Gender;
 import com.loopers.domain.user.PasswordEncryptor;
 import com.loopers.domain.user.UserModel;
@@ -52,6 +54,9 @@ class CouponFacadeIntegrationTest {
     private IssuedCouponRepository issuedCouponRepository;
 
     @Autowired
+    private CouponIssueRequestRepository couponIssueRequestRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -75,8 +80,12 @@ class CouponFacadeIntegrationTest {
     }
 
     private CouponTemplateModel saveTemplate(ZonedDateTime expiredAt) {
+        return saveTemplate(expiredAt, 100);
+    }
+
+    private CouponTemplateModel saveTemplate(ZonedDateTime expiredAt, int totalQuantity) {
         return couponTemplateRepository.save(new CouponTemplateModel(
-                "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt));
+                "신규가입 10% 할인", CouponType.RATE, BigDecimal.valueOf(10), BigDecimal.valueOf(10000), expiredAt, totalQuantity));
     }
 
     @DisplayName("특정 쿠폰의 발급 내역을 조회할 때,")
@@ -181,40 +190,41 @@ class CouponFacadeIntegrationTest {
         }
     }
 
-    @DisplayName("쿠폰을 발급할 때,")
+    @DisplayName("쿠폰 발급을 요청할 때,")
     @Nested
-    class Issue {
+    class RequestIssue {
 
-        @DisplayName("유효한 쿠폰 템플릿으로 발급 요청하면 AVAILABLE 상태의 발급 쿠폰이 반환되고 DB에 저장된다.")
+        @DisplayName("유효한 쿠폰 템플릿으로 발급을 요청하면 PENDING 상태의 발급 요청이 반환되고 DB에 저장된다.")
         @Test
-        void issuedCouponIsReturnedAndPersisted_whenValid() {
+        void issueRequestIsReturnedAndPersisted_whenValid() {
             // given
             CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
 
             // when
-            IssuedCouponInfo result = couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId());
+            CouponIssueRequestInfo result = couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId());
 
             // then
-            List<IssuedCouponModel> saved = issuedCouponRepository.findAllByUserId(savedUser.getId());
+            CouponIssueRequestModel saved = couponIssueRequestRepository.findByRequestId(result.requestId()).orElseThrow();
             assertAll(
                     () -> assertThat(result.couponTemplateId()).isEqualTo(template.getId()),
                     () -> assertThat(result.userId()).isEqualTo(savedUser.getId()),
-                    () -> assertThat(saved).hasSize(1)
+                    () -> assertThat(result.status()).isEqualTo(CouponIssueRequestStatus.PENDING),
+                    () -> assertThat(saved.getCouponTemplateId()).isEqualTo(template.getId())
             );
         }
 
-        @DisplayName("존재하지 않는 쿠폰 템플릿으로 발급 요청하면 NOT_FOUND 예외가 발생한다.")
+        @DisplayName("존재하지 않는 쿠폰 템플릿으로 발급을 요청하면 NOT_FOUND 예외가 발생한다.")
         @Test
         void throwsNotFound_whenTemplateDoesNotExist() {
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, 99999L));
+                    () -> couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, 99999L));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
         }
 
-        @DisplayName("만료된 쿠폰 템플릿으로 발급 요청하면 BAD_REQUEST 예외가 발생한다.")
+        @DisplayName("만료된 쿠폰 템플릿으로 발급을 요청하면 BAD_REQUEST 예외가 발생한다.")
         @Test
         void throwsBadRequest_whenTemplateIsExpired() {
             // given
@@ -222,25 +232,76 @@ class CouponFacadeIntegrationTest {
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId()));
+                    () -> couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
         }
 
-        @DisplayName("이미 발급받은 쿠폰을 다시 발급 요청하면 CONFLICT 예외가 발생한다.")
+        @DisplayName("이미 발급을 요청한 쿠폰을 다시 요청하면 CONFLICT 예외가 발생한다.")
         @Test
-        void throwsConflict_whenSameUserIssuesSameCouponAgain() {
+        void throwsConflict_whenSameUserRequestsSameCouponAgain() {
             // given
             CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
-            couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId());
+            couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId());
 
             // when
             CoreException result = assertThrows(CoreException.class,
-                    () -> couponFacade.issue(LOGIN_ID, LOGIN_PW, template.getId()));
+                    () -> couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId()));
 
             // then
             assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
+        }
+    }
+
+    @DisplayName("쿠폰 발급 요청 상태를 조회할 때,")
+    @Nested
+    class GetIssueRequestStatus {
+
+        @DisplayName("본인의 발급 요청이면 상태가 반환된다.")
+        @Test
+        void returnsStatus_whenRequesterIsOwner() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+            CouponIssueRequestInfo requested = couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId());
+
+            // when
+            CouponIssueRequestInfo result = couponFacade.getIssueRequestStatus(LOGIN_ID, LOGIN_PW, requested.requestId());
+
+            // then
+            assertAll(
+                    () -> assertThat(result.requestId()).isEqualTo(requested.requestId()),
+                    () -> assertThat(result.status()).isEqualTo(CouponIssueRequestStatus.PENDING)
+            );
+        }
+
+        @DisplayName("존재하지 않는 requestId를 조회하면 NOT_FOUND 예외가 발생한다.")
+        @Test
+        void throwsNotFound_whenRequestDoesNotExist() {
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.getIssueRequestStatus(LOGIN_ID, LOGIN_PW, "존재하지-않는-id"));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+
+        @DisplayName("다른 사용자의 발급 요청을 조회하면 FORBIDDEN 예외가 발생한다.")
+        @Test
+        void throwsForbidden_whenRequesterIsNotOwner() {
+            // given
+            CouponTemplateModel template = saveTemplate(ZonedDateTime.now().plusDays(30));
+            CouponIssueRequestInfo requested = couponFacade.requestIssue(LOGIN_ID, LOGIN_PW, template.getId());
+            String otherLoginId = "otheruser1";
+            userRepository.save(new UserModel(
+                    otherLoginId, LOGIN_PW, "다른유저", "1990-01-01", "other@example.com", Gender.MALE, passwordEncryptor));
+
+            // when
+            CoreException result = assertThrows(CoreException.class,
+                    () -> couponFacade.getIssueRequestStatus(otherLoginId, LOGIN_PW, requested.requestId()));
+
+            // then
+            assertThat(result.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
         }
     }
 }

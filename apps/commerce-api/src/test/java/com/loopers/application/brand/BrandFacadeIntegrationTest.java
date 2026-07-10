@@ -1,18 +1,14 @@
 package com.loopers.application.brand;
 
-import com.loopers.application.product.ProductFacade;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
-import com.loopers.domain.product.ProductStatsModel;
-import com.loopers.domain.product.ProductStatsRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
-import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,16 +30,10 @@ class BrandFacadeIntegrationTest {
     private BrandFacade brandFacade;
 
     @Autowired
-    private ProductFacade productFacade;
-
-    @Autowired
     private BrandRepository brandRepository;
 
     @Autowired
     private ProductRepository productRepository;
-
-    @Autowired
-    private ProductStatsRepository productStatsRepository;
 
     @Autowired
     private StockRepository stockRepository;
@@ -51,13 +41,9 @@ class BrandFacadeIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
-    @Autowired
-    private RedisCleanUp redisCleanUp;
-
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
-        redisCleanUp.truncateAll();
     }
 
     private BrandModel saveBrand(String name) {
@@ -121,32 +107,6 @@ class BrandFacadeIntegrationTest {
 
             // then
             assertThat(brandRepository.findById(brand.getId())).isEmpty();
-        }
-
-        @DisplayName("소속 상품이 캐시에 적재되어 있어도 브랜드 삭제 후 조회하면 NOT_FOUND 예외가 발생한다.")
-        @Test
-        void invalidatesProductCache_whenBrandWithProductsIsDeleted() {
-            // given
-            BrandModel brand = saveBrand("Nike");
-            ProductModel product1 = saveProduct(brand.getId(), "에어맥스", BigDecimal.valueOf(150000));
-            ProductModel product2 = saveProduct(brand.getId(), "조던", BigDecimal.valueOf(200000));
-            productStatsRepository.save(new ProductStatsModel(product1));
-            productStatsRepository.save(new ProductStatsModel(product2));
-            saveStock(product1.getId(), 10L);
-            saveStock(product2.getId(), 5L);
-            productFacade.getProduct(product1.getId());
-            productFacade.getProduct(product2.getId());
-
-            // when
-            brandFacade.deleteBrand(brand.getId());
-
-            // then
-            assertAll(
-                () -> assertThat(assertThrows(CoreException.class, () -> productFacade.getProduct(product1.getId())).getErrorType())
-                    .isEqualTo(ErrorType.NOT_FOUND),
-                () -> assertThat(assertThrows(CoreException.class, () -> productFacade.getProduct(product2.getId())).getErrorType())
-                    .isEqualTo(ErrorType.NOT_FOUND)
-            );
         }
     }
 }

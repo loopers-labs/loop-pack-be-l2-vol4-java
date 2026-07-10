@@ -29,11 +29,13 @@ class OrderServiceTest {
 
     private OrderService orderService;
     private OrderRepository orderRepository;
+    private OrderEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
         orderRepository = mock(OrderRepository.class);
-        orderService = new OrderService(orderRepository);
+        eventPublisher = mock(OrderEventPublisher.class);
+        orderService = new OrderService(orderRepository, eventPublisher);
     }
 
     @DisplayName("주문을 생성할 때,")

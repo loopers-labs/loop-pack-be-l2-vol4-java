@@ -1,7 +1,8 @@
 package com.loopers.interfaces.api.coupon;
 
-import com.loopers.application.coupon.IssuedCouponInfo;
+import com.loopers.application.coupon.CouponIssueRequestInfo;
 import com.loopers.application.coupon.MyIssuedCouponInfo;
+import com.loopers.domain.coupon.CouponIssueRequestStatus;
 import com.loopers.domain.coupon.CouponStatus;
 import com.loopers.domain.coupon.CouponType;
 
@@ -46,20 +47,42 @@ public class CouponV1Dto {
         }
     }
 
-    public record IssueResponse(
-            Long id,
+    public enum CouponIssueRequestStatusDto {
+        PENDING, ISSUED, FAILED;
+
+        public static CouponIssueRequestStatusDto from(CouponIssueRequestStatus status) {
+            return valueOf(status.name());
+        }
+    }
+
+    public record IssueRequestResponse(
+            String requestId,
             Long couponTemplateId,
-            Long userId,
-            ZonedDateTime createdAt,
-            ZonedDateTime updatedAt
+            CouponIssueRequestStatusDto status
     ) {
-        public static IssueResponse from(IssuedCouponInfo info) {
-            return new IssueResponse(
-                    info.id(),
+        public static IssueRequestResponse from(CouponIssueRequestInfo info) {
+            return new IssueRequestResponse(
+                    info.requestId(),
                     info.couponTemplateId(),
-                    info.userId(),
-                    info.createdAt(),
-                    info.updatedAt()
+                    CouponIssueRequestStatusDto.from(info.status())
+            );
+        }
+    }
+
+    public record IssueRequestStatusResponse(
+            String requestId,
+            Long couponTemplateId,
+            CouponIssueRequestStatusDto status,
+            Long issuedCouponId,
+            String failureReason
+    ) {
+        public static IssueRequestStatusResponse from(CouponIssueRequestInfo info) {
+            return new IssueRequestStatusResponse(
+                    info.requestId(),
+                    info.couponTemplateId(),
+                    CouponIssueRequestStatusDto.from(info.status()),
+                    info.issuedCouponId(),
+                    info.failureReason()
             );
         }
     }

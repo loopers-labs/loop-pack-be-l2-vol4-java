@@ -36,4 +36,9 @@ public class CouponTemplateRepositoryImpl implements CouponTemplateRepository {
     public CouponTemplateModel save(CouponTemplateModel couponTemplate) {
         return couponTemplateJpaRepository.save(couponTemplate);
     }
+
+    @Override
+    public boolean increaseIssuedQuantityIfAvailable(Long couponTemplateId) {
+        return couponTemplateJpaRepository.increaseIssuedQuantityIfAvailable(couponTemplateId) > 0;
+    }
 }

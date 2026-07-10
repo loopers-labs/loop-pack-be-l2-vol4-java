@@ -19,9 +19,12 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher eventPublisher;
 
     public OrderModel create(Long userId, List<OrderItemData> itemDataList, BigDecimal discountAmount) {
-        return orderRepository.save(OrderModel.create(userId, itemDataList, discountAmount));
+        OrderModel saved = orderRepository.save(OrderModel.create(userId, itemDataList, discountAmount));
+        eventPublisher.publish(OrderCreatedEvent.from(saved));
+        return saved;
     }
 
     public OrderModel getById(Long orderId) {

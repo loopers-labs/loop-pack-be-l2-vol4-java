@@ -2,8 +2,6 @@ package com.loopers.application.like;
 
 import com.loopers.application.product.ProductInfo;
 import com.loopers.application.product.ProductInfoAssembler;
-import com.loopers.domain.like.LikeEventType;
-import com.loopers.domain.like.LikeOutboxService;
 import com.loopers.domain.like.LikeService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
@@ -21,7 +19,6 @@ public class LikeFacade {
 
     private final LikeService likeService;
     private final ProductService productService;
-    private final LikeOutboxService likeOutboxService;
     private final ProductInfoAssembler productInfoAssembler;
     private final UserService userService;
 
@@ -29,18 +26,14 @@ public class LikeFacade {
     public void like(String loginId, String loginPw, Long productId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
         ProductModel product = productService.getById(productId);
-        if (likeService.register(user.getId(), product.getId()).isApplied()) {
-            likeOutboxService.record(product.getId(), LikeEventType.LIKED_EVENT);
-        }
+        likeService.register(user.getId(), product.getId());
     }
 
     @Transactional
     public void unlike(String loginId, String loginPw, Long productId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
         ProductModel product = productService.getById(productId);
-        if (likeService.cancel(user.getId(), product.getId()).isApplied()) {
-            likeOutboxService.record(product.getId(), LikeEventType.UNLIKED_EVENT);
-        }
+        likeService.cancel(user.getId(), product.getId());
     }
 
     public List<ProductInfo> getLikedProducts(String loginId, String loginPw, Long userId) {

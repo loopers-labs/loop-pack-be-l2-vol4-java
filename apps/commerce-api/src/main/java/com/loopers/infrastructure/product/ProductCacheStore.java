@@ -8,8 +8,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -45,27 +43,6 @@ public class ProductCacheStore {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(info), PRODUCT_TTL);
         } catch (Exception e) {
             log.warn("상품 상세 캐시 저장 실패. key={}", key, e);
-        }
-    }
-
-    public void evictProduct(Long productId) {
-        String key = productKey(productId);
-        try {
-            redisTemplate.delete(key);
-        } catch (Exception e) {
-            log.warn("상품 상세 캐시 삭제 실패. key={}", key, e);
-        }
-    }
-
-    public void evictAll(Collection<Long> productIds) {
-        if (productIds.isEmpty()) {
-            return;
-        }
-        try {
-            List<String> keys = productIds.stream().map(this::productKey).toList();
-            redisTemplate.delete(keys);
-        } catch (Exception e) {
-            log.warn("상품 상세 캐시 일괄 삭제 실패. productIds={}", productIds, e);
         }
     }
 
