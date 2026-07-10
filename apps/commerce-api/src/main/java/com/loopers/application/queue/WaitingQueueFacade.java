@@ -5,7 +5,6 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.Clock;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -14,7 +13,6 @@ public class WaitingQueueFacade {
 
     private final WaitingQueueRepository waitingQueueRepository;
     private final WaitingQueueProperties properties;
-    private final Clock clock;
 
     public WaitingQueueInfo.Position enter(String userLoginId) {
         validateUserLoginId(userLoginId);
@@ -23,7 +21,7 @@ public class WaitingQueueFacade {
             return WaitingQueueInfo.Position.admitted(waitingQueueRepository.countWaitingUsers(), entryToken.get());
         }
 
-        waitingQueueRepository.enqueueIfAbsent(userLoginId, clock.millis());
+        waitingQueueRepository.enqueueIfAbsent(userLoginId);
         return position(userLoginId);
     }
 
