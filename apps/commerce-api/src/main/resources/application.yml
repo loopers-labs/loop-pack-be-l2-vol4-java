@@ -89,7 +89,7 @@ outbox:
 order-queue:
   admission:
     interval-ms: 200
-    batch-size: 28     # 커넥션풀40·200ms 가정 기준 초기 추정치. k6 무릎 실측으로 조정
+    batch-size: 10
   entry-token:
     ttl-seconds: 300
 
