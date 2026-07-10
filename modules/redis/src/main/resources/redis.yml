@@ -7,6 +7,7 @@ spring:
 datasource:
   redis:
     database: 0
+    command-timeout-ms: 1000 # Lettuce 명령 타임아웃 — 기본 60초는 Redis 행(hang) 시 요청 스레드를 분 단위로 붙잡는다 (게이트 fail-open 은 빠른 실패 전제)
     master:
       host: ${REDIS_MASTER_HOST}
       port: ${REDIS_MASTER_PORT}

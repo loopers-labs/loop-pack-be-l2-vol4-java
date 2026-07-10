@@ -13,6 +13,7 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -76,6 +77,9 @@ public class RedisConfig{
             Consumer<LettuceClientConfiguration.LettuceClientConfigurationBuilder> customizer
     ){
         LettuceClientConfiguration.LettuceClientConfigurationBuilder builder = LettuceClientConfiguration.builder();
+        // 명령 타임아웃 상한(두 커넥션 팩토리 공통) — Lettuce 기본 60초는 Redis 행(hang) 시 요청 스레드
+        // (와 그 스레드가 문 DB 커넥션)를 분 단위로 붙잡는다. 대기열 게이트의 fail-open 은 "빠른 실패"가 전제.
+        builder.commandTimeout(Duration.ofMillis(redisProperties.commandTimeoutMs()));
         if(customizer != null) customizer.accept(builder);
         LettuceClientConfiguration clientConfig = builder.build();
         RedisStaticMasterReplicaConfiguration masterReplicaConfig = new RedisStaticMasterReplicaConfiguration(master.host(), master.port());
