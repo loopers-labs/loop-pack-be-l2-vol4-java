@@ -15,6 +15,10 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  task:
+    scheduling:
+      pool:
+        size: 4 # 스케줄러 경합 방지(P0) — outbox relay / pg reconcile / product rank / queue admission 4종이 기본 1스레드를 나눠 쓰지 않도록
   profiles:
     active: local
   config:
@@ -35,6 +39,19 @@ spring:
 pg:
   simulator:
     url: http://localhost:8082   # pg-simulator 로컬 포트
+
+# 주문 대기열(8주차) — 처리량 산정 근거 (modules/jpa 기본 Hikari 풀 40 기준):
+#   이론 최대 TPS = 풀 40 / 주문 1건 평균 처리 0.2s = 200 → 안전마진 70% = 140 TPS
+#   (주문 200ms 는 PG 호출이 트랜잭션 밖(record-first)이라 성립 — 커넥션을 물었다면 40/3s ≈ 13 TPS)
+#   Thundering Herd 완화를 위해 1초 140명 일괄이 아니라 100ms × 14명 분할 배출(= 140 TPS)
+queue:
+  admission:
+    interval-ms: 100 # 입장 스케줄러 주기(ms)
+    batch-size: 14   # 1회 입장 인원 = 안전 TPS × (interval-ms / 1000)
+  token:
+    ttl-seconds: 300 # 입장 토큰 TTL 5분 — 만료 시 재진입 필요
+  order-gate:
+    enabled: false   # 행사 때만 켜는 스위치 — 기본 off(기존 주문 흐름 불변). on 이면 QueueAdmissionScheduler 도 함께 활성화된다.
 
 # PG 회복 전략: @CircuitBreaker(name="pgCircuit") — 보편값(커리큘럼 기준)
 resilience4j:
