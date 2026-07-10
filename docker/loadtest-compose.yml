@@ -1,0 +1,44 @@
+# 부하테스트용 commerce-api — CPU/메모리 limit 를 걸어 정해진 자원 안에서 측정한다.
+# infra-compose(mysql/redis/kafka)가 먼저 떠 있어야 한다(같은 docker_default 네트워크 사용).
+#
+#   1) infra 기동:   docker-compose -f docker/infra-compose.yml up -d
+#   2) 시드 적용:    docker exec -i docker-mysql-1 mysql -uroot -proot loopers < docs/local/week7-schema-seed.sql
+#                    docker exec -i docker-mysql-1 mysql -uroot -proot loopers < docs/local/loadtest-seed.sql
+#   3) 이미지 빌드:  cp apps/commerce-api/build/libs/commerce-api-*[!plain].jar apps/commerce-api/build/libs/app.jar
+#                    docker build -f docker/commerce-api.Dockerfile -t commerce-api:loadtest apps/commerce-api/build/libs
+#   4) mysql limit:  docker update --cpus 2 --memory 2g docker-mysql-1
+#   5) 앱 기동:      docker-compose -f docker/loadtest-compose.yml up -d
+#
+# 호스트 bootRun 은 8080 을 비워둬야 함(컨테이너가 측정 대상).
+services:
+  commerce-api:
+    image: commerce-api:loadtest
+    container_name: commerce-api-loadtest
+    cpus: 4.0
+    mem_limit: 4g
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    networks:
+      - infra
+    command:
+      - "--spring.profiles.active=local"
+      - "--datasource.mysql-jpa.main.jdbc-url=jdbc:mysql://mysql:3306/loopers"
+      - "--datasource.mysql-jpa.main.username=application"
+      - "--datasource.mysql-jpa.main.password=application"
+      - "--datasource.redis.master.host=redis-master"
+      - "--datasource.redis.master.port=6379"
+      - "--datasource.redis.replicas[0].host=redis-readonly"
+      - "--datasource.redis.replicas[0].port=6379"
+      - "--spring.kafka.bootstrap-servers=kafka:9092"
+      - "--spring.kafka.admin.properties.bootstrap.servers=kafka:9092"
+      # k6 실측 반영: 한계 12/s × 0.7 → 10/s = tick(200ms)당 2명
+      - "--order-queue.admission.batch-size=2"
+      # 부하테스트 전용: 폴링마다 BCrypt 인증이 CPU 를 태우므로 X-USER-ID 신뢰로 우회
+      # ("로그인된 세션" 상태 시뮬레이션. 실서비스는 세션/JWT 로 이 비용이 사라진다)
+      - "--auth.dev-user-header.enabled=true"
+
+networks:
+  infra:
+    external: true
+    name: docker_default
