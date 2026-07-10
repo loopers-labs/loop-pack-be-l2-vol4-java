@@ -75,6 +75,20 @@ class WaitingQueueIntegrationTest {
         );
     }
 
+    @DisplayName("대기열 순번은 사용자 ID 사전순이 아니라 진입 순서대로 부여된다.")
+    @Test
+    void preservesInsertionOrder_whenUserIdsHaveReverseLexicalOrder() {
+        // arrange
+        waitingQueueRepository.enqueueIfAbsent("z-user");
+        waitingQueueRepository.enqueueIfAbsent("a-user");
+
+        // act
+        List<String> admittedUsers = waitingQueueRepository.popWaitingUsers(2);
+
+        // assert
+        assertThat(admittedUsers).containsExactly("z-user", "a-user");
+    }
+
     @DisplayName("입장 토큰은 TTL이 지나면 만료된다.")
     @Test
     void expiresEntryToken_whenTtlPasses() throws InterruptedException {
@@ -95,7 +109,7 @@ class WaitingQueueIntegrationTest {
         int waitingUsers = 25;
         int expectedAdmittedUsers = 18;
         for (int index = 0; index < waitingUsers; index++) {
-            waitingQueueRepository.enqueueIfAbsent("user" + index, index);
+            waitingQueueRepository.enqueueIfAbsent("user" + index);
         }
 
         // act

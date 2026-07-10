@@ -35,7 +35,14 @@ import org.springframework.http.ResponseEntity;
 import java.time.LocalDate;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -159,6 +166,111 @@ class OrderV1ApiE2ETest {
             assertAll(
                 () -> assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(secondResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
+            );
+        }
+
+        @DisplayName("동일한 입장 토큰으로 주문을 동시에 요청하면 하나의 주문만 생성된다.")
+        @Test
+        void createsOnlyOneOrder_whenSameEntryTokenIsUsedConcurrently() throws Exception {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            OrderDto.Create.V1.Request request = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 1))
+            );
+            HttpHeaders headers = orderHeaders("user1234", "abc123!?");
+            ExecutorService executorService = Executors.newFixedThreadPool(2);
+            CountDownLatch readyLatch = new CountDownLatch(2);
+            CountDownLatch startLatch = new CountDownLatch(1);
+            Callable<ResponseEntity<ApiResponse<Void>>> requestTask = () -> {
+                readyLatch.countDown();
+                startLatch.await();
+                return testRestTemplate.exchange(
+                    ENDPOINT_ORDERS,
+                    HttpMethod.POST,
+                    new HttpEntity<>(request, headers),
+                    voidResponseType()
+                );
+            };
+
+            // act
+            List<ResponseEntity<ApiResponse<Void>>> concurrentResponses = new ArrayList<>();
+            try {
+                List<Future<ResponseEntity<ApiResponse<Void>>>> futures = List.of(
+                    executorService.submit(requestTask),
+                    executorService.submit(requestTask)
+                );
+                assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
+                startLatch.countDown();
+                for (Future<ResponseEntity<ApiResponse<Void>>> future : futures) {
+                    concurrentResponses.add(future.get(30, TimeUnit.SECONDS));
+                }
+            } finally {
+                startLatch.countDown();
+                executorService.shutdownNow();
+            }
+            ResponseEntity<ApiResponse<Void>> reuseResponse = testRestTemplate.exchange(
+                ENDPOINT_ORDERS,
+                HttpMethod.POST,
+                new HttpEntity<>(request, headers),
+                voidResponseType()
+            );
+            ProductJpaEntity savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+
+            // assert
+            assertAll(
+                () -> assertThat(concurrentResponses.stream().map(ResponseEntity::getStatusCode).toList())
+                    .containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.UNAUTHORIZED),
+                () -> assertThat(orderJpaRepository.count()).isEqualTo(1),
+                () -> assertThat(savedProduct.getStock()).isEqualTo(9),
+                () -> assertThat(reuseResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED)
+            );
+        }
+
+        @DisplayName("주문이 실패하면 입장 토큰 claim을 해제해 같은 토큰으로 재시도할 수 있다.")
+        @Test
+        void releasesEntryTokenClaim_whenOrderFails() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 1);
+            OrderDto.Create.V1.Request invalidRequest = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 2))
+            );
+            OrderDto.Create.V1.Request validRequest = new OrderDto.Create.V1.Request(
+                List.of(new OrderDto.Create.V1.ProductRequest(product.getId(), 1))
+            );
+            HttpHeaders headers = orderHeaders("user1234", "abc123!?");
+
+            // act
+            ResponseEntity<ApiResponse<Void>> failedResponse = testRestTemplate.exchange(
+                ENDPOINT_ORDERS,
+                HttpMethod.POST,
+                new HttpEntity<>(invalidRequest, headers),
+                voidResponseType()
+            );
+            ResponseEntity<ApiResponse<Void>> retryResponse = testRestTemplate.exchange(
+                ENDPOINT_ORDERS,
+                HttpMethod.POST,
+                new HttpEntity<>(validRequest, headers),
+                voidResponseType()
+            );
+            ResponseEntity<ApiResponse<Void>> reuseResponse = testRestTemplate.exchange(
+                ENDPOINT_ORDERS,
+                HttpMethod.POST,
+                new HttpEntity<>(validRequest, headers),
+                voidResponseType()
+            );
+            ProductJpaEntity savedProduct = productJpaRepository.findById(product.getId()).orElseThrow();
+
+            // assert
+            assertAll(
+                () -> assertThat(failedResponse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT),
+                () -> assertThat(retryResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(reuseResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(orderJpaRepository.count()).isEqualTo(1),
+                () -> assertThat(savedProduct.getStock()).isZero()
             );
         }
 

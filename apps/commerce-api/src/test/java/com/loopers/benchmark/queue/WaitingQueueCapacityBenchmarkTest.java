@@ -289,7 +289,7 @@ class WaitingQueueCapacityBenchmarkTest {
     private void enqueueDeterministically(List<BenchmarkUser> users) {
         for (int index = 0; index < users.size(); index++) {
             BenchmarkUser user = users.get(index);
-            if (!waitingQueueRepository.enqueueIfAbsent(user.loginId(), index)) {
+            if (!waitingQueueRepository.enqueueIfAbsent(user.loginId())) {
                 throw new IllegalStateException("Failed to enqueue unique benchmark user: " + user.loginId());
             }
         }
