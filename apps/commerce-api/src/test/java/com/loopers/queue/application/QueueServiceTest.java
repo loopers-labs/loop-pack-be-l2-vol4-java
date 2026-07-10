@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,29 @@ class QueueServiceTest {
         QueueResult.Enter result = sut.enter("user-1");
 
         assertThat(result.position()).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("진입 직후 스케줄러가 뽑아가 순번이 null 이어도 예외 없이 순번 0 을 반환한다")
+    void givenPoppedRightAfterAdd_whenEnter_thenReturnsZeroWithoutNpe() {
+        when(waitingQueueRepository.rank("user-1")).thenReturn(null); // add 직후 ZPOPMIN 으로 뽑혀나감
+
+        QueueResult.Enter result = sut.enter("user-1");
+
+        assertThat(result.position()).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("이미 입장 토큰이 있는 유저가 진입하면 대기열에 다시 넣지 않고 순번 0 을 반환한다")
+    void givenAdmittedUser_whenEnter_thenDoesNotReAddAndReturnsZero() {
+        when(entryTokenStore.find("user-1")).thenReturn(Optional.of("tok-123"));
+
+        QueueResult.Enter result = sut.enter("user-1");
+
+        assertAll(
+                () -> assertThat(result.position()).isEqualTo(0L),
+                () -> verify(waitingQueueRepository, never()).add(eq("user-1"), anyLong())
+        );
     }
 
     @Test

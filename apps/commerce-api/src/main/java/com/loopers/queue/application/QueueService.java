@@ -23,8 +23,14 @@ public class QueueService {
 
     /** 대기열에 진입시키고 순번을 돌려준다. 이미 있으면 순번을 유지한다. */
     public QueueResult.Enter enter(String userId) {
+        // 이미 입장 토큰이 있으면(입장한 유저) 대기열에 다시 넣지 않는다.
+        if (entryTokenStore.find(userId).isPresent()) {
+            return new QueueResult.Enter(0L);
+        }
         waitingQueueRepository.add(userId, System.currentTimeMillis());
-        return new QueueResult.Enter(waitingQueueRepository.rank(userId));
+        // add 직후 스케줄러가 ZPOPMIN 으로 뽑아가면 rank 가 null 이다 → 맨 앞(입장 임박)으로 본다.
+        Long rank = waitingQueueRepository.rank(userId);
+        return new QueueResult.Enter(rank == null ? 0L : rank);
     }
 
     /** 현재 순번과 예상 대기시간, 다음 폴링 간격을 돌려준다. 입장했으면 토큰을, 대기열에 없으면 예외. */
