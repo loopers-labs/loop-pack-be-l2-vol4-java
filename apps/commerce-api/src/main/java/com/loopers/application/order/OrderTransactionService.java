@@ -11,6 +11,7 @@ import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderRepository;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.order.StockShortageException;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.stock.StockModel;
@@ -153,8 +154,7 @@ public class OrderTransactionService {
             int affected = stockRepository.deductAtomically(item.getProductId(), item.getQuantity());
             if (affected == 0) {
                 // 상품 존재는 주문 시점에 검증됨 — 0행 = 재고 부족. 롤백으로 전체 점유 취소.
-                throw new CoreException(ErrorType.BAD_REQUEST,
-                    "[productId = " + item.getProductId() + "] 재고가 부족하여 주문을 진행할 수 없습니다.");
+                throw new StockShortageException(item.getProductId());
             }
         }
 

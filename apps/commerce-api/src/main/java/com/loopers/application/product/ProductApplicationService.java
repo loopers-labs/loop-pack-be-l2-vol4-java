@@ -195,6 +195,18 @@ public class ProductApplicationService {
                 "[id = " + brandId + "] 브랜드를 찾을 수 없습니다."));
     }
 
+    /**
+     * 재고만 조회하는 경량 API — 대기열 통과 후 "품절 여부" 확인 전용.
+     *
+     * <p>{@link #getProductDetail}과 달리 브랜드/좋아요 조립·캐시·조회 이벤트 발행을 모두 생략하고
+     * 재고 행 하나만 읽는다. 플래시세일 시 이 확인이 대량으로 호출되므로, 상세 조회의 부가 작업
+     * (특히 조회 이벤트가 메트릭 파이프라인을 폭주시키는 것)을 태우지 않기 위해 분리했다.
+     */
+    @Transactional(readOnly = true)
+    public StockInfo getStock(Long productId) {
+        return StockInfo.from(productId, findStockOrThrow(productId));
+    }
+
     private StockModel findStockOrThrow(Long productId) {
         return stockRepository.findByProductId(productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
