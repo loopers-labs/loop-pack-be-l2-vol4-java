@@ -38,12 +38,12 @@ public class OrderQueueFacade {
         }
         // 큐에 없음 → 스케줄러가 토큰을 발급했으면 "내 차례", 아니면 미진입/완료.
         String token = entryTokenRepository.find(userId).orElse(null);
-        return new QueuePositionInfo(0, 0, token);
+        return new QueuePositionInfo(0, orderQueueService.totalWaiting(), 0, token);
     }
 
     private QueuePositionInfo waiting(long position) {
         long estimatedWaitSeconds = (long) Math.ceil((double) position / throughputPerSecond);
-        return new QueuePositionInfo(position, estimatedWaitSeconds, null);
+        return new QueuePositionInfo(position, orderQueueService.totalWaiting(), estimatedWaitSeconds, null);
     }
 
     // 대기열은 캐시(fail-open)와 정반대다. Redis 에러 시 우회 입장을 허용하면 DB 보호라는 본질이 무너지므로 503으로 막는다.

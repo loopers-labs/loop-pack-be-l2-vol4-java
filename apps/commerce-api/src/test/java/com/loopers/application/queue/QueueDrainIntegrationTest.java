@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -83,6 +84,36 @@ class QueueDrainIntegrationTest {
             List<Long> issued = entryTokenRepository.issueToNext(18, TTL);
 
             assertThat(issued).isEmpty();
+        }
+    }
+
+    @DisplayName("배치 크기 이상의 대기자가 몰려도, ")
+    @Nested
+    class OverCapacity {
+
+        @DisplayName("틱당 배치 크기까지만 방출되고, 전원이 유실·중복 없이 진입 순서대로 입장한다.")
+        @Test
+        void drainsSteadily_whenWaitersExceedBatchSize() {
+            // arrange — 배치 크기(18)를 초과하는 45명이 대기
+            int batchSize = 18;
+            enterInOrder(LongStream.rangeClosed(1, 45).toArray());
+
+            // act — 스케줄러 틱 1회
+            List<Long> tick1 = entryTokenRepository.issueToNext(batchSize, TTL);
+
+            // assert — 앞 18명만 방출, 초과분 27명은 순번이 당겨진 채 대기 유지
+            assertThat(tick1).containsExactlyElementsOf(LongStream.rangeClosed(1, 18).boxed().toList());
+            assertThat(orderQueueRepository.size()).isEqualTo(27L);
+            assertThat(orderQueueRepository.findRank(19L)).contains(0L);
+
+            // act — 남은 인원이 모두 소진될 때까지 틱 반복
+            List<Long> tick2 = entryTokenRepository.issueToNext(batchSize, TTL);
+            List<Long> tick3 = entryTokenRepository.issueToNext(batchSize, TTL);
+
+            // assert — 유실·중복 없이 진입 순서 그대로 전원 입장, 큐 소진
+            assertThat(tick2).containsExactlyElementsOf(LongStream.rangeClosed(19, 36).boxed().toList());
+            assertThat(tick3).containsExactlyElementsOf(LongStream.rangeClosed(37, 45).boxed().toList());
+            assertThat(orderQueueRepository.size()).isEqualTo(0L);
         }
     }
 

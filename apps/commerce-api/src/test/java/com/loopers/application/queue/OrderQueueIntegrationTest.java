@@ -72,6 +72,22 @@ class OrderQueueIntegrationTest {
         void returnsZero_whenNotInQueue() {
             assertThat(orderQueueFacade.position(999L).position()).isEqualTo(0L);
         }
+
+        @DisplayName("응답에 전체 대기 인원이 포함된다.")
+        @Test
+        void includesTotalWaiting() {
+            // arrange
+            orderQueueFacade.enter(1L);
+            orderQueueFacade.enter(2L);
+
+            // act
+            QueuePositionInfo entered = orderQueueFacade.enter(3L);
+            QueuePositionInfo polled = orderQueueFacade.position(1L);
+
+            // assert
+            assertThat(entered.totalWaiting()).isEqualTo(3L);
+            assertThat(polled.totalWaiting()).isEqualTo(3L);
+        }
     }
 
     @DisplayName("여러 유저가 동시에 진입해도, ")

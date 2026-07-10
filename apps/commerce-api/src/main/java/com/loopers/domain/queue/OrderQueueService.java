@@ -21,4 +21,9 @@ public class OrderQueueService {
             .map(rank -> rank + 1)
             .orElse(0L);
     }
+
+    /** 전체 대기 인원. */
+    public long totalWaiting() {
+        return orderQueueRepository.size();
+    }
 }
