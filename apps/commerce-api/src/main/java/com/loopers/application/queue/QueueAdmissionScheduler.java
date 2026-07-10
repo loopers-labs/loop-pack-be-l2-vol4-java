@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 // 대기열에서 admitBatch 만큼 배치 발급하는 스케줄러. OutboxRelay 와 동일하게 개별 실패는 삼키고 다음 tick 에 재시도한다.
 // (@EnableScheduling 은 CommerceApiApplication 에 이미 선언돼 있다.)
+// queue.scheduler-enabled=false(test 프로필)면 자동 tick 은 꺼지지만 admit() 자체는 테스트가 직접 호출할 수 있다.
 @Slf4j
 @Component
 public class QueueAdmissionScheduler {
@@ -34,6 +35,12 @@ public class QueueAdmissionScheduler {
     }
 
     @Scheduled(fixedDelayString = "${queue.scheduler-interval-ms}")
+    public void scheduledAdmit() {
+        if (queueProperties.schedulerEnabled()) {
+            admit();
+        }
+    }
+
     public void admit() {
         try {
             queueAdmissionRepository.admitBatch(queueProperties.batchSize(), TOKEN_TTL);

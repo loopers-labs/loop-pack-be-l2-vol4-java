@@ -11,7 +11,7 @@ class QueuePropertiesTest {
     @Test
     void calculatesBatchSize_fromThroughputAndSchedulerInterval() {
         // given
-        QueueProperties queueProperties = new QueueProperties(100, 70);
+        QueueProperties queueProperties = new QueueProperties(100, 70, true);
 
         // when
         int batchSize = queueProperties.batchSize();
