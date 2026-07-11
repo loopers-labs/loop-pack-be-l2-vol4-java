@@ -10,6 +10,8 @@ import com.loopers.domain.money.Money;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
+import com.loopers.domain.queue.EntryTokenRepository;
+import com.loopers.domain.queue.OrderQueueRepository;
 import com.loopers.domain.user.LoginId;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.coupon.CouponJpaRepository;
@@ -21,6 +23,7 @@ import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.api.user.UserV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,6 +39,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,7 +62,10 @@ class OrderV1ApiE2ETest {
     private final UserJpaRepository userJpaRepository;
     private final CouponJpaRepository couponJpaRepository;
     private final UserCouponJpaRepository userCouponJpaRepository;
+    private final OrderQueueRepository orderQueueRepository;
+    private final EntryTokenRepository entryTokenRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     public OrderV1ApiE2ETest(
@@ -70,7 +77,10 @@ class OrderV1ApiE2ETest {
         UserJpaRepository userJpaRepository,
         CouponJpaRepository couponJpaRepository,
         UserCouponJpaRepository userCouponJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        OrderQueueRepository orderQueueRepository,
+        EntryTokenRepository entryTokenRepository,
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
@@ -80,12 +90,16 @@ class OrderV1ApiE2ETest {
         this.userJpaRepository = userJpaRepository;
         this.couponJpaRepository = couponJpaRepository;
         this.userCouponJpaRepository = userCouponJpaRepository;
+        this.orderQueueRepository = orderQueueRepository;
+        this.entryTokenRepository = entryTokenRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private void signup(String loginId, String password) {
@@ -96,6 +110,17 @@ class OrderV1ApiE2ETest {
             new ParameterizedTypeReference<>() {};
         testRestTemplate.exchange(ENDPOINT_SIGNUP, HttpMethod.POST,
             new HttpEntity<>(request), responseType);
+    }
+
+    private Long userId(String loginId) {
+        return userJpaRepository.findByLoginId(new LoginId(loginId)).orElseThrow().getId();
+    }
+
+    /** 유저를 대기열에 넣고 드레인해 실제 입장 토큰을 발급받는다(관문 통과용). */
+    private String admit(Long userId) {
+        orderQueueRepository.enter(userId, System.currentTimeMillis());
+        entryTokenRepository.issueToNext(1, Duration.ofMinutes(5));
+        return entryTokenRepository.find(userId).orElseThrow();
     }
 
     private Product saveProduct(int stock) {
@@ -113,16 +138,24 @@ class OrderV1ApiE2ETest {
         return headers;
     }
 
+    private HttpHeaders entryHeaders(String loginId, String password, String token) {
+        HttpHeaders headers = authHeaders(loginId, password);
+        headers.set("X-Entry-Token", token);
+        return headers;
+    }
+
     @DisplayName("POST /api/v1/orders")
     @Nested
     class Place {
-        @DisplayName("유효한 인증 헤더와 주문 항목으로 요청하면, 주문이 생성되고 재고가 차감된다.")
+        @DisplayName("입장 토큰과 유효한 주문 항목으로 요청하면, 주문이 생성되고 재고가 차감되며 토큰이 소진된다.")
         @Test
         void createsOrderAndDecreasesStock_whenRequestIsValid() {
             // arrange
             signup("minwoo01", "Passw0rd!");
+            Long userId = userId("minwoo01");
+            String token = admit(userId);
             Product product = saveProduct(10);
-            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            HttpHeaders headers = entryHeaders("minwoo01", "Passw0rd!", token);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
                 List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), null
             );
@@ -143,7 +176,9 @@ class OrderV1ApiE2ETest {
                 () -> assertThat(response.getBody().data().items()).hasSize(1),
                 () -> assertThat(orderJpaRepository.findAll()).hasSize(1),
                 () -> assertThat(orderItemJpaRepository.findAll()).hasSize(1),
-                () -> assertThat(reloaded.getStock().getQuantity()).isEqualTo(7)
+                () -> assertThat(reloaded.getStock().getQuantity()).isEqualTo(7),
+                // 주문 성공 후 입장 토큰은 소진(삭제)된다.
+                () -> assertThat(entryTokenRepository.find(userId)).isEmpty()
             );
         }
 
@@ -152,12 +187,13 @@ class OrderV1ApiE2ETest {
         void appliesCoupon_whenCouponIdIsGiven() {
             // arrange
             signup("minwoo01", "Passw0rd!");
-            Long userId = userJpaRepository.findByLoginId(new LoginId("minwoo01")).orElseThrow().getId();
+            Long userId = userId("minwoo01");
+            String token = admit(userId);
             Product product = saveProduct(10);
             Coupon coupon = couponJpaRepository.save(new Coupon("천원 할인",
                 new Discount(CouponType.FIXED, 1000L), null, LocalDateTime.of(2099, 12, 31, 23, 59, 59)));
             UserCoupon userCoupon = userCouponJpaRepository.save(new UserCoupon(userId, coupon.getId()));
-            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            HttpHeaders headers = entryHeaders("minwoo01", "Passw0rd!", token);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
                 List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 3)), userCoupon.getId()
             );
@@ -185,8 +221,9 @@ class OrderV1ApiE2ETest {
         void throwsBadRequest_whenStockIsInsufficient() {
             // arrange
             signup("minwoo01", "Passw0rd!");
+            String token = admit(userId("minwoo01"));
             Product product = saveProduct(5);
-            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            HttpHeaders headers = entryHeaders("minwoo01", "Passw0rd!", token);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
                 List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 10)), null
             );
@@ -211,7 +248,8 @@ class OrderV1ApiE2ETest {
         void throwsNotFound_whenProductDoesNotExist() {
             // arrange
             signup("minwoo01", "Passw0rd!");
-            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            String token = admit(userId("minwoo01"));
+            HttpHeaders headers = entryHeaders("minwoo01", "Passw0rd!", token);
             OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
                 List.of(new OrderV1Dto.OrderLineRequest(999L, 1)), null
             );
@@ -245,6 +283,54 @@ class OrderV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("입장 토큰 없이 주문하면, 403 FORBIDDEN 응답을 받고 주문이 저장되지 않는다.")
+        @Test
+        void throwsForbidden_whenEntryTokenMissing() {
+            // arrange — 대기열을 통과하지 않아 토큰이 없다.
+            signup("minwoo01", "Passw0rd!");
+            Product product = saveProduct(10);
+            HttpHeaders headers = authHeaders("minwoo01", "Passw0rd!");
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1)), null
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_ORDER, HttpMethod.POST,
+                    new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(orderJpaRepository.findAll()).isEmpty()
+            );
+        }
+
+        @DisplayName("잘못된 입장 토큰으로 주문하면, 403 FORBIDDEN 응답을 받는다.")
+        @Test
+        void throwsForbidden_whenEntryTokenInvalid() {
+            // arrange — 실제 발급 토큰이 아닌 임의 값.
+            signup("minwoo01", "Passw0rd!");
+            admit(userId("minwoo01"));
+            Product product = saveProduct(10);
+            HttpHeaders headers = entryHeaders("minwoo01", "Passw0rd!", "not-a-real-token");
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(
+                List.of(new OrderV1Dto.OrderLineRequest(product.getId(), 1)), null
+            );
+
+            // act
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response =
+                testRestTemplate.exchange(ENDPOINT_ORDER, HttpMethod.POST,
+                    new HttpEntity<>(request, headers), responseType);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         }
     }
 }
