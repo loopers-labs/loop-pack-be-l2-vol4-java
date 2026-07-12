@@ -1,0 +1,6 @@
+package com.loopers.application.ranking;
+
+import com.loopers.application.product.ProductInfo;
+
+public record RankingInfo(long rank, ProductInfo product) {
+}

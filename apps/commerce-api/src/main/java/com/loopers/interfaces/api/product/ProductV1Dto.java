@@ -15,9 +15,15 @@ public class ProductV1Dto {
         BigDecimal price,
         long likeCount,
         BrandResponse brand,
-        boolean available
+        boolean available,
+        Long rank
     ) {
         public static ProductResponse from(ProductInfo info) {
+            return from(info, null);
+        }
+
+        // 순위는 캐시되는 ProductInfo(@Cacheable) 밖에서 별도로 조회해 넘겨받는다 — 랭킹은 계속 바뀌므로 캐시에 가두면 안 된다.
+        public static ProductResponse from(ProductInfo info, Long rank) {
             return new ProductResponse(
                 info.id(),
                 info.name(),
@@ -25,7 +31,8 @@ public class ProductV1Dto {
                 info.price(),
                 info.likeCount(),
                 BrandResponse.from(info.brand()),
-                info.stock() > 0
+                info.stock() > 0,
+                rank
             );
         }
     }
