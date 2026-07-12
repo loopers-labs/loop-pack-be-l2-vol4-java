@@ -10,6 +10,7 @@ public enum ErrorType {
     BAD_REQUEST(400, "Bad Request", "잘못된 요청입니다."),
     NOT_FOUND(404, "Not Found", "존재하지 않는 요청입니다."),
     CONFLICT(409, "Conflict", "이미 존재하는 리소스입니다."),
+    ORDER_QUEUE_TOKEN_REQUIRED(403, "ORDER_QUEUE_TOKEN_REQUIRED", "주문 입장 토큰이 필요합니다."),
     EXTERNAL_SYSTEM_UNAVAILABLE(503, "EXTERNAL_SYSTEM_UNAVAILABLE", "일시적으로 외부 시스템을 사용할 수 없습니다."),
 
     USER_NOT_FOUND(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),

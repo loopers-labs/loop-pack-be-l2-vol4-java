@@ -1,0 +1,33 @@
+@baseUrl = http://localhost:8080
+@loginId = user1
+@loginPw = password
+@queueToken = replace-with-token-from-position-response
+@productId = 1
+
+### Enter order queue
+POST {{baseUrl}}/api/v1/queue/enter
+X-Loopers-LoginId: {{loginId}}
+X-Loopers-LoginPw: {{loginPw}}
+
+### Poll order queue position
+# Response includes recommendedPollingIntervalSeconds. Use it as the next polling delay.
+GET {{baseUrl}}/api/v1/queue/position
+X-Loopers-LoginId: {{loginId}}
+X-Loopers-LoginPw: {{loginPw}}
+
+### Place order with queue token
+POST {{baseUrl}}/api/v1/orders
+Content-Type: application/json
+X-Loopers-LoginId: {{loginId}}
+X-Loopers-LoginPw: {{loginPw}}
+X-Loopers-Queue-Token: {{queueToken}}
+
+{
+  "items": [
+    {
+      "productId": {{productId}},
+      "quantity": 1
+    }
+  ],
+  "couponId": null
+}

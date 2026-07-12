@@ -5,6 +5,7 @@ import com.loopers.application.ordering.order.OrderFacade;
 import com.loopers.application.ordering.order.OrderQuery;
 import com.loopers.application.ordering.order.OrderQueryService;
 import com.loopers.application.ordering.order.OrderResult;
+import com.loopers.application.ordering.queue.OrderQueueService;
 import com.loopers.interfaces.api.support.HeaderValidator;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -29,18 +30,22 @@ public class OrderController {
 
     private final OrderFacade orderFacade;
     private final OrderQueryService orderQueryService;
+    private final OrderQueueService orderQueueService;
 
     @PostMapping
     public ApiResponse<OrderDto.OrderCreateResponse> placeOrder(
         @RequestHeader(HeaderValidator.LOGIN_ID) String loginId,
         @RequestHeader(HeaderValidator.LOGIN_PW) String loginPw,
+        @RequestHeader(value = HeaderValidator.QUEUE_TOKEN, required = false) String queueToken,
         @RequestBody OrderDto.OrderCreateRequest request
     ) {
         HeaderValidator.validateUser(loginId, loginPw);
+        orderQueueService.requireValidToken(loginId, queueToken);
         if (request == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "주문 요청은 필수입니다.");
         }
         OrderResult.Detail result = orderFacade.placeOrder(request.toCommand(loginId));
+        orderQueueService.deleteToken(loginId);
         return ApiResponse.success(OrderDto.OrderCreateResponse.from(result));
     }
 

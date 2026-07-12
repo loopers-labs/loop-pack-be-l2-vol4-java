@@ -10,10 +10,12 @@ import com.loopers.domain.payment.gateway.PaymentGatewayResult;
 import com.loopers.domain.payment.payment.Payment;
 import com.loopers.domain.payment.payment.PaymentRepository;
 import com.loopers.domain.payment.payment.PaymentStatus;
+import com.loopers.domain.ordering.queue.OrderQueueRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.ordering.OrderDto;
 import com.loopers.interfaces.api.support.HeaderValidator;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,21 +30,27 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "commerce.workers.order-queue.enabled=false"
+)
 class PaymentApiE2ETest {
 
     private final org.springframework.boot.test.web.client.TestRestTemplate testRestTemplate;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
+    private final OrderQueueRepository orderQueueRepository;
     private final FakePaymentGateway fakePaymentGateway;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     PaymentApiE2ETest(
@@ -50,21 +58,26 @@ class PaymentApiE2ETest {
         BrandRepository brandRepository,
         ProductRepository productRepository,
         PaymentRepository paymentRepository,
+        OrderQueueRepository orderQueueRepository,
         FakePaymentGateway fakePaymentGateway,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
         this.paymentRepository = paymentRepository;
+        this.orderQueueRepository = orderQueueRepository;
         this.fakePaymentGateway = fakePaymentGateway;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         fakePaymentGateway.reset();
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("POST /api/v1/payments 는 PG 결제 요청을 보내고 내부 결제를 PROCESSING 상태로 반영한다.")
@@ -107,6 +120,7 @@ class PaymentApiE2ETest {
     }
 
     private Long placeOrder(Long productId) {
+        String token = orderQueueRepository.issueToken("user1", Duration.ofMinutes(5));
         ParameterizedTypeReference<ApiResponse<OrderDto.OrderCreateResponse>> responseType =
             new ParameterizedTypeReference<>() {};
         ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> response = testRestTemplate.exchange(
@@ -114,7 +128,7 @@ class PaymentApiE2ETest {
             HttpMethod.POST,
             new HttpEntity<>(
                 new OrderDto.OrderCreateRequest(List.of(new OrderDto.OrderCreateItemRequest(productId, 1))),
-                userHeaders("user1")
+                userHeaders("user1", token)
             ),
             responseType
         );
@@ -125,6 +139,12 @@ class PaymentApiE2ETest {
         HttpHeaders headers = new HttpHeaders();
         headers.add(HeaderValidator.LOGIN_ID, userId);
         headers.add(HeaderValidator.LOGIN_PW, "password");
+        return headers;
+    }
+
+    private HttpHeaders userHeaders(String userId, String queueToken) {
+        HttpHeaders headers = userHeaders(userId);
+        headers.add(HeaderValidator.QUEUE_TOKEN, queueToken);
         return headers;
     }
 

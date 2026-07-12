@@ -1,10 +1,10 @@
 # Domain Glossary
 
-이 문서는 현재 7주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 8주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 문서 목적
 
-- 현재 7주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
+- 현재 8주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
 - `.docs/design`의 4개 제출 문서는 volume-2 설계 이력으로 보존하며 현재 기준으로 덮어쓰지 않는다.
 - 구현 단계에서 패키지, 클래스, 테스트 이름을 정할 때 이 문서를 먼저 확인한다.
 - 이번 주차 설계에는 `Point`/포인트 도메인을 포함하지 않는다.
@@ -50,6 +50,12 @@
 | 쿠폰 복구 | 결제 실패/취소/타임아웃 시 사용 쿠폰을 되돌리는 처리 | 재고 복구와 함께 `AVAILABLE` 상태로 변경한다. |
 | 4주차 핵심 범위 | 재고, 쿠폰, 주문의 정합성과 동시성 제어 | RDB 트랜잭션과 비관적 row lock으로 처리한다. |
 | 7주차 핵심 범위 | 이벤트 기반 경계 분리, Kafka 파이프라인, Transactional Outbox, 비동기 선착순 쿠폰 발급 | ApplicationEvent, Outbox relay, Consumer 멱등성, Micrometer 지표로 처리한다. |
+| 8주차 핵심 범위 | 주문 API 앞단의 Redis 기반 대기열, 입장 토큰, 스케줄러 기반 순차 입장, polling 순번 조회 | `ordering.queue` 경계에서 처리하고 주문 생성 이후 흐름은 기존 ordering/payment/event 구조를 재사용한다. |
+| 대기열 | 주문 API 진입 전 사용자를 순서대로 대기시키는 전역 관문 | Redis Sorted Set 기반으로 진입 순서를 관리한다. |
+| 입장 토큰 | 대기열에서 입장이 허용된 사용자에게 발급되는 주문 진입 권한 | TTL을 가지며 주문 API 진입 시 검증하고 주문 완료 후 삭제한다. |
+| 순번 | 대기열 안에서 사용자의 현재 대기 위치 | polling 조회 API 응답에 포함한다. |
+| 예상 대기 시간 | 현재 순번과 스케줄러 처리량 기준으로 계산한 대략적인 대기 시간 | polling 조회 API 응답에 포함한다. |
+| 권장 polling 간격 | 클라이언트가 다음 순번 조회까지 기다리면 좋은 시간 | 대기 순번이 뒤로 밀릴수록 늘리고 최대 10초로 제한한다. |
 | 기존 확장 설계 | 결제 worker, 0원 주문 처리 | 현재 주차 필수 범위와 분리해 관리한다. |
 
 ## 아키텍처 기준
@@ -66,7 +72,7 @@
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
-| `ordering` | `Order`, `OrderLine` | 주문 생성, 주문 상태, 주문 항목 스냅샷 |
+| `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
 | `event` | `EventOutbox`, Kafka relay | 주문/카탈로그 이벤트 저장, Kafka 전파, relay 상태 관리 |
 
@@ -90,6 +96,19 @@
 | 쿠폰 발급 락 | 템플릿 row를 `PESSIMISTIC_WRITE`로 잠근 뒤 전체 발급 수와 사용자별 발급 수를 검사하고 발급 쿠폰을 저장한다. |
 | 비동기 쿠폰 발급 | `POST /api/v1/coupons/{couponId}/issue`는 `CouponIssueRequest(PENDING)`와 `coupon-issue-requests` Outbox를 저장하고, 실제 발급은 Kafka consumer가 처리한다. |
 | 쿠폰 발급 결과 확인 | 사용자는 `GET /api/v1/coupons/issues/{requestId}`로 발급 요청 상태를 polling한다. |
+| 대기열 도메인 경계 | 주문 API 앞단의 관문이므로 별도 최상위 `queue` 모듈을 만들지 않고 `ordering.queue` 하위에 둔다. |
+| 대기열 범위 | 주문 API 전체를 보호하는 전역 대기열 1개로 시작한다. 상품별/이벤트별 대기열은 후속 확장으로 둔다. |
+| 대기열 Redis key | 대기열 Sorted Set은 `commerce:ordering:queue:v1:waiting`, 입장 토큰은 `commerce:ordering:queue:v1:token:{userId}`를 사용한다. |
+| 대기열 순서 score | Redis `INCR commerce:ordering:queue:v1:sequence` 결과를 Sorted Set score로 사용한다. 같은 밀리초 진입으로 인한 순서 흔들림을 피한다. |
+| 입장 토큰 TTL | 입장 토큰은 5분 TTL을 가진다. 토큰 값은 UUID 문자열로 발급하고 주문 API의 `X-Loopers-Queue-Token` 헤더와 비교한다. |
+| 입장 스케줄러 | 1초마다 10명 입장을 기본값으로 시작한다. 실제 운영 처리량은 DB 커넥션 풀, 평균 주문 처리 시간, 목표 안정 처리량에 따라 설정값으로 조정한다. |
+| 대기열 API | 대고객 API prefix를 맞춰 `POST /api/v1/queue/enter`, `GET /api/v1/queue/position`을 사용한다. 사용자 식별은 기존 `X-Loopers-LoginId`, `X-Loopers-LoginPw` 헤더를 사용한다. |
+| 대기열 응답 | 진입/조회 API는 같은 응답 DTO를 사용한다. 필드는 `status`, `position`, `waitingCount`, `estimatedWaitSeconds`, `recommendedPollingIntervalSeconds`, `token`이다. |
+| 주문 진입 권한 오류 | 주문 API에 `X-Loopers-Queue-Token` 헤더가 없거나 Redis 토큰과 일치하지 않으면 `ORDER_QUEUE_TOKEN_REQUIRED` 403으로 거부한다. |
+| 대기열 구현 이름 | `OrderQueueController`, `OrderQueueDto`, `OrderQueueService`, `OrderQueueAdmissionWorker`, `OrderQueueAdmissionWorkerScheduler`, `OrderQueueRepository`, `RedisOrderQueueRepository`, `OrderQueueStatus`를 사용한다. |
+| 대기열 조회 우선순위 | 입장 토큰이 있으면 `READY`를 우선 반환한다. 토큰이 없고 대기열에 있으면 `WAITING`, 둘 다 없으면 `NOT_QUEUED`를 반환한다. |
+| 예상 대기 시간 계산 | `ceil(position / admitBatchSize) * schedulerIntervalSeconds`로 계산한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
+| 권장 polling 간격 계산 | `WAITING`은 예상 대기 시간을 기준으로 1~10초 사이를 반환한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
 | 주문 생성 락 | 상품 ID 오름차순으로 상품 row를 잠그고 재고를 차감한 뒤 optional 발급 쿠폰 row를 잠가 사용 처리한다. |
 | 주문 원자성 | 재고 차감, 쿠폰 `USED` 전이, 할인 스냅샷 주문 저장은 하나의 DB 트랜잭션으로 처리한다. |
 | 주문 쿠폰 식별자 | 주문 요청과 주문 스냅샷의 nullable `couponId`는 발급 쿠폰 ID다. |
@@ -131,6 +150,8 @@
 | `IssuedCoupon` | 발급 쿠폰 | 사용자별 쿠폰의 할인 조건 스냅샷과 사용 상태를 표현한다. |
 | `Order` | 주문 | 주문 대표 상태와 총액을 관리한다. |
 | `OrderLine` | 주문 항목 | 주문 당시 상품명, 단가, 수량 스냅샷을 보관한다. |
+| 대기열 | 주문 대기열 | 주문 API 앞단에서 사용자 진입 순서와 입장 권한을 관리한다. |
+| 입장 토큰 | 주문 입장 토큰 | 대기열에서 입장이 허용된 사용자가 주문 API에 진입할 수 있음을 나타낸다. |
 | `Payment` | 결제 | 결제 요청과 외부 결제 결과를 기록한다. |
 | `EventOutbox` | 이벤트 아웃박스 | Kafka로 보낼 주문/카탈로그 이벤트를 저장한다. |
 | `PaymentGateway` | 외부 결제 시스템 | 결제 승인, 매입, 승인 취소를 수행하는 외부 시스템이다. |
@@ -183,6 +204,14 @@
 | `SUCCEEDED` | 실제 발급 쿠폰이 생성됐다. |
 | `FAILED` | 발급 한도 초과, 만료, 중복 발급 등으로 발급이 거부됐다. |
 
+### OrderQueueStatus
+
+| 상태 | 의미 |
+| --- | --- |
+| `WAITING` | 대기열에 등록되어 아직 입장 토큰을 받지 못했다. |
+| `READY` | 입장 토큰이 발급되어 주문 API에 진입할 수 있다. |
+| `NOT_QUEUED` | 대기열에도 없고 입장 토큰도 없다. |
+
 ### OutboxStatus
 
 | 상태 | 의미 |
@@ -202,6 +231,7 @@
 | 상품 ADMIN | `ProductAdminController` | `ProductService` | `ProductRepository`, `BrandRepository` |
 | 좋아요 등록/취소/조회 | `ProductLikeController` | `ProductLikeService` | `ProductLikeRepository` |
 | 주문 생성/조회 | `OrderController` | `OrderFacade`, `OrderService`, `StockService` | `OrderRepository`, `ProductRepository` |
+| 대기열 진입/순번 조회 | `OrderQueueController` | `OrderQueueService`, `OrderQueueAdmissionWorker` | `OrderQueueRepository`, `RedisOrderQueueRepository` |
 | 쿠폰 발급 요청/결과 조회/내 쿠폰 조회 | `CouponV1Controller` | `CouponCommandService`, `CouponQueryService`, `CouponIssueRequestEventService` | `CouponTemplateRepository`, `CouponIssueRequestRepository`, `IssuedCouponRepository` |
 | 쿠폰 ADMIN | `CouponAdminController` | `CouponCommandService`, `CouponQueryService` | `CouponTemplateRepository`, `IssuedCouponRepository` |
 | 주문 ADMIN 조회 | `OrderAdminController` | `OrderService` | `OrderRepository` |

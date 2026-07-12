@@ -1,6 +1,6 @@
 # Architecture Decision
 
-이 문서는 현재 7주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 8주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 결정
 
@@ -17,18 +17,21 @@ com.loopers
     catalog
     coupon
     ordering
+      queue
     payment
     event
   domain
     catalog
     coupon
     ordering
+      queue
     payment
     event
   infrastructure
     catalog
     coupon
     ordering
+      queue
     payment
     event
   support
@@ -40,7 +43,7 @@ com.loopers
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
-| `ordering` | `Order`, `OrderLine` | 주문 생성, 주문 상태, 주문 항목 스냅샷 |
+| `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
 | `event` | `EventOutbox`, Kafka relay | 주문/카탈로그 이벤트 저장, Kafka 전파, relay 상태 관리 |
 
@@ -83,6 +86,27 @@ com.loopers
 | 결과 조회 | 사용자는 `GET /api/v1/coupons/issues/{requestId}`로 `PENDING`/`SUCCEEDED`/`FAILED` 상태를 polling한다. |
 | 모니터링 | Outbox relay, Kafka consumer, product metrics update 지표를 Micrometer/Prometheus로 노출한다. |
 
+## 8주차 대기열 기준
+
+8주차 구현은 주문 API 앞단의 Redis 기반 대기열을 `ordering.queue` 하위 경계에 둔다.
+
+| 영역 | 처리 |
+| --- | --- |
+| 도메인 경계 | 대기열은 독립 최상위 모듈이 아니라 주문 진입을 제어하는 관문이므로 `ordering.queue`에 둔다. |
+| 대기열 범위 | 주문 API 전체를 보호하는 전역 대기열 1개로 시작한다. 상품별/이벤트별 대기열은 후속 확장으로 둔다. |
+| 저장소 | Redis Sorted Set `commerce:ordering:queue:v1:waiting`으로 대기 순서를 관리하고, TTL이 있는 입장 토큰을 `commerce:ordering:queue:v1:token:{userId}`로 관리한다. |
+| 진입 순서 | Sorted Set score는 Redis `INCR commerce:ordering:queue:v1:sequence` 결과를 사용한다. userId는 member로 저장하고 `ZADD NX`로 중복 진입을 막는다. |
+| 입장 토큰 | 토큰 값은 UUID 문자열이며 TTL은 5분이다. 주문 API의 `X-Loopers-Queue-Token` 헤더 값과 Redis 토큰 값을 비교한다. |
+| 스케줄러 | `commerce.workers.order-queue.enabled=true`, `initial-delay-ms=1000`, `fixed-delay-ms=1000`, `admit-batch-size=10`을 기본값으로 사용한다. 배치 크기는 DB 커넥션 풀과 평균 주문 처리 시간 기준으로 조정 가능한 설정으로 둔다. |
+| API | 대기열 진입은 `POST /api/v1/queue/enter`, 순번 조회는 `GET /api/v1/queue/position`을 사용한다. 사용자 식별은 기존 로그인 헤더를 따른다. |
+| 응답 DTO | 진입/조회 API는 `status`, `position`, `waitingCount`, `estimatedWaitSeconds`, `recommendedPollingIntervalSeconds`, `token`을 포함하는 같은 응답 DTO를 사용한다. 상태는 `WAITING`, `READY`, `NOT_QUEUED`이다. |
+| 주문 API 연계 | 주문 생성 진입 시 `X-Loopers-Queue-Token` 헤더를 Redis 토큰과 비교한다. 토큰이 없거나 일치하지 않으면 `ORDER_QUEUE_TOKEN_REQUIRED` 403으로 거부하고, 주문 완료 후 토큰을 삭제한다. |
+| 구현 이름 | `OrderQueueController`, `OrderQueueDto`, `OrderQueueService`, `OrderQueueAdmissionWorker`, `OrderQueueAdmissionWorkerScheduler`, `OrderQueueRepository`, `RedisOrderQueueRepository`, `OrderQueueStatus`를 사용한다. |
+| 조회 우선순위 | 입장 토큰이 있으면 `READY`를 우선 반환한다. 토큰이 없고 대기열에 있으면 `WAITING`, 둘 다 없으면 `NOT_QUEUED`를 반환한다. |
+| 예상 대기 시간 | `ceil(position / admitBatchSize) * schedulerIntervalSeconds`로 계산한다. 기본 설정에서는 1~10번 1초, 11~20번 2초다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
+| 권장 polling 간격 | `recommendedPollingIntervalSeconds`는 예상 대기 시간을 기준으로 1~10초 사이를 반환한다. `READY`는 즉시 진입해야 하므로 0초, `NOT_QUEUED`는 null이다. |
+| 후속 흐름 | 주문 생성 이후 이벤트 발행, Kafka 파이프라인, Metrics 집계는 7주차 구조를 재사용한다. |
+
 ## 외부 경계
 
 | 경계 | 이번 설계에서의 처리 | 이유 |
@@ -122,7 +146,7 @@ com.loopers
 
 ## 현재 코드와의 관계
 
-현재 구현은 기존 5계층 패키지를 유지하고, `catalog`, `coupon`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다.
+현재 구현은 기존 5계층 패키지를 유지하고, `catalog`, `coupon`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다. 8주차 대기열은 `ordering.queue` 하위 패키지로 둔다.
 
 구현 대상 도메인은 순수 도메인 엔티티와 infrastructure JPA 엔티티를 분리한다. 기존 예제 코드의 JPA Entity 구조는 과제 핵심 범위가 아니므로 별도 리팩터링 대상에서 제외한다.
 

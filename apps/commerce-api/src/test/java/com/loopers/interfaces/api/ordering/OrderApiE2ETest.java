@@ -7,12 +7,14 @@ import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.application.coupon.CouponCommand;
 import com.loopers.application.coupon.CouponCommandService;
 import com.loopers.domain.coupon.CouponType;
+import com.loopers.domain.ordering.queue.OrderQueueRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
 import com.loopers.domain.ordering.order.OrderStatus;
 import com.loopers.domain.payment.payment.PaymentStatus;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -35,14 +38,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "commerce.workers.order-queue.enabled=false"
+)
 class OrderApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final CouponCommandService couponCommandService;
+    private final OrderQueueRepository orderQueueRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     OrderApiE2ETest(
@@ -50,18 +58,23 @@ class OrderApiE2ETest {
         BrandRepository brandRepository,
         ProductRepository productRepository,
         CouponCommandService couponCommandService,
-        DatabaseCleanUp databaseCleanUp
+        OrderQueueRepository orderQueueRepository,
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
         this.couponCommandService = couponCommandService;
+        this.orderQueueRepository = orderQueueRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("POST /api/v1/orders")
@@ -136,6 +149,78 @@ class OrderApiE2ETest {
                 () -> assertThat(response.getBody().data().discountAmount()).isEqualTo(500L),
                 () -> assertThat(response.getBody().data().finalAmount()).isEqualTo(1_500L),
                 () -> assertThat(response.getBody().data().couponId()).isEqualTo(issuedCouponId)
+            );
+        }
+
+        @DisplayName("입장 토큰이 없으면 주문 생성을 403으로 거부한다.")
+        @Test
+        void rejectsOrder_whenQueueTokenIsMissing() {
+            // arrange
+            Product product = saveProduct("상품", 1_000L, 10);
+            OrderDto.OrderCreateRequest request = new OrderDto.OrderCreateRequest(
+                List.of(new OrderDto.OrderCreateItemRequest(product.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> response = exchange(
+                "/api/v1/orders",
+                HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders("user1")),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("ORDER_QUEUE_TOKEN_REQUIRED")
+            );
+        }
+
+        @DisplayName("입장 토큰이 일치하지 않으면 주문 생성을 403으로 거부한다.")
+        @Test
+        void rejectsOrder_whenQueueTokenIsInvalid() {
+            // arrange
+            Product product = saveProduct("상품", 1_000L, 10);
+            orderQueueRepository.issueToken("user1", Duration.ofMinutes(5));
+            OrderDto.OrderCreateRequest request = new OrderDto.OrderCreateRequest(
+                List.of(new OrderDto.OrderCreateItemRequest(product.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> response = placeOrderWithQueueToken(
+                "user1",
+                request,
+                "invalid-token"
+            );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("ORDER_QUEUE_TOKEN_REQUIRED")
+            );
+        }
+
+        @DisplayName("주문 생성에 성공하면 사용한 입장 토큰을 삭제한다.")
+        @Test
+        void deletesQueueToken_whenOrderIsCreated() {
+            // arrange
+            Product product = saveProduct("상품", 1_000L, 10);
+            String token = orderQueueRepository.issueToken("user1", Duration.ofMinutes(5));
+            OrderDto.OrderCreateRequest request = new OrderDto.OrderCreateRequest(
+                List.of(new OrderDto.OrderCreateItemRequest(product.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> response = placeOrderWithQueueToken(
+                "user1",
+                request,
+                token
+            );
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(orderQueueRepository.findToken("user1")).isEmpty()
             );
         }
     }
@@ -233,20 +318,44 @@ class OrderApiE2ETest {
         String userId,
         OrderDto.OrderCreateRequest request
     ) {
+        String token = orderQueueRepository.issueToken(userId, Duration.ofMinutes(5));
+        return placeOrderWithQueueToken(userId, request, token);
+    }
+
+    private ResponseEntity<ApiResponse<OrderDto.OrderCreateResponse>> placeOrderWithQueueToken(
+        String userId,
+        OrderDto.OrderCreateRequest request,
+        String token
+    ) {
         ParameterizedTypeReference<ApiResponse<OrderDto.OrderCreateResponse>> responseType =
             new ParameterizedTypeReference<>() {};
         return testRestTemplate.exchange(
             "/api/v1/orders",
             HttpMethod.POST,
-            new HttpEntity<>(request, userHeaders(userId)),
+            new HttpEntity<>(request, userHeaders(userId, token)),
             responseType
         );
+    }
+
+    private <T> ResponseEntity<T> exchange(
+        String url,
+        HttpMethod method,
+        HttpEntity<?> request,
+        ParameterizedTypeReference<T> responseType
+    ) {
+        return testRestTemplate.exchange(url, method, request, responseType);
     }
 
     private HttpHeaders userHeaders(String userId) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(HeaderValidator.LOGIN_ID, userId);
         headers.add(HeaderValidator.LOGIN_PW, "password");
+        return headers;
+    }
+
+    private HttpHeaders userHeaders(String userId, String queueToken) {
+        HttpHeaders headers = userHeaders(userId);
+        headers.add("X-Loopers-Queue-Token", queueToken);
         return headers;
     }
 

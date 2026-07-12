@@ -7,6 +7,7 @@ public final class HeaderValidator {
 
     public static final String LOGIN_ID = "X-Loopers-LoginId";
     public static final String LOGIN_PW = "X-Loopers-LoginPw";
+    public static final String QUEUE_TOKEN = "X-Loopers-Queue-Token";
     public static final String ADMIN_LDAP = "X-Loopers-Ldap";
 
     private static final String ADMIN_LDAP_VALUE = "loopers.admin";

@@ -49,6 +49,12 @@ commerce:
       enabled: ${COMMERCE_EVENT_RELAY_ENABLED:false}
       initial-delay-ms: 5000
       fixed-delay-ms: 5000
+    order-queue:
+      enabled: ${COMMERCE_ORDER_QUEUE_WORKER_ENABLED:true}
+      initial-delay-ms: 1000
+      fixed-delay-ms: 1000
+      admit-batch-size: 10
+      token-ttl: 5m
   consumers:
     coupon-issue:
       enabled: ${COMMERCE_COUPON_ISSUE_CONSUMER_ENABLED:false}
