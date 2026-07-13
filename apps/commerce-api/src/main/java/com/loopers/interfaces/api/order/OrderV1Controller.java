@@ -61,7 +61,9 @@ public class OrderV1Controller {
             }
             unlockAll(lockedProductIds, authUser.userId());
             if (lockResult == QueueRedisStore.TokenLockResult.EXPIRED) {
-                throw new CoreException(ErrorType.UNAUTHORIZED, "대기열 토큰이 만료되었습니다. 다시 입장해주세요.");
+                // 인증 자체는 이미 통과했으므로 401이 아니다 — 대기열 토큰이라는 별도 리소스가
+                // 더 이상 유효하지 않다는 뜻이라 410(GONE)으로 응답한다.
+                throw new CoreException(ErrorType.GONE, "대기열 토큰이 만료되었습니다. 다시 입장해주세요.");
             }
             throw new CoreException(ErrorType.CONFLICT, "이미 처리 중인 주문 요청입니다.");
         }

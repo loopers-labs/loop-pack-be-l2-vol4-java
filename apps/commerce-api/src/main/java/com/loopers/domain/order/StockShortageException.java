@@ -16,7 +16,7 @@ public class StockShortageException extends CoreException {
     private final Long productId;
 
     public StockShortageException(Long productId) {
-        super(ErrorType.BAD_REQUEST, "[productId = " + productId + "] 재고가 부족하여 주문을 진행할 수 없습니다.");
+        super(ErrorType.CONFLICT, "[productId = " + productId + "] 재고가 부족하여 주문을 진행할 수 없습니다.");
         this.productId = productId;
     }
 

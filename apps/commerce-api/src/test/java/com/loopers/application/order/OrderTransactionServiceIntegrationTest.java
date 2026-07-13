@@ -177,7 +177,8 @@ class OrderTransactionServiceIntegrationTest {
             orderTransactionService.bindResources(orderB.getId()));
 
         // assert — B의 점유는 전부 롤백: 재고 2 유지, B는 PENDING 그대로
-        assertThat(result.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+        // 재고 소진(StockShortageException)은 요청 형식 오류가 아니라 상태 충돌이므로 CONFLICT(409)다.
+        assertThat(result.getErrorType()).isEqualTo(ErrorType.CONFLICT);
         assertThat(stockOf(product)).isEqualTo(2);
         assertThat(orderRepository.findById(orderB.getId()).orElseThrow().getStatus())
             .isEqualTo(OrderStatus.PENDING);
