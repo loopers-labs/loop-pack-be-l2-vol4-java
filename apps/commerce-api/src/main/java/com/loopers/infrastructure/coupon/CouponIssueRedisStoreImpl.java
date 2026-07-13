@@ -57,6 +57,12 @@ public class CouponIssueRedisStoreImpl implements CouponIssueRedisStore {
             return 1
         end
 
+        -- 예약이 이미 취소(cancel)되어 사라졌으면 재확정하지 않는다.
+        -- (재전달/리밸런싱으로 confirm 이 cancel 보다 늦게 도착하는 경합을 차단)
+        if redis.call('ZSCORE', reservedKey, userId) == false then
+            return 0
+        end
+
         local storedRequestId = redis.call('GET', requestKey)
         if storedRequestId ~= false and storedRequestId ~= requestId then
             return 0

@@ -2,11 +2,13 @@ server:
   shutdown: graceful
   tomcat:
     threads:
-      max: 200 # 최대 워커 스레드 수 (default : 200)
+      max: 400 # 최대 워커 스레드 수 (default 200) — 대기열 폴링(가벼운 Redis 조회)의 높은 동시성을 소화
       min-spare: 10 # 최소 유지 스레드 수 (default : 10)
     connection-timeout: 1m # 연결 타임아웃 (ms) (default : 60000ms = 1m)
-    max-connections: 8192 # 최대 동시 연결 수 (default : 8192)
-    accept-count: 100 # 대기 큐 크기 (default : 100)
+    # 대기열은 "1만 명이 동시에 붙어 순번을 기다린다"가 전제 — 연결을 거부하지 않고 모두 수용해야
+    # "줄 서면 반드시 내 차례가 온다"는 대기열의 약속이 성립한다. 그래서 수용 한도를 1만 규모로 올린다.
+    max-connections: 20000 # 최대 동시 연결 수 (default 8192)
+    accept-count: 10000 # 수락 대기 백로그 (default 100)
     keep-alive-timeout: 60s # 60s
   max-http-request-header-size: 8KB
 
@@ -61,6 +63,23 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 3
   # retry: PgSimulatorGateway 에서 orderId 사전 조회 기반 수동 재시도로 대체
   #   (@Retry 는 멱등성 전제 필요 — pg-simulator 멱등키 미지원이므로 직접 제어)
+
+# 대기열(Round 8) — target-product-ids 가 비어있으면 게이트가 전혀 걸리지 않아 기존 주문 흐름과 동일하게 동작한다.
+queue:
+  target-product-ids: []
+  # 배치 크기 12 + 스케줄러 100ms 주기 = 초당 120명 입장.
+  # 부하 테스트로 측정한 1대의 다운스트림(주문+결제) 처리능력 ~120건/초에 맞춘 값이다.
+  # (초당 200 입장은 용량 초과로 붕괴, 120은 안정. 스케일아웃 시 인스턴스 수만큼 상향)
+  batch-size: 12
+  token-ttl-seconds: 300
+  poll-interval-near-millis: 1000
+  poll-interval-mid-millis: 2000
+  poll-interval-far-millis: 5000
+
+ratelimit:
+  orders:
+    limit: 100
+    window-seconds: 1
 
 ---
 spring:

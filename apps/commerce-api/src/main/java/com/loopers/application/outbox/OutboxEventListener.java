@@ -91,7 +91,11 @@ public class OutboxEventListener {
     /**
      * 선착순 쿠폰 발급 요청 — 접수 행(coupon_issue_requests)과 같은 트랜잭션으로 기록되어
      * "202 를 받은 요청은 반드시 처리된다"를 보장한다. requestId 를 eventId 로 사용해
-     * 접수증-메시지-처리기록이 하나의 식별자로 이어진다. key=couponId → 같은 쿠폰은 순차 처리(선착순).
+     * 접수증-메시지-처리기록이 하나의 식별자로 이어진다.
+     *
+     * <p>key=userId — 선착순 판정은 이미 Redis 예약(reserve) 단계에서 끝나므로, 이 시점의
+     * Kafka 메시지는 "당첨 확정된 결과의 DB 반영"일 뿐이라 쿠폰별 순서 보장이 불필요하다.
+     * userId 로 분산해 여러 파티션에서 병렬 소비할 수 있다.
      */
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onCouponIssueRequested(CouponIssueRequestedEvent event) {

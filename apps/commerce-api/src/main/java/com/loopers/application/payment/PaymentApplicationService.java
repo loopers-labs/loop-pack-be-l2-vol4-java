@@ -1,6 +1,9 @@
 package com.loopers.application.payment;
 
+import com.loopers.application.order.OrderInfo;
 import com.loopers.application.order.OrderTransactionService;
+import com.loopers.application.queue.QueueApplicationService;
+import com.loopers.domain.order.StockShortageException;
 import com.loopers.domain.payment.CardType;
 import com.loopers.domain.payment.PaymentModel;
 import com.loopers.domain.payment.PaymentRepository;
@@ -52,6 +55,7 @@ public class PaymentApplicationService {
     private final PgGateway pgGateway;
     private final PaymentRepository paymentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final QueueApplicationService queueApplicationService;
 
     @Lazy
     @Autowired
@@ -69,8 +73,15 @@ public class PaymentApplicationService {
         orderTransactionService.validateConfirmable(userId, orderId, amount);
 
         // 2. 자원 점유 — 실패 시 견적 폐기(PENDING → FAILED)
+        // StockShortageException(확정 품절)은 일반 CoreException보다 먼저 잡아야 한다 — 품절은
+        // 대기열 토큰을 즉시 회수해 재대기를 요구하지만, 그 외 실패(쿠폰 만료 등)는 토큰 TTL이
+        // 남아있는 한 재시도를 허용해야 하므로 토큰을 소비하지 않는다.
         try {
             orderTransactionService.bindResources(orderId);
+        } catch (StockShortageException e) {
+            queueApplicationService.consume(e.getProductId(), userId);
+            orderTransactionService.markOrderFailed(orderId);
+            throw e;
         } catch (CoreException e) {
             orderTransactionService.markOrderFailed(orderId);
             throw e;
@@ -145,9 +156,13 @@ public class PaymentApplicationService {
 
         if ("SUCCESS".equals(status)) {
             payment.markSuccess(transactionKey);             // JPA dirty checking → 자동 UPDATE
-            orderTransactionService.completePayment(orderId);
+            OrderInfo orderInfo = orderTransactionService.completePayment(orderId);
             // 결제 확정 부가작업(데이터 플랫폼 전송 등)은 이벤트로 분리 — 커밋 후 리스너가 비동기 처리
             eventPublisher.publishEvent(new PaymentCompletedEvent(orderId, transactionKey, payment.getAmount()));
+            // 대기열 게이트 대상이 아닌 상품에 대한 consume은 안전한 no-op이므로 게이트 여부를 따로 확인하지 않는다.
+            for (OrderInfo.OrderItemInfo item : orderInfo.items()) {
+                queueApplicationService.consume(item.productId(), orderInfo.userId());
+            }
         } else {
             payment.markFailed(reason != null ? reason : "결제 실패");
             orderTransactionService.releaseAndFail(orderId);
