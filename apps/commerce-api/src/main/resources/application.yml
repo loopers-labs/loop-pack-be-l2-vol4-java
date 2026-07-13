@@ -85,6 +85,14 @@ outbox:
     fixed-delay-ms: 1000
     batch-size: 100
 
+# 주문 대기열. 스케줄러 발급 주기·배치. 목표 TPS·예상 대기시간이 이 둘에서 파생된다(k6 실측으로 조정).
+order-queue:
+  admission:
+    interval-ms: 200
+    batch-size: 10
+  entry-token:
+    ttl-seconds: 300
+
 ---
 spring:
   config:

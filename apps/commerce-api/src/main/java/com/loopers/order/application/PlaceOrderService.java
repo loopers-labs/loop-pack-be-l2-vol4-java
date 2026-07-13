@@ -12,7 +12,6 @@ import com.loopers.order.domain.ShippingDestination;
 import com.loopers.order.application.event.OrderCreatedEvent;
 import com.loopers.product.application.ProductInfo;
 import com.loopers.product.application.ProductReader;
-import com.loopers.product.domain.ProductStock;
 import com.loopers.product.domain.ProductStockRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -58,9 +57,14 @@ public class PlaceOrderService {
         for (OrderCommand.Line line : sortedLines) {
             // getInfo 는 ON_SALE·미삭제 상품만 반환하므로 삭제·판매중지(SUSPENDED) 상품 주문을 함께 막는다.
             ProductInfo product = productReader.getInfo(line.productId());
-            ProductStock stock = productStockRepository.findByProductIdForUpdate(line.productId())
-                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.STOCK_NOT_FOUND));
-            stock.decrease(line.quantity());
+            // 원자적 조건부 차감 — 조회 후 인메모리 차감 대신 UPDATE 한 문장으로 재고≥수량을 강제한다.
+            // 0행이면 재고부족 또는 상품없음이므로 실패 경로에서만 한 번 더 조회해 구분한다.
+            if (productStockRepository.decreaseStock(line.productId(), line.quantity()) == 0) {
+                boolean stockExists = productStockRepository.findByProductId(line.productId()).isPresent();
+                throw stockExists
+                        ? new CoreException(ErrorType.CONFLICT, ProductErrorCode.OUT_OF_STOCK)
+                        : new CoreException(ErrorType.NOT_FOUND, ProductErrorCode.STOCK_NOT_FOUND);
+            }
 
             String brandName = brandReader.getName(product.brandId());
             orderItems.add(OrderItem.create(

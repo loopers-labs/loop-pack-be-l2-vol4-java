@@ -30,7 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -72,7 +74,11 @@ class PlaceOrderServiceTest {
     private void stubProduct(Long productId, Long brandId, String name, long price, int stockQty) {
         when(productReader.getInfo(productId)).thenReturn(new ProductInfo(name, brandId, price));
         when(brandReader.getName(brandId)).thenReturn("브랜드" + brandId);
-        when(productStockRepository.findByProductIdForUpdate(productId))
+        // 원자적 차감의 실제 의미를 모사 — 요청 수량이 재고 이하면 1행, 초과면 0행.
+        when(productStockRepository.decreaseStock(eq(productId), anyInt()))
+                .thenAnswer(inv -> (int) inv.getArgument(1) <= stockQty ? 1 : 0);
+        // 0행일 때만 참조된다(재고부족 vs 상품없음 구분). 존재하는 재고로 두면 부족 시 CONFLICT 로 해석된다.
+        when(productStockRepository.findByProductId(productId))
                 .thenReturn(Optional.of(ProductStock.create(productId, stockQty)));
     }
 
@@ -111,8 +117,8 @@ class PlaceOrderServiceTest {
         )), ORDER_NUMBER);
 
         InOrder inOrder = inOrder(productStockRepository);
-        inOrder.verify(productStockRepository).findByProductIdForUpdate(10L);
-        inOrder.verify(productStockRepository).findByProductIdForUpdate(20L);
+        inOrder.verify(productStockRepository).decreaseStock(eq(10L), anyInt());
+        inOrder.verify(productStockRepository).decreaseStock(eq(20L), anyInt());
     }
 
     @Test
@@ -151,7 +157,7 @@ class PlaceOrderServiceTest {
                 .isInstanceOf(CoreException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorType.NOT_FOUND);
 
-        verify(productStockRepository, never()).findByProductIdForUpdate(any());
+        verify(productStockRepository, never()).decreaseStock(anyLong(), anyInt());
         verify(orderRepository, never()).save(any());
     }
 

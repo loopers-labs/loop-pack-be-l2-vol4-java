@@ -49,7 +49,7 @@ public class Product extends BaseEntity {
     @Column
     private String thumbnailUrl;
 
-    @Column(name = "like_count", nullable = false)
+    @Column(name = "like_count", nullable = false, columnDefinition = "bigint not null default 0")
     private long likeCount;
 
     private Product(Long brandId, String name, String description, long price, String thumbnailUrl) {

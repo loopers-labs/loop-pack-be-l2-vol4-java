@@ -2,8 +2,10 @@ package com.loopers.config;
 
 import com.loopers.user.application.UserAccountService;
 import com.loopers.support.auth.AdminAuthenticationFilter;
+import com.loopers.support.auth.DevUserIdAuthenticationFilter;
 import com.loopers.support.auth.HeaderAuthenticationFilter;
 import com.loopers.support.auth.UnauthorizedEntryPoint;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,7 +35,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http,
         UserAccountService userAccountService,
-        UnauthorizedEntryPoint unauthorizedEntryPoint
+        UnauthorizedEntryPoint unauthorizedEntryPoint,
+        @Value("${auth.dev-user-header.enabled:false}") boolean devUserHeaderEnabled
     ) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
@@ -47,12 +50,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/v1/users/password").authenticated()
                 .requestMatchers("/api/v1/likes/**").authenticated()
                 .requestMatchers("/api/v1/orders/**").authenticated()
+                .requestMatchers("/api/v1/queue/**").authenticated()
                 .requestMatchers("/api/v1/coupons/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/payments").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint))
             .addFilterBefore(new AdminAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new HeaderAuthenticationFilter(userAccountService), UsernamePasswordAuthenticationFilter.class);
+        if (devUserHeaderEnabled) {
+            // 부하테스트 전용: X-USER-ID 를 principal 로 신뢰(BCrypt 우회). 기본 꺼짐.
+            http.addFilterBefore(new DevUserIdAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        }
         return http.build();
     }
 }
