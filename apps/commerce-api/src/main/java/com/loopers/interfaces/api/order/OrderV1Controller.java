@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,15 +18,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/orders")
 public class OrderV1Controller implements OrderV1ApiSpec {
 
+    /** 대기열 입장 토큰 헤더 — 게이트(queue.order-gate.enabled) on 일 때만 검증되는 선택 헤더. (X-Loopers-* 컨벤션) */
+    public static final String HEADER_ENTRY_TOKEN = "X-Loopers-EntryToken";
+
     private final OrderFacade orderFacade;
 
     @PostMapping
     @Override
     public ApiResponse<OrderV1Dto.OrderResponse> createOrder(
         AuthHeaders auth,
+        @RequestHeader(value = HEADER_ENTRY_TOKEN, required = false) String entryToken,
         @RequestBody OrderV1Dto.CreateOrderRequest request
     ) {
-        OrderInfo info = orderFacade.createOrder(auth.loginId(), request.toCommand());
+        OrderInfo info = orderFacade.createOrder(auth.loginId(), request.toCommand(), entryToken);
         return ApiResponse.success(OrderV1Dto.OrderResponse.from(info));
     }
 

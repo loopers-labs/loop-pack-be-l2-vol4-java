@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.application.queue.EntryTokenGate;
 import com.loopers.domain.coupon.UserCoupon;
 import com.loopers.domain.coupon.UserCouponRepository;
 import com.loopers.domain.order.OrderLine;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -34,9 +36,26 @@ public class OrderFacade {
     private final UserRepository userRepository;
     private final UserCouponRepository userCouponRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final EntryTokenGate entryTokenGate;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public OrderInfo createOrder(String loginId, PlaceOrderCommand command) {
+        return createOrder(loginId, command, null);
+    }
+
+    /**
+     * 대기열 게이트(행사 스위치, 기본 off) 검증은 트랜잭션 "밖"에서 수행한다.
+     * 이 프로젝트 설정(jpa.yml — auto-commit/지연 획득 설정 없음)에선 트랜잭션 시작 시점에 DB 커넥션이
+     * 즉시 획득되므로, 검증을 @Transactional 안에 두면 거부될 폭증 트래픽이 Redis 왕복 동안 커넥션 풀을
+     * 점유해 back-pressure 전제가 무너진다. @Transactional 분리는 self-invocation(this 호출은 프록시를
+     * 안 탐) 함정이 있어 TransactionTemplate 로 경계를 명시한다 — 전파/롤백 의미는 @Transactional 기본과 동일.
+     */
+    public OrderInfo createOrder(String loginId, PlaceOrderCommand command, String entryToken) {
+        entryTokenGate.verify(loginId, entryToken); // 커넥션 획득 전에 무자격 요청 차단
+        return transactionTemplate.execute(status -> placeOrder(loginId, command));
+    }
+
+    private OrderInfo placeOrder(String loginId, PlaceOrderCommand command) {
         User user = userRepository.findByLoginId(loginId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
@@ -79,6 +98,10 @@ public class OrderFacade {
                 .map(i -> new OrderPlaced.Line(i.getProductId(), i.getQuantity()))
                 .toList(),
             ZonedDateTime.now()));
+        // 주문 성공 시 1회용 입장 토큰 소진. 이 뒤 커밋이 실패하면 "토큰 소진 + 주문 롤백"이 남는데,
+        // 쿠폰 @Version 은 커밋 시점 검증이라 이 조합은 반복 발생 가능하다. 다만 fail-safe 방향
+        // (무자격 통과·중복 판매 없음, 유저 불편만 존재)이라 수용 — afterCommit 이동은 백로그.
+        entryTokenGate.consume(loginId);
         return OrderInfo.from(saved);
     }
 

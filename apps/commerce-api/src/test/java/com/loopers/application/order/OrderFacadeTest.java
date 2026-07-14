@@ -1,5 +1,7 @@
 package com.loopers.application.order;
 
+import com.loopers.application.queue.EntryTokenGate;
+import com.loopers.application.queue.QueueProperties;
 import com.loopers.domain.coupon.CouponSnapshot;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCoupon;
@@ -12,6 +14,7 @@ import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.event.OrderPlaced;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserRepository;
 import com.loopers.domain.vo.Money;
@@ -23,6 +26,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -48,9 +53,22 @@ class OrderFacadeTest {
     private final UserRepository userRepository = mock(UserRepository.class);
     private final UserCouponRepository userCouponRepository = mock(UserCouponRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final EntryTokenRepository entryTokenRepository = mock(EntryTokenRepository.class);
+    // 실제 트랜잭션 없이 콜백만 실행 — 매니저를 mock 으로 대체해 경계 로직만 통과시킨다
+    private final TransactionTemplate transactionTemplate =
+        new TransactionTemplate(mock(PlatformTransactionManager.class));
+    // 기존 시나리오는 게이트 off(기본값) — 대기열과 무관하게 주문 흐름이 그대로 동작해야 한다
     private final OrderFacade orderFacade =
         new OrderFacade(orderService, orderRepository, productRepository, userRepository,
-            userCouponRepository, eventPublisher);
+            userCouponRepository, eventPublisher, gate(false), transactionTemplate);
+
+    private EntryTokenGate gate(boolean enabled) {
+        return new EntryTokenGate(entryTokenRepository, new QueueProperties(
+            new QueueProperties.Admission(100, 14),
+            new QueueProperties.Token(300),
+            new QueueProperties.OrderGate(enabled)
+        ));
+    }
 
     private void givenUser(long id) {
         User user = mock(User.class);
@@ -274,6 +292,86 @@ class OrderFacadeTest {
 
             // assert
             assertThat(ex.getErrorType()).isEqualTo(ErrorType.NOT_FOUND);
+        }
+    }
+
+    @DisplayName("입장 게이트가 켜진 상태로 주문을 생성할 때, ")
+    @Nested
+    class CreateOrderWithGate {
+
+        private final OrderFacade gatedFacade =
+            new OrderFacade(orderService, orderRepository, productRepository, userRepository,
+                userCouponRepository, eventPublisher, gate(true), transactionTemplate);
+
+        @DisplayName("유효한 입장 토큰이면 주문이 성공하고, 1회용 토큰은 소진(삭제)된다.")
+        @Test
+        void createsOrder_andConsumesToken() {
+            // arrange
+            Product product = productWithId(11L, 1000L, 10);
+            givenUser(7L);
+            when(entryTokenRepository.find(LOGIN_ID)).thenReturn(Optional.of("token-1"));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // act
+            OrderInfo info = gatedFacade.createOrder(LOGIN_ID, command(11L, 2), "token-1");
+
+            // assert
+            assertThat(info.totalAmount()).isEqualTo(2000L);
+            verify(entryTokenRepository).delete(LOGIN_ID);
+        }
+
+        @DisplayName("입장 토큰이 없으면 BAD_REQUEST 로 거부되고, 유저 조회·상품 조회·주문 저장은 일어나지 않는다.")
+        @Test
+        void rejects_whenTokenMissing() {
+            // arrange
+            when(entryTokenRepository.find(LOGIN_ID)).thenReturn(Optional.empty());
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> gatedFacade.createOrder(LOGIN_ID, command(11L, 1), null));
+
+            // assert — 게이트가 트랜잭션(DB 접근) 앞단에서 끊는다: 유저 조회조차 없어야 한다
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            verify(userRepository, never()).findByLoginId(any());
+            verify(productRepository, never()).findAllForUpdate(any());
+            verify(orderRepository, never()).save(any());
+        }
+
+        @DisplayName("입장 토큰이 발급 값과 다르면 BAD_REQUEST 로 거부되고, 토큰은 소진되지 않는다.")
+        @Test
+        void rejects_whenTokenMismatches() {
+            // arrange
+            when(entryTokenRepository.find(LOGIN_ID)).thenReturn(Optional.of("token-1"));
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> gatedFacade.createOrder(LOGIN_ID, command(11L, 1), "forged-token"));
+
+            // assert
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            verify(userRepository, never()).findByLoginId(any());
+            verify(entryTokenRepository, never()).delete(any());
+            verify(orderRepository, never()).save(any());
+        }
+
+        @DisplayName("검증을 통과했어도 주문이 실패하면(재고 부족), 토큰은 소진되지 않아 재시도에 쓸 수 있다.")
+        @Test
+        void keepsToken_whenOrderFailsAfterVerify() {
+            // arrange — 유효 토큰 + 재고 1개뿐인 상품에 5개 주문
+            Product product = productWithId(11L, 1000L, 1);
+            givenUser(7L);
+            when(entryTokenRepository.find(LOGIN_ID)).thenReturn(Optional.of("token-1"));
+            when(productRepository.findAllForUpdate(List.of(11L))).thenReturn(List.of(product));
+
+            // act
+            CoreException ex = assertThrows(CoreException.class,
+                () -> gatedFacade.createOrder(LOGIN_ID, command(11L, 5), "token-1"));
+
+            // assert — 주문 실패 시 consume 까지 도달하지 않아 delete(DEL) 미호출
+            assertThat(ex.getErrorType()).isEqualTo(ErrorType.BAD_REQUEST);
+            verify(entryTokenRepository, never()).delete(any());
+            verify(orderRepository, never()).save(any());
         }
     }
 }
