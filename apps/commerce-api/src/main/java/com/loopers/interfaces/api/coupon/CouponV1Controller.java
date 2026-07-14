@@ -32,6 +32,28 @@ public class CouponV1Controller {
         return ApiResponse.success(response);
     }
 
+    @PostMapping("/coupons/{couponId}/issue-requests")
+    public ApiResponse<CouponDto.FirstComeIssue.RequestResponse> requestFirstComeIssue(
+        @LoginUser AuthenticatedUser user,
+        @PathVariable(value = "couponId") Long couponId
+    ) {
+        CouponDto.FirstComeIssue.RequestResponse response = CouponDto.FirstComeIssue.RequestResponse.from(
+            couponFacade.requestFirstComeIssue(couponId, user.loginId(), ZonedDateTime.now())
+        );
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/coupons/issue-requests/{requestId}")
+    public ApiResponse<CouponDto.FirstComeIssue.ResultResponse> getFirstComeIssueResult(
+        @LoginUser AuthenticatedUser user,
+        @PathVariable(value = "requestId") String requestId
+    ) {
+        CouponDto.FirstComeIssue.ResultResponse response = CouponDto.FirstComeIssue.ResultResponse.from(
+            couponFacade.getFirstComeIssueResult(requestId, user.loginId())
+        );
+        return ApiResponse.success(response);
+    }
+
     @GetMapping("/users/me/coupons")
     public ApiResponse<List<CouponDto.Issued.Response>> getMyCoupons(
         @LoginUser AuthenticatedUser user

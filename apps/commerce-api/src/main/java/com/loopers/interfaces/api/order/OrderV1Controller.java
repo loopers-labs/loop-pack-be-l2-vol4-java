@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.order;
 
 import com.loopers.application.order.OrderFacade;
 import com.loopers.application.order.OrderInfo;
+import com.loopers.application.order.QueuedOrderFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,14 +26,18 @@ import java.util.List;
 @RequestMapping("/api/v1/orders")
 public class OrderV1Controller {
 
+    private static final String ENTRY_TOKEN_HEADER = "X-Entry-Token";
+
     private final OrderFacade orderFacade;
+    private final QueuedOrderFacade queuedOrderFacade;
 
     @PostMapping
     public ApiResponse<OrderDto.Create.V1.Response> createOrder(
         @LoginUser AuthenticatedUser user,
+        @RequestHeader(value = ENTRY_TOKEN_HEADER, required = false) String entryToken,
         @Valid @RequestBody OrderDto.Create.V1.Request request
     ) {
-        OrderInfo info = orderFacade.createOrder(user.loginId(), request.toCommands(), request.couponId());
+        OrderInfo info = queuedOrderFacade.createOrder(user.loginId(), request.toCommands(), request.couponId(), entryToken);
         OrderDto.Create.V1.Response response = OrderDto.Create.V1.Response.from(info);
         return ApiResponse.success(response);
     }

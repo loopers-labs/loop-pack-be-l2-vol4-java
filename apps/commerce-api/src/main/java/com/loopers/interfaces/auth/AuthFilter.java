@@ -42,6 +42,7 @@ public class AuthFilter extends OncePerRequestFilter {
         return AUTH_REQUIRED_PATHS.contains(path)
             || path.equals("/api/v1/orders")
             || path.matches("^/api/v1/orders/[^/]+$")
+            || path.startsWith("/api/v1/queue")
             || path.equals("/api/v1/payments")
             || path.matches("^/api/v1/payments/orders/[^/]+$")
             || path.matches("^/api/v1/coupons/[^/]+/issue$")

@@ -4,6 +4,8 @@ import com.loopers.domain.brand.Brand;
 import com.loopers.domain.product.Product;
 import com.loopers.infrastructure.brand.BrandJpaEntity;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.infrastructure.outbox.OutboxEventJpaEntity;
+import com.loopers.infrastructure.outbox.OutboxEventJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaEntity;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
@@ -41,6 +43,7 @@ class ProductV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
+    private final OutboxEventJpaRepository outboxEventJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
     private final RedisTemplate<String, String> redisTemplate;
@@ -50,6 +53,7 @@ class ProductV1ApiE2ETest {
         TestRestTemplate testRestTemplate,
         BrandJpaRepository brandJpaRepository,
         ProductJpaRepository productJpaRepository,
+        OutboxEventJpaRepository outboxEventJpaRepository,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp,
         RedisTemplate<String, String> redisTemplate
@@ -57,6 +61,7 @@ class ProductV1ApiE2ETest {
         this.testRestTemplate = testRestTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
+        this.outboxEventJpaRepository = outboxEventJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
         this.redisTemplate = redisTemplate;
@@ -385,6 +390,40 @@ class ProductV1ApiE2ETest {
             assertThat(productResponse.getBody().data().likeCount()).isEqualTo(1);
         }
 
+        @DisplayName("좋아요가 새로 생성되면 카탈로그 이벤트를 outbox에 기록하고, 중복 좋아요는 기록하지 않는다.")
+        @Test
+        void storesCatalogEventInOutbox_once_whenUserLikesProduct() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            HttpEntity<Void> authenticatedRequest = new HttpEntity<>(authHeaders("user1234", "abc123!?"));
+
+            // act
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
+                HttpMethod.POST,
+                authenticatedRequest,
+                voidResponseType()
+            );
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
+                HttpMethod.POST,
+                authenticatedRequest,
+                voidResponseType()
+            );
+
+            // assert
+            var events = outboxEventJpaRepository.findAll();
+            assertAll(
+                () -> assertThat(events).hasSize(1),
+                () -> assertThat(events.get(0).toDomain().getTopic()).isEqualTo("catalog-events"),
+                () -> assertThat(events.get(0).toDomain().getMessageKey()).isEqualTo(String.valueOf(product.getId())),
+                () -> assertThat(events.get(0).toDomain().getEventType()).isEqualTo("PRODUCT_LIKED"),
+                () -> assertThat(events.get(0).toDomain().getPayload()).contains("\"likeCountDelta\":1")
+            );
+        }
+
         @DisplayName("인증 헤더가 없으면, 401 UNAUTHORIZED 응답을 받는다.")
         @Test
         void throwsUnauthorized_whenCredentialHeaderIsMissing() {
@@ -445,6 +484,42 @@ class ProductV1ApiE2ETest {
             assertAll(
                 () -> assertThat(unlikeResponse.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(productResponse.getBody().data().likeCount()).isZero()
+            );
+        }
+
+        @DisplayName("좋아요 취소가 성공하면 카탈로그 이벤트를 outbox에 기록한다.")
+        @Test
+        void storesCatalogEventInOutbox_whenUserUnlikesProduct() {
+            // arrange
+            signup("user1234", "abc123!?");
+            BrandJpaEntity brand = saveBrand("Loopers", "감성 이커머스 브랜드");
+            ProductJpaEntity product = saveProduct(brand.getId(), "니트", "부드러운 니트", 30_000L, 10);
+            HttpEntity<Void> authenticatedRequest = new HttpEntity<>(authHeaders("user1234", "abc123!?"));
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
+                HttpMethod.POST,
+                authenticatedRequest,
+                voidResponseType()
+            );
+
+            // act
+            testRestTemplate.exchange(
+                ENDPOINT_PRODUCTS + "/" + product.getId() + "/likes",
+                HttpMethod.DELETE,
+                authenticatedRequest,
+                voidResponseType()
+            );
+
+            // assert
+            var events = outboxEventJpaRepository.findAll().stream()
+                .map(OutboxEventJpaEntity::toDomain)
+                .toList();
+            assertAll(
+                () -> assertThat(events).hasSize(2),
+                () -> assertThat(events.get(1).getTopic()).isEqualTo("catalog-events"),
+                () -> assertThat(events.get(1).getMessageKey()).isEqualTo(String.valueOf(product.getId())),
+                () -> assertThat(events.get(1).getEventType()).isEqualTo("PRODUCT_UNLIKED"),
+                () -> assertThat(events.get(1).getPayload()).contains("\"likeCountDelta\":-1")
             );
         }
     }

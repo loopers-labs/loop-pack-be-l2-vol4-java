@@ -27,6 +27,17 @@ public class CouponService {
         return couponRepository.save(new Coupon(name, type, value, minOrderAmount, expiredAt));
     }
 
+    public Coupon createFirstComeCoupon(
+        String name,
+        CouponType type,
+        Long value,
+        Long minOrderAmount,
+        ZonedDateTime expiredAt,
+        Long issueLimit
+    ) {
+        return couponRepository.save(new Coupon(name, type, value, minOrderAmount, expiredAt, issueLimit));
+    }
+
     public Coupon getCoupon(Long id) {
         return getCouponById(id);
     }
@@ -57,6 +68,9 @@ public class CouponService {
 
     public IssuedCoupon issueCoupon(Long couponId, String userLoginId, ZonedDateTime now) {
         Coupon coupon = getCouponById(couponId);
+        if (coupon.isFirstCome()) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "선착순 쿠폰은 비동기 발급 요청으로 처리해야 합니다.");
+        }
         issuedCouponRepository.findByCouponIdAndUserLoginId(couponId, userLoginId)
             .ifPresent(issuedCoupon -> {
                 throw new CoreException(ErrorType.CONFLICT, "이미 발급된 쿠폰입니다.");

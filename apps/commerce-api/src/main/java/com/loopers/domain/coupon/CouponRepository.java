@@ -7,4 +7,5 @@ public interface CouponRepository {
     Coupon save(Coupon coupon);
     Optional<Coupon> find(Long id);
     List<Coupon> findAll(int page, int size);
+    int increaseIssuedCount(Long couponId);
 }

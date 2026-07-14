@@ -13,10 +13,16 @@ public class Coupon {
     private Long value;
     private Long minOrderAmount;
     private ZonedDateTime expiredAt;
+    private Long issueLimit;
+    private Long issuedCount;
     private boolean deleted;
 
     public Coupon(String name, CouponType type, Long value, Long minOrderAmount, ZonedDateTime expiredAt) {
-        this(null, name, type, value, minOrderAmount, expiredAt, false);
+        this(null, name, type, value, minOrderAmount, expiredAt, null, 0L, false);
+    }
+
+    public Coupon(String name, CouponType type, Long value, Long minOrderAmount, ZonedDateTime expiredAt, Long issueLimit) {
+        this(null, name, type, value, minOrderAmount, expiredAt, issueLimit, 0L, false);
     }
 
     private Coupon(
@@ -26,6 +32,8 @@ public class Coupon {
         Long value,
         Long minOrderAmount,
         ZonedDateTime expiredAt,
+        Long issueLimit,
+        Long issuedCount,
         boolean deleted
     ) {
         validateName(name);
@@ -33,6 +41,8 @@ public class Coupon {
         validateValue(type, value);
         validateMinOrderAmount(minOrderAmount);
         validateExpiredAt(expiredAt);
+        validateIssueLimit(issueLimit);
+        validateIssuedCount(issueLimit, issuedCount);
 
         this.id = id;
         this.name = name;
@@ -40,6 +50,8 @@ public class Coupon {
         this.value = value;
         this.minOrderAmount = minOrderAmount == null ? 0L : minOrderAmount;
         this.expiredAt = expiredAt;
+        this.issueLimit = issueLimit;
+        this.issuedCount = issuedCount == null ? 0L : issuedCount;
         this.deleted = deleted;
     }
 
@@ -52,7 +64,21 @@ public class Coupon {
         ZonedDateTime expiredAt,
         boolean deleted
     ) {
-        return new Coupon(id, name, type, value, minOrderAmount, expiredAt, deleted);
+        return reconstruct(id, name, type, value, minOrderAmount, expiredAt, null, 0L, deleted);
+    }
+
+    public static Coupon reconstruct(
+        Long id,
+        String name,
+        CouponType type,
+        Long value,
+        Long minOrderAmount,
+        ZonedDateTime expiredAt,
+        Long issueLimit,
+        Long issuedCount,
+        boolean deleted
+    ) {
+        return new Coupon(id, name, type, value, minOrderAmount, expiredAt, issueLimit, issuedCount, deleted);
     }
 
     public Long getId() {
@@ -77,6 +103,18 @@ public class Coupon {
 
     public ZonedDateTime getExpiredAt() {
         return expiredAt;
+    }
+
+    public Long getIssueLimit() {
+        return issueLimit;
+    }
+
+    public Long getIssuedCount() {
+        return issuedCount;
+    }
+
+    public boolean isFirstCome() {
+        return issueLimit != null;
     }
 
     public boolean isDeleted() {
@@ -170,6 +208,21 @@ public class Coupon {
     private void validateExpiredAt(ZonedDateTime expiredAt) {
         if (expiredAt == null) {
             throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 만료 일시는 비어있을 수 없습니다.");
+        }
+    }
+
+    private void validateIssueLimit(Long issueLimit) {
+        if (issueLimit != null && issueLimit < 1) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 발급 한도는 1 이상이어야 합니다.");
+        }
+    }
+
+    private void validateIssuedCount(Long issueLimit, Long issuedCount) {
+        if (issuedCount == null || issuedCount < 0) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 발급 수는 0 이상이어야 합니다.");
+        }
+        if (issueLimit != null && issuedCount > issueLimit) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "쿠폰 발급 수는 발급 한도를 초과할 수 없습니다.");
         }
     }
 }
