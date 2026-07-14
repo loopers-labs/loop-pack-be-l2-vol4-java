@@ -1,0 +1,38 @@
+### 대기열 진입 (재진입 시 기존 순번 유지)
+POST {{commerce-api}}/api/v1/queue/enter
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 순번 조회 (순번 + 전체 대기 인원)
+GET {{commerce-api}}/api/v1/queue/position
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 주문 생성 — 입장 토큰 없이 요청 시 401 UNAUTHORIZED
+POST {{commerce-api}}/api/v1/orders
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+Content-Type: application/json
+
+{
+  "items": [{ "productId": 1, "quantity": 1 }]
+}
+
+---
+
+### 주문 생성 — 스케줄러가 발급한 입장 토큰으로 요청 (토큰은 스케줄러 로그 또는 Redis에서 확인)
+POST {{commerce-api}}/api/v1/orders
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+X-Queue-Token: {{queueToken}}
+Content-Type: application/json
+
+{
+  "items": [{ "productId": 1, "quantity": 1 }]
+}
+
+---

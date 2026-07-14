@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
@@ -10,6 +11,7 @@ import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.infrastructure.user.UserJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +50,8 @@ class OrderV1ApiE2ETest {
     @Autowired private UserJpaRepository userJpaRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private DatabaseCleanUp databaseCleanUp;
+    @Autowired private EntryTokenRepository entryTokenRepository;
+    @Autowired private RedisCleanUp redisCleanUp;
 
     private UserModel testUser;
     private ProductModel savedProduct;
@@ -65,6 +70,7 @@ class OrderV1ApiE2ETest {
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders authHeaders() {
@@ -74,13 +80,21 @@ class OrderV1ApiE2ETest {
         return headers;
     }
 
+    /** 주문 생성(POST)은 QueueTokenInterceptor 검증 대상 — 대기열을 이미 통과했다고 가정하고 토큰을 직접 발급해 헤더에 싣는다. */
+    private HttpHeaders authHeadersForOrderCreation() {
+        HttpHeaders headers = authHeaders();
+        String token = entryTokenRepository.issue(testUser.getId(), Duration.ofMinutes(5));
+        headers.set("X-Queue-Token", token);
+        return headers;
+    }
+
     private ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> createOrder(int quantity) {
         Map<String, Object> request = Map.of(
             "items", List.of(Map.of("productId", savedProduct.getId(), "quantity", quantity))
         );
         return testRestTemplate.exchange(
             ORDER_ENDPOINT, HttpMethod.POST,
-            new HttpEntity<>(request, authHeaders()),
+            new HttpEntity<>(request, authHeadersForOrderCreation()),
             new ParameterizedTypeReference<>() {}
         );
     }
@@ -122,7 +136,7 @@ class OrderV1ApiE2ETest {
             );
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDER_ENDPOINT, HttpMethod.POST,
-                new HttpEntity<>(request, authHeaders()),
+                new HttpEntity<>(request, authHeadersForOrderCreation()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -134,7 +148,7 @@ class OrderV1ApiE2ETest {
         void returns400_whenStockInsufficient() {
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDER_ENDPOINT, HttpMethod.POST,
-                new HttpEntity<>(Map.of("items", List.of(Map.of("productId", savedProduct.getId(), "quantity", 999))), authHeaders()),
+                new HttpEntity<>(Map.of("items", List.of(Map.of("productId", savedProduct.getId(), "quantity", 999))), authHeadersForOrderCreation()),
                 new ParameterizedTypeReference<>() {}
             );
 
@@ -147,7 +161,7 @@ class OrderV1ApiE2ETest {
             Map<String, Object> request = Map.of("items", List.of());
             ResponseEntity<ApiResponse<Void>> response = testRestTemplate.exchange(
                 ORDER_ENDPOINT, HttpMethod.POST,
-                new HttpEntity<>(request, authHeaders()),
+                new HttpEntity<>(request, authHeadersForOrderCreation()),
                 new ParameterizedTypeReference<>() {}
             );
 

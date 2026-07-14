@@ -44,6 +44,11 @@ resilience4j:
         slow-call-rate-threshold: 80                  # 느린 호출 80% 이상 시 OPEN
         wait-duration-in-open-state: 10s              # OPEN 후 10초 대기
         permitted-number-of-calls-in-half-open-state: 3  # HALF_OPEN 시 3회 테스트
+      queue-token:                                    # 대기열 입장 토큰 검증(Redis) 보호 — fail-closed
+        sliding-window-size: 20                       # 최근 20회 호출 기준
+        failure-rate-threshold: 50                    # 50% 이상 실패 시 OPEN
+        wait-duration-in-open-state: 5s               # OPEN 후 5초 대기 (Retry-After와 일치)
+        permitted-number-of-calls-in-half-open-state: 3  # HALF_OPEN 시 3회 테스트
 
 ---
 spring:

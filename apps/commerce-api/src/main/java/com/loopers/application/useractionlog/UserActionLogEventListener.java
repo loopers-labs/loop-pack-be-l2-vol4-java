@@ -9,6 +9,7 @@ import com.loopers.domain.useractionlog.UserActionType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -24,19 +25,19 @@ public class UserActionLogEventListener {
 
     private final UserActionLogRepository userActionLogRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(OrderPlacedEvent event) {
         save(event.userId(), UserActionType.ORDER_PLACED, event.orderId(), null);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(PaymentCompletedEvent event) {
         save(event.userId(), UserActionType.PAYMENT_COMPLETED, event.paymentId(), null);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(PaymentFailedEvent event) {
         save(event.userId(), UserActionType.PAYMENT_FAILED, event.paymentId(), event.failureCode());

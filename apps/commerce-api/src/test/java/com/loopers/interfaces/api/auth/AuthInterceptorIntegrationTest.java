@@ -1,14 +1,17 @@
 package com.loopers.interfaces.api.auth;
 
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
 import com.loopers.interfaces.api.WebMvcConfig;
+import com.loopers.interfaces.api.queue.QueueTokenInterceptor;
 import com.loopers.interfaces.api.user.UserV1Controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserV1Controller.class)
-@Import({WebMvcConfig.class, AuthInterceptor.class, CurrentUserArgumentResolver.class})
+@Import({WebMvcConfig.class, AuthInterceptor.class, QueueTokenInterceptor.class, CurrentUserArgumentResolver.class})
 class AuthInterceptorIntegrationTest {
 
     @Autowired
@@ -29,6 +32,12 @@ class AuthInterceptorIntegrationTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private EntryTokenRepository entryTokenRepository;
+
+    @MockitoBean
+    private CircuitBreaker entryTokenCircuitBreaker;
 
     @DisplayName("GET /api/v1/users/me 요청 시,")
     @Nested
