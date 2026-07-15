@@ -15,8 +15,8 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductModel createProduct(String name, String description, Long price, Integer stock) {
-        ProductModel product = new ProductModel(name, description, price, stock);
+    public ProductModel createProduct(String name, String description, Long price, Integer stock, Long brandId) {
+        ProductModel product = new ProductModel(name, description, price, stock, brandId);
         return productRepository.save(product);
     }
 
@@ -31,10 +31,16 @@ public class ProductService {
         return productRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
+    public ProductPage searchProducts(ProductSearchCondition condition) {
+        return productRepository.search(condition);
+    }
+
     @Transactional
-    public ProductModel updateProduct(Long id, String name, String description, Long price, Integer stock) {
+    public ProductModel updateProduct(
+        Long id, String name, String description, Long price, Integer stock, Long brandId) {
         ProductModel product = getProduct(id);
-        product.update(name, description, price, stock);
+        product.update(name, description, price, stock, brandId);
         return productRepository.save(product);
     }
 

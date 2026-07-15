@@ -2,11 +2,12 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductPageInfo;
+import com.loopers.domain.product.ProductSearchCondition;
+import com.loopers.domain.product.ProductSortType;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -23,7 +24,8 @@ public class ProductV1Controller {
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.stock(),
+            request.brandId()
         );
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
         return ApiResponse.success(response);
@@ -39,12 +41,16 @@ public class ProductV1Controller {
     }
 
     @GetMapping
-    public ApiResponse<List<ProductV1Dto.ProductResponse>> getAllProducts() {
-        List<ProductInfo> infos = productFacade.getAllProducts();
-        List<ProductV1Dto.ProductResponse> responses = infos.stream()
-            .map(ProductV1Dto.ProductResponse::from)
-            .toList();
-        return ApiResponse.success(responses);
+    public ApiResponse<ProductV1Dto.ProductListResponse> getProducts(
+        @RequestParam(value = "brandId", required = false) Long brandId,
+        @RequestParam(value = "sort", required = false) String sort,
+        @RequestParam(value = "page", defaultValue = "0") int page,
+        @RequestParam(value = "size", defaultValue = "20") int size
+    ) {
+        ProductSearchCondition condition =
+            new ProductSearchCondition(brandId, ProductSortType.from(sort), page, size);
+        ProductPageInfo pageInfo = productFacade.searchProducts(condition);
+        return ApiResponse.success(ProductV1Dto.ProductListResponse.from(pageInfo));
     }
 
     @PutMapping("/{productId}")
@@ -57,7 +63,8 @@ public class ProductV1Controller {
             request.name(),
             request.description(),
             request.price(),
-            request.stock()
+            request.stock(),
+            request.brandId()
         );
         ProductV1Dto.ProductResponse response = ProductV1Dto.ProductResponse.from(info);
         return ApiResponse.success(response);

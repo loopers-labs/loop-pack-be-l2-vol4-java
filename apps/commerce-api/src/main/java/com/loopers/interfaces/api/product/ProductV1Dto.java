@@ -1,20 +1,24 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductPageInfo;
+import java.util.List;
 
 public class ProductV1Dto {
     public record CreateProductRequest(
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId
     ) {}
 
     public record UpdateProductRequest(
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId
     ) {}
 
     public record ProductResponse(
@@ -22,7 +26,9 @@ public class ProductV1Dto {
         String name,
         String description,
         Long price,
-        Integer stock
+        Integer stock,
+        Long brandId,
+        Long likeCount
     ) {
         public static ProductResponse from(ProductInfo info) {
             return new ProductResponse(
@@ -30,7 +36,27 @@ public class ProductV1Dto {
                 info.name(),
                 info.description(),
                 info.price(),
-                info.stock()
+                info.stock(),
+                info.brandId(),
+                info.likeCount()
+            );
+        }
+    }
+
+    public record ProductListResponse(
+        List<ProductResponse> items,
+        int page,
+        int size,
+        long totalCount,
+        int totalPages
+    ) {
+        public static ProductListResponse from(ProductPageInfo pageInfo) {
+            return new ProductListResponse(
+                pageInfo.items().stream().map(ProductResponse::from).toList(),
+                pageInfo.page(),
+                pageInfo.size(),
+                pageInfo.totalCount(),
+                pageInfo.totalPages()
             );
         }
     }
