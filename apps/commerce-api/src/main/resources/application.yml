@@ -84,3 +84,13 @@ spring:
 springdoc:
   api-docs:
     enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+queue:
+  scheduler:
+    enabled: false

@@ -1,6 +1,7 @@
 package com.loopers.config;
 
 import com.loopers.interfaces.api.admin.AdminInterceptor;
+import com.loopers.interfaces.api.queue.QueueTokenInterceptor;
 import com.loopers.interfaces.api.user.LoginInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginInterceptor loginInterceptor;
     private final AdminInterceptor adminInterceptor;
+    private final QueueTokenInterceptor queueTokenInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -29,5 +31,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         registry.addInterceptor(adminInterceptor)
             .addPathPatterns("/api-admin/v1/**");
+
+        registry.addInterceptor(queueTokenInterceptor)
+            .addPathPatterns("/api/v1/orders"); // POST만 QueueTokenInterceptor 내부에서 필터링
     }
 }

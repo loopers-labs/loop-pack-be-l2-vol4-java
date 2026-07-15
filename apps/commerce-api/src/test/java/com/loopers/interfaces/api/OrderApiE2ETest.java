@@ -5,6 +5,7 @@ import com.loopers.domain.coupon.CouponTemplateModel;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.coupon.UserCouponModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.coupon.CouponTemplateJpaRepository;
@@ -13,6 +14,7 @@ import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.interfaces.api.order.OrderDto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,7 @@ class OrderApiE2ETest {
     private static final String BASE_URL = "/api/v1/orders";
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
+    private static final String ENTRY_TOKEN_HEADER = "X-Entry-Token";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -57,6 +60,12 @@ class OrderApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private EntryTokenRepository entryTokenRepository;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     private UserModel savedUser;
     private ProductModel savedProduct;
     private HttpHeaders userHeaders;
@@ -70,13 +79,17 @@ class OrderApiE2ETest {
         savedProduct = productJpaRepository.save(new ProductModel("에어포스1", 10000L, 1L));
         stockJpaRepository.save(new StockModel(savedProduct.getId(), 10));
 
+        String validToken = entryTokenRepository.issue(savedUser.getId());
+
         userHeaders = new HttpHeaders();
         userHeaders.set(LOGIN_ID_HEADER, "user01");
         userHeaders.set(LOGIN_PW_HEADER, "Password1!");
+        userHeaders.set(ENTRY_TOKEN_HEADER, validToken);
     }
 
     @AfterEach
     void tearDown() {
+        redisCleanUp.truncateAll();
         databaseCleanUp.truncateAllTables();
     }
 
@@ -159,6 +172,73 @@ class OrderApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("입장 토큰 없이 주문하면, 401을 반환한다.")
+        @Test
+        void returns401_whenEntryTokenMissing() {
+            // arrange
+            HttpHeaders headersWithoutToken = new HttpHeaders();
+            headersWithoutToken.set(LOGIN_ID_HEADER, "user01");
+            headersWithoutToken.set(LOGIN_PW_HEADER, "Password1!");
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, headersWithoutToken),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("유효하지 않은 입장 토큰으로 주문하면, 401을 반환한다.")
+        @Test
+        void returns401_whenEntryTokenInvalid() {
+            // arrange
+            HttpHeaders headersWithInvalidToken = new HttpHeaders();
+            headersWithInvalidToken.set(LOGIN_ID_HEADER, "user01");
+            headersWithInvalidToken.set(LOGIN_PW_HEADER, "Password1!");
+            headersWithInvalidToken.set(ENTRY_TOKEN_HEADER, "invalid-token");
+
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, headersWithInvalidToken),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+
+        @DisplayName("유효한 토큰으로 주문에 성공하면, 토큰이 삭제된다.")
+        @Test
+        void deletesToken_afterOrderCreatedSuccessfully() {
+            // arrange
+            OrderDto.CreateRequest request = new OrderDto.CreateRequest(
+                List.of(new OrderDto.OrderItemRequest(savedProduct.getId(), 1))
+            );
+
+            // act
+            ResponseEntity<ApiResponse<OrderDto.OrderResponse>> response = testRestTemplate.exchange(
+                BASE_URL, HttpMethod.POST,
+                new HttpEntity<>(request, userHeaders),
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(entryTokenRepository.find(savedUser.getId())).isEmpty();
         }
     }
 

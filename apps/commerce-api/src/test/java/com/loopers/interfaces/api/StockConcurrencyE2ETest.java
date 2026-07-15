@@ -2,6 +2,7 @@ package com.loopers.interfaces.api;
 
 import com.loopers.application.user.UserService;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.user.UserModel;
 import com.loopers.infrastructure.product.ProductJpaRepository;
@@ -9,6 +10,7 @@ import com.loopers.infrastructure.stock.StockJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.order.OrderDto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,7 @@ class StockConcurrencyE2ETest {
     private static final String ORDER_URL = "/api/v1/orders";
     private static final String LOGIN_ID_HEADER = "X-Loopers-LoginId";
     private static final String LOGIN_PW_HEADER = "X-Loopers-LoginPw";
+    private static final String ENTRY_TOKEN_HEADER = "X-Entry-Token";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -52,6 +55,12 @@ class StockConcurrencyE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private EntryTokenRepository entryTokenRepository;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     private ProductModel savedProduct;
 
     @BeforeEach
@@ -61,6 +70,7 @@ class StockConcurrencyE2ETest {
 
     @AfterEach
     void tearDown() {
+        redisCleanUp.truncateAll();
         databaseCleanUp.truncateAllTables();
     }
 
@@ -73,8 +83,8 @@ class StockConcurrencyE2ETest {
         UserModel user1 = userService.signUp(new UserModel("user01", "Password1!", "유저1", LocalDate.of(1990, 1, 1), "u1@test.com"));
         UserModel user2 = userService.signUp(new UserModel("user02", "Password1!", "유저2", LocalDate.of(1990, 1, 1), "u2@test.com"));
 
-        HttpHeaders headers1 = headers("user01");
-        HttpHeaders headers2 = headers("user02");
+        HttpHeaders headers1 = headers(user1);
+        HttpHeaders headers2 = headers(user2);
         OrderDto.CreateRequest request = orderRequest(savedProduct.getId(), 1);
 
         CountDownLatch latch = new CountDownLatch(1);
@@ -113,8 +123,8 @@ class StockConcurrencyE2ETest {
         List<HttpHeaders> headersList = new ArrayList<>();
         for (int i = 1; i <= 10; i++) {
             String loginId = "user" + String.format("%02d", i);
-            userService.signUp(new UserModel(loginId, "Password1!", "유저" + i, LocalDate.of(1990, 1, 1), "u" + i + "@test.com"));
-            headersList.add(headers(loginId));
+            UserModel user = userService.signUp(new UserModel(loginId, "Password1!", "유저" + i, LocalDate.of(1990, 1, 1), "u" + i + "@test.com"));
+            headersList.add(headers(user));
         }
         OrderDto.CreateRequest request = orderRequest(savedProduct.getId(), 1);
 
@@ -154,8 +164,8 @@ class StockConcurrencyE2ETest {
         List<HttpHeaders> headersList = new ArrayList<>();
         for (int i = 1; i <= 10; i++) {
             String loginId = "user" + String.format("%02d", i);
-            userService.signUp(new UserModel(loginId, "Password1!", "유저" + i, LocalDate.of(1990, 1, 1), "u" + i + "@test.com"));
-            headersList.add(headers(loginId));
+            UserModel user = userService.signUp(new UserModel(loginId, "Password1!", "유저" + i, LocalDate.of(1990, 1, 1), "u" + i + "@test.com"));
+            headersList.add(headers(user));
         }
         OrderDto.CreateRequest request = orderRequest(savedProduct.getId(), 1);
 
@@ -191,10 +201,11 @@ class StockConcurrencyE2ETest {
         );
     }
 
-    private HttpHeaders headers(String loginId) {
+    private HttpHeaders headers(UserModel user) {
         HttpHeaders h = new HttpHeaders();
-        h.set(LOGIN_ID_HEADER, loginId);
+        h.set(LOGIN_ID_HEADER, user.getLoginId());
         h.set(LOGIN_PW_HEADER, "Password1!");
+        h.set(ENTRY_TOKEN_HEADER, entryTokenRepository.issue(user.getId()));
         return h;
     }
 
