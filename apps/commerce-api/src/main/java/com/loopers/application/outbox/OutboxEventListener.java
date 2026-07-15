@@ -75,7 +75,8 @@ public class OutboxEventListener {
         List<Map<String, Object>> items = order.getItems().stream()
             .map(item -> Map.<String, Object>of(
                 "productId", item.getProductId(),
-                "quantity", item.getQuantity()
+                "quantity", item.getQuantity(),
+                "price", item.getProductPrice()   // 랭킹 점수(price*amount) 계산을 위해 단가를 함께 싣는다
             ))
             .toList();
 
