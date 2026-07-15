@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.application.product.StockInfo;
+import com.loopers.infrastructure.ranking.RankingRedisStore;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.util.List;
 public class ProductV1Controller {
 
     private final ProductApplicationService productApplicationService;
+    private final RankingRedisStore rankingRedisStore;
 
     @GetMapping
     public ApiResponse<List<ProductV1Dto.ProductResponse>> getProducts(
@@ -39,7 +41,9 @@ public class ProductV1Controller {
         @PathVariable Long productId
     ) {
         ProductInfo info = productApplicationService.getProductDetail(productId);
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        // 랭킹은 항상 최신값이어야 하므로 상세 캐시와 분리해 매 요청 실시간 조회 후 병합한다.
+        Integer rank = rankingRedisStore.findLiveRank(productId);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info, rank));
     }
 
     /**
