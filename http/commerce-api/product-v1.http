@@ -1,0 +1,35 @@
+### 상품 목록 — 브랜드 필터 + 좋아요순 정렬 + 페이징
+GET {{commerce-api}}/api/v1/products?brandId=1&sort=likes_desc&page=0&size=20
+
+### 상품 목록 — 전체 좋아요순
+GET {{commerce-api}}/api/v1/products?sort=likes_desc&page=0&size=20
+
+### 상품 목록 — 최신순
+GET {{commerce-api}}/api/v1/products?sort=latest&page=0&size=20
+
+### 상품 상세
+GET {{commerce-api}}/api/v1/products/777
+
+### 상품 생성
+POST {{commerce-api}}/api/v1/products
+Content-Type: application/json
+
+{
+  "name": "새 상품",
+  "description": "새 상품 설명",
+  "price": 10000,
+  "stock": 100,
+  "brandId": 1
+}
+
+### 상품 수정 (상세 캐시 무효화 확인용)
+PUT {{commerce-api}}/api/v1/products/777
+Content-Type: application/json
+
+{
+  "name": "수정된 상품",
+  "description": "수정된 설명",
+  "price": 20000,
+  "stock": 50,
+  "brandId": 2
+}
