@@ -10,9 +10,8 @@ public class RedisTestContainersConfig {
 
     static {
         redisContainer.start();
-    }
 
-    public RedisTestContainersConfig() {
+        // RedisProperties 바인딩(빈 생성)보다 먼저 적용되도록 생성자가 아닌 static 블록에서 설정한다.
         System.setProperty("datasource.redis.database", "0");
         System.setProperty("datasource.redis.master.host", redisContainer.getHost());
         System.setProperty("datasource.redis.master.port", String.valueOf(redisContainer.getFirstMappedPort()));
