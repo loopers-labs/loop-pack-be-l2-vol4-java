@@ -24,6 +24,11 @@ spring:
       - kafka.yml
       - logging.yml
       - monitoring.yml
+  # 메트릭/랭킹 배치 컨슈머 튜닝 — MetricsKafkaListenerConfig 팩토리가 이 값을 이어받는다.
+  kafka:
+    consumer:
+      max-poll-records: 500
+      fetch-max-wait: 500ms
 
 demo-kafka:
   test:

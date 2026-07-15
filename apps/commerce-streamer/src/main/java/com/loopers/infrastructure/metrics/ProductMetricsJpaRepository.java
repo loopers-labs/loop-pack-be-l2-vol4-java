@@ -15,24 +15,23 @@ import org.springframework.data.repository.query.Param;
  */
 public interface ProductMetricsJpaRepository extends JpaRepository<ProductMetrics, Long> {
 
+    /**
+     * 배치 집계 upsert — 한 배치에서 productId 별로 합산한 좋아요 증감/판매량/조회수를 한 번에 반영한다.
+     *
+     * <p>좋아요/판매/조회를 개별 upsert 3종으로 나누지 않고 단일 쿼리로 합쳐, 배치당 상품별 DB 왕복을
+     * 1회로 줄인다. 증감 의미(원자 증가, like_count 음수 방지)는 기존과 동일하다.
+     */
     @Modifying
     @Query(value = "INSERT INTO product_metrics (product_id, like_count, sale_count, view_count, updated_at) "
-        + "VALUES (:productId, GREATEST(:delta, 0), 0, 0, NOW(6)) "
-        + "ON DUPLICATE KEY UPDATE like_count = GREATEST(like_count + :delta, 0), updated_at = NOW(6)",
+        + "VALUES (:productId, GREATEST(:likeDelta, 0), :saleDelta, :viewDelta, NOW(6)) "
+        + "ON DUPLICATE KEY UPDATE "
+        + "like_count = GREATEST(like_count + :likeDelta, 0), "
+        + "sale_count = sale_count + :saleDelta, "
+        + "view_count = view_count + :viewDelta, "
+        + "updated_at = NOW(6)",
         nativeQuery = true)
-    int upsertLikeCount(@Param("productId") Long productId, @Param("delta") long delta);
-
-    @Modifying
-    @Query(value = "INSERT INTO product_metrics (product_id, like_count, sale_count, view_count, updated_at) "
-        + "VALUES (:productId, 0, :quantity, 0, NOW(6)) "
-        + "ON DUPLICATE KEY UPDATE sale_count = sale_count + :quantity, updated_at = NOW(6)",
-        nativeQuery = true)
-    int upsertSaleCount(@Param("productId") Long productId, @Param("quantity") long quantity);
-
-    @Modifying
-    @Query(value = "INSERT INTO product_metrics (product_id, like_count, sale_count, view_count, updated_at) "
-        + "VALUES (:productId, 0, 0, 1, NOW(6)) "
-        + "ON DUPLICATE KEY UPDATE view_count = view_count + 1, updated_at = NOW(6)",
-        nativeQuery = true)
-    int upsertViewCount(@Param("productId") Long productId);
+    int upsertMetrics(@Param("productId") Long productId,
+                      @Param("likeDelta") long likeDelta,
+                      @Param("saleDelta") long saleDelta,
+                      @Param("viewDelta") long viewDelta);
 }
