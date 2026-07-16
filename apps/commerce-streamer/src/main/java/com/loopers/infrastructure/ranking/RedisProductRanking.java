@@ -4,12 +4,15 @@ import com.loopers.config.RankingProperties;
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.ranking.ProductRanking;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.connection.zset.Aggregate;
+import org.springframework.data.redis.connection.zset.Weights;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 
 // ProductRanking 포트의 Redis Sorted Set 어댑터. 일별 key에 ZINCRBY 로 점수를 누적하고 TTL 을 재설정한다.
 @Component
@@ -34,6 +37,15 @@ public class RedisProductRanking implements ProductRanking {
         String key = keyOf(LocalDate.now());
         redisTemplate.opsForZSet().incrementScore(key, String.valueOf(productId), delta);
         redisTemplate.expire(key, ttl);  // 일별 key라서 매 적재 시 재설정해도 마지막 쓰기 후 TTL 만큼만 살아 자연 만료된다
+    }
+
+    @Override
+    public void carryOver(LocalDate fromDate, LocalDate toDate, double weight) {
+        String toKey = keyOf(toDate);
+        
+        // 오늘(fromDate) 점수에 weight(0.1)를 곱해 내일(toDate) 키로 미리 복사. 소스가 비면 아무 일도 안 함
+        redisTemplate.opsForZSet().unionAndStore(keyOf(fromDate), Collections.emptyList(), toKey, Aggregate.SUM, Weights.of(weight));
+        redisTemplate.expire(toKey, ttl);
     }
 
     static String keyOf(LocalDate date) {
