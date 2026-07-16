@@ -10,12 +10,13 @@ import java.util.List;
  */
 public record OrderPlacedMessage(Long orderId, List<Line> lines) {
 
-    public record Line(Long productId, int quantity) {
+    public record Line(Long productId, int quantity, long lineAmount) {
     }
 
     public static OrderPlacedMessage of(Long orderId, List<OrderItem> items) {
         List<Line> lines = items.stream()
-            .map(item -> new Line(item.getProductId(), item.getQuantity()))
+            .map(item -> new Line(item.getProductId(), item.getQuantity(),
+                item.getProductPrice() * item.getQuantity()))
             .toList();
         return new OrderPlacedMessage(orderId, lines);
     }
