@@ -1,0 +1,11 @@
+### 오늘 랭킹 1페이지 (기본 size=20)
+GET http://localhost:8080/api/v1/rankings
+
+### 특정 일자 랭킹
+GET http://localhost:8080/api/v1/rankings?date=20260715&size=20&page=1
+
+### 어제 랭킹 (TTL 2일 이내)
+GET http://localhost:8080/api/v1/rankings?date=20260714
+
+### 잘못된 date 형식 → 400
+GET http://localhost:8080/api/v1/rankings?date=2026-07-15
