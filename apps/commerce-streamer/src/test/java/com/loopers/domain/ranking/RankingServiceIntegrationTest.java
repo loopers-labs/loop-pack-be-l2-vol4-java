@@ -44,6 +44,12 @@ class RankingServiceIntegrationTest {
         return redisTemplate.opsForZSet().score(todayKey(), String.valueOf(productId));
     }
 
+    private void seedWeights(double view, double like, double order) {
+        redisTemplate.opsForHash().put("ranking:weights", "view", String.valueOf(view));
+        redisTemplate.opsForHash().put("ranking:weights", "like", String.valueOf(like));
+        redisTemplate.opsForHash().put("ranking:weights", "order", String.valueOf(order));
+    }
+
     @DisplayName("배치 커맨드를 반영할 때,")
     @Nested
     class ApplyBatch {
@@ -130,6 +136,39 @@ class RankingServiceIntegrationTest {
             // then
             assertThat(scoreOf(productIdA)).isCloseTo(0.1, within(1e-9));
             assertThat(scoreOf(productIdB)).isCloseTo(0.2, within(1e-9));
+        }
+    }
+
+    @DisplayName("Redis에 저장된 가중치가 있을 때,")
+    @Nested
+    class ApplyBatchWithCustomWeights {
+
+        @DisplayName("재배포 없이 다음 배치부터 바뀐 가중치가 즉시 반영된다.")
+        @Test
+        void reflectsUpdatedWeights_withoutRedeploy() {
+            // given
+            Long productId = 7L;
+            seedWeights(0.1, 0.2, 1.0);
+
+            // when
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.order(productId, 1L, BigDecimal.valueOf(1_000))));
+
+            // then: 1.0 * 1000 * 1 = 1000 (기본 가중치 0.6이었다면 600)
+            assertThat(scoreOf(productId)).isCloseTo(1_000.0, within(1e-6));
+        }
+
+        @DisplayName("가중치 값이 손상되어 있으면 기본값으로 폴백해 정상 반영된다.")
+        @Test
+        void fallsBackToDefault_whenWeightValueIsCorrupted() {
+            // given
+            Long productId = 8L;
+            redisTemplate.opsForHash().put("ranking:weights", "view", "NOT_A_NUMBER");
+
+            // when
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.view(productId)));
+
+            // then: 기본 view 가중치 0.1로 폴백
+            assertThat(scoreOf(productId)).isCloseTo(0.1, within(1e-9));
         }
     }
 }

@@ -10,6 +10,7 @@ final class RankingRedisKeys {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     static final Duration TTL = Duration.ofDays(2);
+    static final String WEIGHTS_KEY = "ranking:weights";
 
     private RankingRedisKeys() {
     }
