@@ -1,10 +1,13 @@
 package com.loopers.domain.ranking;
 
+import org.springframework.stereotype.Component;
+
 /**
  * 랭킹 점수 정책(VO). 유저 행동 신호를 ZINCRBY 델타(점수)로 환산하는 규칙을 한곳에 캡슐화한다.
  * 가중치는 "주문 1건 > 좋아요 3건" 같은 검증 가능한 비즈니스 제약을 인코딩한다.
  * (초기엔 상수 → 이후 config 외부화 가능. guide 결정 #2)
  */
+@Component
 public class RankingScorePolicy {
 
     // 신호별 가중치. 의도: 구매 결정에 가까운 신호일수록 크게 반영한다.

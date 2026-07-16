@@ -3,6 +3,7 @@ package com.loopers.interfaces.consumer;
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,23 +27,27 @@ class OrderEventsConsumerIntegrationTest {
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     OrderEventsConsumerIntegrationTest(
         OrderEventsConsumer orderEventsConsumer,
         ProductMetricsJpaRepository productMetricsJpaRepository,
         EventHandledJpaRepository eventHandledJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.orderEventsConsumer = orderEventsConsumer;
         this.productMetricsJpaRepository = productMetricsJpaRepository;
         this.eventHandledJpaRepository = eventHandledJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("주문 이벤트를 받으면 상품별 수량만큼 product_metrics.sales_count 가 누적된다.")
