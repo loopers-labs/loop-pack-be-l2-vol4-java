@@ -13,8 +13,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
+// increaseLikeCount 등 @Modifying 쿼리는 ProductMetricsService의 @Transactional에 합류해야 실행 가능하므로
+// 쓰기는 Service를 통해 호출하고, 조회(findByProductId)만 Repository를 직접 사용한다.
 @SpringBootTest
-class ProductMetricsRepositoryIntegrationTest {
+class ProductMetricsServiceIntegrationTest {
+
+    @Autowired
+    private ProductMetricsService productMetricsService;
 
     @Autowired
     private ProductMetricsRepository productMetricsRepository;
@@ -38,7 +43,7 @@ class ProductMetricsRepositoryIntegrationTest {
             Long productId = 1L;
 
             // when
-            productMetricsRepository.increaseLikeCount(productId);
+            productMetricsService.increaseLikeCount(productId);
 
             // then
             Optional<ProductMetricsModel> result = productMetricsRepository.findByProductId(productId);
@@ -53,10 +58,10 @@ class ProductMetricsRepositoryIntegrationTest {
         void accumulates_whenProductIdAlreadyExists() {
             // given
             Long productId = 2L;
-            productMetricsRepository.increaseLikeCount(productId);
+            productMetricsService.increaseLikeCount(productId);
 
             // when
-            productMetricsRepository.increaseLikeCount(productId);
+            productMetricsService.increaseLikeCount(productId);
 
             // then
             Long likeCount = productMetricsRepository.findByProductId(productId).orElseThrow().getLikeCount();
@@ -75,7 +80,7 @@ class ProductMetricsRepositoryIntegrationTest {
             Long productId = 3L;
 
             // when
-            productMetricsRepository.decreaseLikeCount(productId);
+            productMetricsService.decreaseLikeCount(productId);
 
             // then
             Long likeCount = productMetricsRepository.findByProductId(productId).orElseThrow().getLikeCount();
@@ -87,11 +92,11 @@ class ProductMetricsRepositoryIntegrationTest {
         void decreases_whenLikeCountIsPositive() {
             // given
             Long productId = 4L;
-            productMetricsRepository.increaseLikeCount(productId);
-            productMetricsRepository.increaseLikeCount(productId);
+            productMetricsService.increaseLikeCount(productId);
+            productMetricsService.increaseLikeCount(productId);
 
             // when
-            productMetricsRepository.decreaseLikeCount(productId);
+            productMetricsService.decreaseLikeCount(productId);
 
             // then
             Long likeCount = productMetricsRepository.findByProductId(productId).orElseThrow().getLikeCount();
@@ -108,10 +113,10 @@ class ProductMetricsRepositoryIntegrationTest {
         void accumulatesByQuantity_whenSalesIncreased() {
             // given
             Long productId = 5L;
-            productMetricsRepository.increaseSalesCount(productId, 3L);
+            productMetricsService.increaseSalesCount(productId, 3L);
 
             // when
-            productMetricsRepository.increaseSalesCount(productId, 2L);
+            productMetricsService.increaseSalesCount(productId, 2L);
 
             // then
             Long salesCount = productMetricsRepository.findByProductId(productId).orElseThrow().getSalesCount();
@@ -128,10 +133,10 @@ class ProductMetricsRepositoryIntegrationTest {
         void accumulates_whenViewIncreased() {
             // given
             Long productId = 6L;
-            productMetricsRepository.increaseViewCount(productId);
+            productMetricsService.increaseViewCount(productId);
 
             // when
-            productMetricsRepository.increaseViewCount(productId);
+            productMetricsService.increaseViewCount(productId);
 
             // then
             Long viewCount = productMetricsRepository.findByProductId(productId).orElseThrow().getViewCount();
