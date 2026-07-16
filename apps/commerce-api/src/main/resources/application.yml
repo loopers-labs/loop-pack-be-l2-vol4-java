@@ -43,6 +43,16 @@ payment:
     interval: 30s   # 폴링 주기(스케줄러 fixedDelay)
     grace: 30s      # 생성 후 이 시간이 지난 PENDING 만 폴링 대상(정상 콜백이 도착할 유예)
 
+# 주문 대기열 (Redis Sorted Set + 입장 토큰)
+queue:
+  admission:
+    interval-ms: 100   # 스케줄러 주기(ms). 1초에 1000/100 = 10번 실행
+    batch-size: 18     # 한 주기 발급 수 = 175 TPS ÷ (초당 실행 10회) ≈ 18 (Thundering Herd 완화)
+    enabled: true      # 입장 스케줄러 활성화 (테스트는 @TestPropertySource 로 off)
+  token:
+    ttl: 5m            # 입장 토큰 TTL. 미사용 시 자동 만료되어 다음 유저에게 기회가 돌아감
+  throughput-per-second: 175   # 초당 처리량. 예상 대기 시간 = 순번 / 이 값 (DB 풀 50 / 주문 200ms → 250 TPS × 안전마진 70%)
+
 resilience4j:
   circuitbreaker:
     instances:
@@ -77,6 +87,17 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+# 통합 테스트에서는 입장 스케줄러를 끈다. 테스트가 admitNext 를 직접 호출해 대기열 상태를 통제하고,
+# 100ms 스케줄러가 캐시된 컨텍스트에서 공유 Redis 의 대기열을 가로채는 것을 막는다. (로컬 dev 는 local 프로파일이라 켜진 채 유지)
+queue:
+  admission:
+    enabled: false
 
 ---
 spring:
