@@ -23,8 +23,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -50,6 +53,9 @@ class ProductFacadeIntegrationTest {
     private ProductStatsRepository productStatsRepository;
 
     @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -73,6 +79,11 @@ class ProductFacadeIntegrationTest {
 
     private void saveStock(Long productId, Long quantity) {
         stockRepository.save(new StockModel(productId, quantity));
+    }
+
+    private void seedRankScore(Long productId, double score) {
+        String key = "ranking:all:" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
     }
 
     @DisplayName("상품을 생성할 때,")
@@ -170,6 +181,62 @@ class ProductFacadeIntegrationTest {
                     () -> assertThat(result.name()).isEqualTo(cached.name()),
                     () -> assertThat(result.price()).isEqualByComparingTo(cached.price())
             );
+        }
+    }
+
+    @DisplayName("상품 상세를 랭킹 정보와 함께 조회할 때,")
+    @Nested
+    class GetProductDetail {
+
+        @DisplayName("오늘의 랭킹에 포함된 상품이면 순위가 함께 반환된다.")
+        @Test
+        void returnsRank_whenProductIsRanked() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "에어맥스", BigDecimal.valueOf(150000));
+            saveStock(product.getId(), 10L);
+            seedRankScore(product.getId(), 99.0);
+
+            // when
+            ProductDetailInfo result = productFacade.getProductDetail(product.getId());
+
+            // then
+            assertAll(
+                    () -> assertThat(result.product().id()).isEqualTo(product.getId()),
+                    () -> assertThat(result.rank()).isEqualTo(1L)
+            );
+        }
+
+        @DisplayName("오늘의 랭킹에 없는 상품이면 순위는 null이다.")
+        @Test
+        void returnsNullRank_whenProductIsNotRanked() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "에어맥스", BigDecimal.valueOf(150000));
+            saveStock(product.getId(), 10L);
+
+            // when
+            ProductDetailInfo result = productFacade.getProductDetail(product.getId());
+
+            // then
+            assertThat(result.rank()).isNull();
+        }
+
+        @DisplayName("상품 정보가 캐시된 이후 랭킹이 새로 반영되어도 순위는 캐시를 우회해 최신 값으로 반환된다.")
+        @Test
+        void returnsFreshRank_evenWhenProductInfoIsCached() {
+            // given
+            BrandModel brand = saveBrand("Nike");
+            ProductModel product = saveProduct(brand.getId(), "에어맥스", BigDecimal.valueOf(150000));
+            saveStock(product.getId(), 10L);
+            productFacade.getProduct(product.getId());
+
+            // when: 캐시 적재 이후 랭킹 점수 반영
+            seedRankScore(product.getId(), 10.0);
+            ProductDetailInfo result = productFacade.getProductDetail(product.getId());
+
+            // then
+            assertThat(result.rank()).isEqualTo(1L);
         }
     }
 

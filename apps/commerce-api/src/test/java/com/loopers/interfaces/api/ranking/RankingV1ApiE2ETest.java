@@ -1,0 +1,143 @@
+package com.loopers.interfaces.api.ranking;
+
+import com.loopers.domain.brand.BrandModel;
+import com.loopers.domain.brand.BrandRepository;
+import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.product.ProductStatsModel;
+import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.stock.StockModel;
+import com.loopers.domain.stock.StockRepository;
+import com.loopers.interfaces.api.ApiResponse;
+import com.loopers.interfaces.api.PageResponse;
+import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class RankingV1ApiE2ETest {
+
+    private static final String BASE_URL = "/api/v1/rankings";
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    @Autowired
+    private TestRestTemplate testRestTemplate;
+
+    @Autowired
+    private BrandRepository brandRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private StockRepository stockRepository;
+
+    @Autowired
+    private ProductStatsRepository productStatsRepository;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
+    @AfterEach
+    void tearDown() {
+        databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
+    }
+
+    private ProductModel saveProduct(Long brandId, String name, BigDecimal price) {
+        ProductModel product = productRepository.save(new ProductModel(brandId, name, price));
+        productStatsRepository.save(new ProductStatsModel(product));
+        stockRepository.save(new StockModel(product.getId(), 10L));
+        return product;
+    }
+
+    private void seedScore(LocalDate date, Long productId, double score) {
+        String key = "ranking:all:" + date.format(DATE_FORMAT);
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
+    }
+
+    @DisplayName("GET /api/v1/rankings")
+    @Nested
+    class GetRankings {
+
+        @DisplayName("date로 조회하면 점수 내림차순 상품 랭킹 페이지를 반환한다.")
+        @Test
+        void returnsRankingPage_whenDateIsProvided() {
+            // given
+            LocalDate date = LocalDate.of(2026, 7, 16);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel high = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel low = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            seedScore(date, high.getId(), 100.0);
+            seedScore(date, low.getId(), 50.0);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(BASE_URL + "?date=20260716&page=1&size=20", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
+                    () -> assertThat(response.getBody().data().content()).hasSize(2),
+                    () -> assertThat(response.getBody().data().content().get(0).rank()).isEqualTo(1L),
+                    () -> assertThat(response.getBody().data().content().get(0).productId()).isEqualTo(high.getId()),
+                    () -> assertThat(response.getBody().data().content().get(0).brandName()).isEqualTo("Nike")
+            );
+        }
+
+        @DisplayName("데이터가 없는 날짜로 조회하면 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenNoDataForDate() {
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(BASE_URL + "?date=20200101", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().content()).isEmpty(),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(0)
+            );
+        }
+
+        @DisplayName("date 형식이 올바르지 않으면 400 Bad Request 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenDateFormatIsInvalid() {
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL + "?date=2026-07-16", HttpMethod.GET, null, Void.class);
+
+            // then
+            assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+    }
+}

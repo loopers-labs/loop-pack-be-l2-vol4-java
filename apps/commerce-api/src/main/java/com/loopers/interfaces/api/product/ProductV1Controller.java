@@ -1,5 +1,6 @@
 package com.loopers.interfaces.api.product;
 
+import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.interfaces.api.ApiResponse;
@@ -20,8 +21,8 @@ public class ProductV1Controller {
     public ApiResponse<ProductV1Dto.ProductResponse> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
-        ProductInfo info = productFacade.getProduct(productId);
-        return ApiResponse.success(ProductV1Dto.ProductResponse.from(info));
+        ProductDetailInfo detail = productFacade.getProductDetail(productId);
+        return ApiResponse.success(ProductV1Dto.ProductResponse.from(detail));
     }
 
     @GetMapping
