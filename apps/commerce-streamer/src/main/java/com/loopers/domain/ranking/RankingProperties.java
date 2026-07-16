@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record RankingProperties(
     @DefaultValue("0.1") double viewWeight,
     @DefaultValue("0.2") double likeWeight,
-    @DefaultValue("0.6") double orderWeight,
+    @DefaultValue("0.7") double orderWeight,
     @DefaultValue("2") int ttlDays,
     @DefaultValue("0.1") double carryOverRate
 ) {}

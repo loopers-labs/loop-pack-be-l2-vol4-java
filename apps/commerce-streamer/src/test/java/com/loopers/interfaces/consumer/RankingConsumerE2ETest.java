@@ -59,24 +59,28 @@ class RankingConsumerE2ETest {
         });
     }
 
-    @DisplayName("가중치가 순서에 반영된다 — 주문 1건(qty1, 0.6)이 좋아요 2건(0.4)보다 높은 점수다.")
+    @DisplayName("가중치가 순서에 반영된다 — 주문 1건(qty1, 0.7)이 좋아요 3건(0.6)보다 높은 점수다.")
     @Test
-    void orderOutweighsTwoLikes() {
+    void orderOutweighsThreeLikes() {
         String like1 = "{\"eventId\":\"rk-l1\",\"type\":\"LikeAdded\",\"productId\":201,"
             + "\"likeCount\":1,\"version\":1,\"occurredAt\":\"" + OCCURRED_AT + "\"}";
         String like2 = "{\"eventId\":\"rk-l2\",\"type\":\"LikeAdded\",\"productId\":201,"
             + "\"likeCount\":2,\"version\":2,\"occurredAt\":\"" + OCCURRED_AT + "\"}";
+        String like3 = "{\"eventId\":\"rk-l3\",\"type\":\"LikeAdded\",\"productId\":201,"
+            + "\"likeCount\":3,\"version\":3,\"occurredAt\":\"" + OCCURRED_AT + "\"}";
         String order = "{\"eventId\":\"rk-o1\",\"type\":\"OrderPlaced\",\"orderId\":1,"
             + "\"lines\":[{\"productId\":202,\"quantity\":1}],\"occurredAt\":\"" + OCCURRED_AT + "\"}";
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             publish("catalog-events", "201", like1);
             publish("catalog-events", "201", like2);
+            publish("catalog-events", "201", like3);
             publish("order-events", "1", order);
-            assertThat(rankingRepository.findScore(DATE, 201L)).hasValueSatisfying(
-                s -> assertThat(s).isCloseTo(0.4, within(1e-9)));
-            assertThat(rankingRepository.findScore(DATE, 202L)).hasValueSatisfying(
-                s -> assertThat(s).isCloseTo(0.6, within(1e-9)));
+            Double likeScore = rankingRepository.findScore(DATE, 201L).orElse(0.0);
+            Double orderScore = rankingRepository.findScore(DATE, 202L).orElse(0.0);
+            assertThat(likeScore).isCloseTo(0.6, within(1e-9));
+            assertThat(orderScore).isCloseTo(0.7, within(1e-9));
+            assertThat(orderScore).isGreaterThan(likeScore); // 주문 1건 > 좋아요 3건
         });
     }
 

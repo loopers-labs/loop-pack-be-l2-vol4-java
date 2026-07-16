@@ -32,7 +32,7 @@ demo-kafka:
 ranking:
   view-weight: 0.1
   like-weight: 0.2
-  order-weight: 0.6
+  order-weight: 0.7
   ttl-days: 2
   carry-over-rate: 0.1
 
