@@ -50,4 +50,10 @@ public class RankingFacade {
         }
         return new PageImpl<>(items, pageable, total);
     }
+
+    public Long getRank(Long productId) {
+        return rankingService.getRank(LocalDate.now(), productId)
+                             .map(zeroBased -> zeroBased + 1)
+                             .orElse(null);
+    }
 }

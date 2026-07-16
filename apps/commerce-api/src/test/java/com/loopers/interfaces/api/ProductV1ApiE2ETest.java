@@ -3,6 +3,7 @@ package com.loopers.interfaces.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.brand.BrandDescription;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.brand.BrandName;
@@ -20,12 +21,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +54,10 @@ class ProductV1ApiE2ETest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
+    private RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -75,6 +84,11 @@ class ProductV1ApiE2ETest {
         ));
     }
 
+    private void seedScore(LocalDate date, Long productId, double score) {
+        String key = "ranking:all:" + date.format(DateTimeFormatter.BASIC_ISO_DATE);
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
+    }
+
     private List<ProductV1Dto.ProductSummaryResponse> readContent(MvcResult mvcResult) throws Exception {
         ApiResponse<JsonNode> response = objectMapper.readValue(
                 mvcResult.getResponse().getContentAsString(),
@@ -82,6 +96,14 @@ class ProductV1ApiE2ETest {
         );
         JsonNode content = response.data().get("content");
         return objectMapper.convertValue(content, new TypeReference<>() {});
+    }
+
+    private ProductV1Dto.ProductDetailResponse readDetail(MvcResult mvcResult) throws Exception {
+        ApiResponse<JsonNode> response = objectMapper.readValue(
+                mvcResult.getResponse().getContentAsString(),
+                new TypeReference<>() {}
+        );
+        return objectMapper.convertValue(response.data(), ProductV1Dto.ProductDetailResponse.class);
     }
 
     @DisplayName("GET /api/v1/products")
@@ -225,6 +247,46 @@ class ProductV1ApiE2ETest {
                     () -> assertThat(detail.price()).isEqualTo(10000L),
                     () -> assertThat(detail.brand().id()).isEqualTo(brand.getId()),
                     () -> assertThat(detail.brand().name()).isEqualTo("나이키")
+            );
+        }
+
+        @DisplayName("오늘 랭킹에 있으면, 순위(rank, 1-based)를 함께 반환한다.")
+        @Test
+        void returnsRank_whenRanked() throws Exception {
+            // given
+            BrandModel brand = saveBrand("나이키");
+            ProductModel a = saveProduct(brand.getId(), "A", 1000L);
+            ProductModel b = saveProduct(brand.getId(), "B", 2000L);
+            LocalDate today = LocalDate.now();
+            seedScore(today, b.getId(), 2.0);  // b 가 1위
+            seedScore(today, a.getId(), 1.0);  // a 가 2위
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(get(ENDPOINT + "/" + a.getId())).andReturn();
+
+            // then
+            ProductV1Dto.ProductDetailResponse detail = readDetail(mvcResult);
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()),
+                    () -> assertThat(detail.rank()).isEqualTo(2L)
+            );
+        }
+
+        @DisplayName("오늘 랭킹에 없으면, rank 는 null 이다.")
+        @Test
+        void returnsNullRank_whenNotRanked() throws Exception {
+            // given
+            BrandModel brand = saveBrand("나이키");
+            ProductModel product = saveProduct(brand.getId(), "티셔츠", 10000L);
+
+            // when
+            MvcResult mvcResult = mockMvc.perform(get(ENDPOINT + "/" + product.getId())).andReturn();
+
+            // then
+            ProductV1Dto.ProductDetailResponse detail = readDetail(mvcResult);
+            assertAll(
+                    () -> assertThat(mvcResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()),
+                    () -> assertThat(detail.rank()).isNull()
             );
         }
 
