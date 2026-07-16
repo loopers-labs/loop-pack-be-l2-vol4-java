@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Component
@@ -27,6 +28,16 @@ public class RankingService {
             deltas.merge(command.productId(), score(command, weights), Double::sum);
         }
         rankingRepository.incrementScores(LocalDate.now(), deltas);
+    }
+
+    // 콜드 스타트 완화: from 날짜의 전체 점수에 ratio를 곱해 to 날짜 키에 미리 반영해둔다.
+    public void carryOverScores(LocalDate from, LocalDate to, double ratio) {
+        Map<Long, Double> scores = rankingRepository.findAll(from);
+        if (scores.isEmpty()) return;
+
+        Map<Long, Double> scaledDeltas = scores.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() * ratio));
+        rankingRepository.incrementScores(to, scaledDeltas);
     }
 
     private double score(RankingCommand.UpdateRanking command, RankingWeights weights) {

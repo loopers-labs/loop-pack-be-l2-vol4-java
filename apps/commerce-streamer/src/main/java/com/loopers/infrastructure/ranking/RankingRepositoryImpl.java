@@ -4,10 +4,13 @@ import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.ranking.RankingRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class RankingRepositoryImpl implements RankingRepository {
@@ -32,5 +35,21 @@ public class RankingRepositoryImpl implements RankingRepository {
                 masterRedisTemplate.opsForZSet().incrementScore(key, String.valueOf(productId), delta)
         );
         masterRedisTemplate.expire(key, RankingRedisKeys.TTL);
+    }
+
+    // Score Carry-Over(콜드 스타트 완화) 스케줄러가 원본 날짜의 전체 점수를 읽어올 때 사용한다.
+    @Override
+    public Map<Long, Double> findAll(LocalDate date) {
+        String key = RankingRedisKeys.dailyKey(date);
+        Set<ZSetOperations.TypedTuple<String>> tuples = masterRedisTemplate.opsForZSet().rangeWithScores(key, 0, -1);
+        if (tuples == null || tuples.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Double> scores = new HashMap<>();
+        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+            scores.put(Long.valueOf(tuple.getValue()), tuple.getScore());
+        }
+        return scores;
     }
 }

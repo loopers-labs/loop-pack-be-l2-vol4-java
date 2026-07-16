@@ -6,4 +6,6 @@ import java.util.Map;
 public interface RankingRepository {
 
     void incrementScores(LocalDate date, Map<Long, Double> productScoreDeltas);
+
+    Map<Long, Double> findAll(LocalDate date);
 }

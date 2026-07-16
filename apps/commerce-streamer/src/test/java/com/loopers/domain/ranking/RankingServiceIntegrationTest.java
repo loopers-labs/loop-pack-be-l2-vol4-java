@@ -36,12 +36,20 @@ class RankingServiceIntegrationTest {
         redisCleanUp.truncateAll();
     }
 
+    private String keyOf(LocalDate date) {
+        return "ranking:all:" + date.format(DATE_FORMAT);
+    }
+
     private String todayKey() {
-        return "ranking:all:" + LocalDate.now().format(DATE_FORMAT);
+        return keyOf(LocalDate.now());
     }
 
     private Double scoreOf(Long productId) {
         return redisTemplate.opsForZSet().score(todayKey(), String.valueOf(productId));
+    }
+
+    private Double scoreOf(LocalDate date, Long productId) {
+        return redisTemplate.opsForZSet().score(keyOf(date), String.valueOf(productId));
     }
 
     private void seedWeights(double view, double like, double order) {
@@ -169,6 +177,60 @@ class RankingServiceIntegrationTest {
 
             // then: 기본 view 가중치 0.1로 폴백
             assertThat(scoreOf(productId)).isCloseTo(0.1, within(1e-9));
+        }
+    }
+
+    @DisplayName("Score Carry-Over를 수행할 때,")
+    @Nested
+    class CarryOverScores {
+
+        @DisplayName("from 날짜의 점수에 ratio를 곱해 to 날짜 키에 반영한다.")
+        @Test
+        void copiesScaledScores_fromSourceDateToTargetDate() {
+            // given
+            LocalDate today = LocalDate.now();
+            LocalDate tomorrow = today.plusDays(1);
+            Long productId = 9L;
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.order(productId, 1L, BigDecimal.valueOf(1_000))));
+            // 오늘 점수: 0.6 * 1000 * 1 = 600
+
+            // when
+            rankingService.carryOverScores(today, tomorrow, 0.1);
+
+            // then: 600 * 0.1 = 60
+            assertThat(scoreOf(tomorrow, productId)).isCloseTo(60.0, within(1e-6));
+        }
+
+        @DisplayName("이미 to 날짜에 점수가 있으면 carry-over된 점수가 더해진다.")
+        @Test
+        void addsToExistingTargetScore() {
+            // given
+            LocalDate today = LocalDate.now();
+            LocalDate tomorrow = today.plusDays(1);
+            Long productId = 10L;
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.view(productId)));
+            // 오늘 점수: 0.1
+            redisTemplate.opsForZSet().add(keyOf(tomorrow), String.valueOf(productId), 5.0);
+
+            // when
+            rankingService.carryOverScores(today, tomorrow, 0.5);
+
+            // then: 5.0 + (0.1 * 0.5) = 5.05
+            assertThat(scoreOf(tomorrow, productId)).isCloseTo(5.05, within(1e-9));
+        }
+
+        @DisplayName("from 날짜에 점수가 없으면 아무 것도 반영하지 않는다.")
+        @Test
+        void doesNothing_whenSourceDateHasNoScores() {
+            // given
+            LocalDate emptyDate = LocalDate.of(2000, 1, 1);
+            LocalDate target = LocalDate.of(2000, 1, 2);
+
+            // when
+            rankingService.carryOverScores(emptyDate, target, 0.1);
+
+            // then
+            assertThat(redisTemplate.opsForZSet().zCard(keyOf(target))).isZero();
         }
     }
 }

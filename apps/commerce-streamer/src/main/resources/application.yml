@@ -33,7 +33,19 @@ demo-kafka:
 spring:
   config:
     activate:
-      on-profile: local, test
+      on-profile: local
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트에서는 carryOver()를 각 테스트가 직접, 결정론적으로 트리거한다.
+# 자동 스케줄(23:50)까지 켜두면 테스트 컨텍스트 캐시를 공유하는 다른 테스트가 assertion 하는
+# 동안 공유 Redis 테스트컨테이너의 랭킹 상태를 비결정적으로 바꿔버리므로 test 프로필에서는 자동 실행을 끈다.
+ranking:
+  carry-over-scheduler-enabled: false
 
 ---
 spring:
