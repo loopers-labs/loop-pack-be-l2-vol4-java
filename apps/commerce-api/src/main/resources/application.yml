@@ -29,6 +29,25 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# 주문 대기열. 발급 속도 140 TPS = 100ms × 14명 분산 발급 (1s 일괄은 같은 총량이라도 Thundering Herd).
+#  발급 속도는 하류에서 가장 좁은 병목에서 역산 — 로컬 실측 기준 커넥션 풀(이론 상한 ~2,500 TPS)보다
+#  재고 핫로우 락 직렬화(~160 TPS 포화)가 먼저 상한이었다. 행사 상품 구성(핫로우 집중도)에 따라
+#  달라지므로 리허설 실측 후 재산정하는 운영 파라미터로 둔다(단일 인기 상품 행사면 12 이하 권장).
+#  폴링 밴드: 앞순번일수록 짧게 (토큰 수신 지연 최소화).
+queue:
+  enabled: true
+  token-ttl-seconds: 300
+  scheduler:
+    interval-ms: 100
+    batch-size: 14
+  polling:
+    bands:
+      - max-position: 100
+        interval-ms: 1000
+      - max-position: 1000
+        interval-ms: 3000
+    default-interval-ms: 5000
+
 # PG(pg-simulator) 연동. read-timeout 은 PG 동기 응답(100~500ms)보다 충분히 위로 둔다.
 pg:
   base-url: http://localhost:8082
@@ -75,6 +94,17 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+# test: 대기열 게이트 off — 기존 주문/결제 통합 테스트가 토큰 없이 동작.
+# 대기열 자체 테스트만 @SpringBootTest(properties = "queue.enabled=true") 로 개별 활성화한다.
+spring:
+  config:
+    activate:
+      on-profile: test
+
+queue:
+  enabled: false
 
 ---
 spring:
