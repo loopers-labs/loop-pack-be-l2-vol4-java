@@ -6,11 +6,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> {
 
     Optional<ProductModel> findByIdAndDeletedAtIsNull(Long id);
+
+    List<ProductModel> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
 
     @Modifying
     @Query("update ProductModel p set p.likeCount = p.likeCount + 1 where p.id = :id")

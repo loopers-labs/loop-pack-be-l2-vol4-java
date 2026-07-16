@@ -38,6 +38,14 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAllByIdIn(final List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids);
+    }
+
+    @Override
     public void increaseLikeCount(final Long productId) {
         productJpaRepository.increaseLikeCount(productId);
     }
