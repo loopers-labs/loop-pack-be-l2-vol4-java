@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.within;
 class RankingCarryOverSchedulerIntegrationTest {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HOURLY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
     @Autowired
     private RankingCarryOverScheduler rankingCarryOverScheduler;
@@ -49,6 +51,14 @@ class RankingCarryOverSchedulerIntegrationTest {
 
     private Double scoreOf(LocalDate date, Long productId) {
         return redisTemplate.opsForZSet().score(keyOf(date), String.valueOf(productId));
+    }
+
+    private String hourlyKeyOf(LocalDateTime dateTime) {
+        return "ranking:hourly:" + dateTime.format(HOURLY_DATE_FORMAT);
+    }
+
+    private Double hourlyScoreOf(LocalDateTime dateTime, Long productId) {
+        return redisTemplate.opsForZSet().score(hourlyKeyOf(dateTime), String.valueOf(productId));
     }
 
     @DisplayName("carryOver를 호출할 때,")
@@ -80,6 +90,38 @@ class RankingCarryOverSchedulerIntegrationTest {
             // then
             LocalDate tomorrow = LocalDate.now().plusDays(1);
             assertThat(redisTemplate.opsForZSet().zCard(keyOf(tomorrow))).isZero();
+        }
+    }
+
+    @DisplayName("hourlyCarryOver를 호출할 때,")
+    @Nested
+    class HourlyCarryOver {
+
+        @DisplayName("이번 시간 점수의 기본 비율(0.1)만큼 다음 시간 키에 미리 반영된다.")
+        @Test
+        void copiesTenPercentOfThisHourScore_intoNextHourKey() {
+            // given
+            Long productId = 2L;
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.order(productId, 1L, BigDecimal.valueOf(1_000))));
+            // 이번 시간 점수: 0.6 * 1000 * 1 = 600
+
+            // when
+            rankingCarryOverScheduler.hourlyCarryOver();
+
+            // then: 600 * 0.1 = 60
+            LocalDateTime nextHour = LocalDateTime.now().plusHours(1);
+            assertThat(hourlyScoreOf(nextHour, productId)).isCloseTo(60.0, within(1e-6));
+        }
+
+        @DisplayName("이번 시간 랭킹이 비어있으면 다음 시간 키에도 아무 것도 생기지 않는다.")
+        @Test
+        void createsNothing_whenThisHourRankingIsEmpty() {
+            // when
+            rankingCarryOverScheduler.hourlyCarryOver();
+
+            // then
+            LocalDateTime nextHour = LocalDateTime.now().plusHours(1);
+            assertThat(redisTemplate.opsForZSet().zCard(hourlyKeyOf(nextHour))).isZero();
         }
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.within;
 class RankingServiceIntegrationTest {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HOURLY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
     @Autowired
     private RankingService rankingService;
@@ -50,6 +52,14 @@ class RankingServiceIntegrationTest {
 
     private Double scoreOf(LocalDate date, Long productId) {
         return redisTemplate.opsForZSet().score(keyOf(date), String.valueOf(productId));
+    }
+
+    private String hourlyKeyOf(LocalDateTime dateTime) {
+        return "ranking:hourly:" + dateTime.format(HOURLY_DATE_FORMAT);
+    }
+
+    private Double hourlyScoreOf(LocalDateTime dateTime, Long productId) {
+        return redisTemplate.opsForZSet().score(hourlyKeyOf(dateTime), String.valueOf(productId));
     }
 
     private void seedWeights(double view, double like, double order) {
@@ -145,6 +155,21 @@ class RankingServiceIntegrationTest {
             assertThat(scoreOf(productIdA)).isCloseTo(0.1, within(1e-9));
             assertThat(scoreOf(productIdB)).isCloseTo(0.2, within(1e-9));
         }
+
+        @DisplayName("일간 키뿐 아니라 시간별 키에도 같은 배치가 동시에 반영된다.")
+        @Test
+        void alsoAddsToHourlyKey_whenApplyBatch() {
+            // given
+            Long productId = 11L;
+            List<RankingCommand.UpdateRanking> commands = List.of(RankingCommand.UpdateRanking.like(productId));
+
+            // when
+            rankingService.applyBatch(commands);
+
+            // then
+            assertThat(scoreOf(productId)).isCloseTo(0.2, within(1e-9));
+            assertThat(hourlyScoreOf(LocalDateTime.now(), productId)).isCloseTo(0.2, within(1e-9));
+        }
     }
 
     @DisplayName("Redis에 저장된 가중치가 있을 때,")
@@ -231,6 +256,42 @@ class RankingServiceIntegrationTest {
 
             // then
             assertThat(redisTemplate.opsForZSet().zCard(keyOf(target))).isZero();
+        }
+    }
+
+    @DisplayName("시간별 Score Carry-Over를 수행할 때,")
+    @Nested
+    class CarryOverHourlyScores {
+
+        @DisplayName("from 시간의 점수에 ratio를 곱해 to 시간 키에 반영한다.")
+        @Test
+        void copiesScaledScores_fromSourceHourToTargetHour() {
+            // given
+            LocalDateTime thisHour = LocalDateTime.now();
+            LocalDateTime nextHour = thisHour.plusHours(1);
+            Long productId = 12L;
+            rankingService.applyBatch(List.of(RankingCommand.UpdateRanking.order(productId, 1L, BigDecimal.valueOf(1_000))));
+            // 이번 시간 점수: 0.6 * 1000 * 1 = 600
+
+            // when
+            rankingService.carryOverHourlyScores(thisHour, nextHour, 0.1);
+
+            // then: 600 * 0.1 = 60
+            assertThat(hourlyScoreOf(nextHour, productId)).isCloseTo(60.0, within(1e-6));
+        }
+
+        @DisplayName("from 시간에 점수가 없으면 아무 것도 반영하지 않는다.")
+        @Test
+        void doesNothing_whenSourceHourHasNoScores() {
+            // given
+            LocalDateTime emptyHour = LocalDateTime.of(2000, 1, 1, 0, 0);
+            LocalDateTime target = emptyHour.plusHours(1);
+
+            // when
+            rankingService.carryOverHourlyScores(emptyHour, target, 0.1);
+
+            // then
+            assertThat(redisTemplate.opsForZSet().zCard(hourlyKeyOf(target))).isZero();
         }
     }
 }

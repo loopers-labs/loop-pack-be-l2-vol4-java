@@ -26,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +38,7 @@ class RankingV1ApiE2ETest {
 
     private static final String BASE_URL = "/api/v1/rankings";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HOURLY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -77,6 +79,11 @@ class RankingV1ApiE2ETest {
 
     private void seedScore(LocalDate date, Long productId, double score) {
         String key = "ranking:all:" + date.format(DATE_FORMAT);
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
+    }
+
+    private void seedHourlyScore(LocalDateTime dateTime, Long productId, double score) {
+        String key = "ranking:hourly:" + dateTime.format(HOURLY_DATE_FORMAT);
         redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
     }
 
@@ -135,6 +142,66 @@ class RankingV1ApiE2ETest {
             // when
             ResponseEntity<Void> response =
                     testRestTemplate.exchange(BASE_URL + "?date=2026-07-16", HttpMethod.GET, null, Void.class);
+
+            // then
+            assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings/hourly")
+    @Nested
+    class GetHourlyRankings {
+
+        @DisplayName("dateTime으로 조회하면 점수 내림차순 상품 랭킹 페이지를 반환한다.")
+        @Test
+        void returnsRankingPage_whenDateTimeIsProvided() {
+            // given
+            LocalDateTime dateTime = LocalDateTime.of(2026, 7, 16, 23, 0);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel high = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel low = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            seedHourlyScore(dateTime, high.getId(), 100.0);
+            seedHourlyScore(dateTime, low.getId(), 50.0);
+
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(BASE_URL + "/hourly?dateTime=2026071623&page=1&size=20", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
+                    () -> assertThat(response.getBody().data().content()).hasSize(2),
+                    () -> assertThat(response.getBody().data().content().get(0).rank()).isEqualTo(1L),
+                    () -> assertThat(response.getBody().data().content().get(0).productId()).isEqualTo(high.getId())
+            );
+        }
+
+        @DisplayName("데이터가 없는 시간으로 조회하면 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenNoDataForHour() {
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(BASE_URL + "/hourly?dateTime=2020010100", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().content()).isEmpty(),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(0)
+            );
+        }
+
+        @DisplayName("dateTime 형식이 올바르지 않으면 400 Bad Request 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenDateTimeFormatIsInvalid() {
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL + "/hourly?dateTime=2026-07-16-23", HttpMethod.GET, null, Void.class);
 
             // then
             assertThat(response.getStatusCode().value()).isEqualTo(400);

@@ -6,6 +6,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.ranking.RankingHourlyQueryCondition;
 import com.loopers.domain.ranking.RankingQueryCondition;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
@@ -21,6 +22,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 class RankingFacadeIntegrationTest {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HOURLY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
     @Autowired
     private RankingFacade rankingFacade;
@@ -70,6 +73,11 @@ class RankingFacadeIntegrationTest {
 
     private void seedScore(LocalDate date, Long productId, double score) {
         String key = "ranking:all:" + date.format(DATE_FORMAT);
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
+    }
+
+    private void seedHourlyScore(LocalDateTime dateTime, Long productId, double score) {
+        String key = "ranking:hourly:" + dateTime.format(HOURLY_DATE_FORMAT);
         redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
     }
 
@@ -137,6 +145,65 @@ class RankingFacadeIntegrationTest {
                     () -> assertThat(result.items()).isEmpty(),
                     () -> assertThat(result.totalElements()).isEqualTo(0)
             );
+        }
+    }
+
+    @DisplayName("시간별 랭킹 페이지를 조회할 때,")
+    @Nested
+    class GetHourlyRankings {
+
+        @DisplayName("점수 내림차순으로 순위와 상품 정보가 조합되어 반환된다.")
+        @Test
+        void returnsRankingsOrderedByScoreDesc_withAggregatedProductInfo() {
+            // given
+            LocalDateTime dateTime = LocalDateTime.of(2026, 7, 16, 23, 0);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel high = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel low = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            seedHourlyScore(dateTime, high.getId(), 100.0);
+            seedHourlyScore(dateTime, low.getId(), 50.0);
+
+            // when
+            RankingPageInfo result = rankingFacade.getHourlyRankings(new RankingHourlyQueryCondition(dateTime, 1, 20));
+
+            // then
+            assertAll(
+                    () -> assertThat(result.totalElements()).isEqualTo(2),
+                    () -> assertThat(result.items()).hasSize(2),
+                    () -> assertThat(result.items().get(0).rank()).isEqualTo(1L),
+                    () -> assertThat(result.items().get(0).product().id()).isEqualTo(high.getId())
+            );
+        }
+
+        @DisplayName("해당 시간에 랭킹 데이터가 없으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmpty_whenNoRankingDataForHour() {
+            // when
+            RankingPageInfo result =
+                    rankingFacade.getHourlyRankings(new RankingHourlyQueryCondition(LocalDateTime.of(2000, 1, 1, 0, 0), 1, 20));
+
+            // then
+            assertAll(
+                    () -> assertThat(result.items()).isEmpty(),
+                    () -> assertThat(result.totalElements()).isEqualTo(0)
+            );
+        }
+
+        @DisplayName("일간 랭킹과 시간별 랭킹은 서로 다른 키를 조회하므로 섞이지 않는다.")
+        @Test
+        void doesNotMixWithDailyRanking() {
+            // given
+            LocalDate date = LocalDate.of(2026, 7, 16);
+            LocalDateTime dateTime = LocalDateTime.of(2026, 7, 16, 23, 0);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel dailyOnly = saveProduct(brand.getId(), "일간전용", BigDecimal.valueOf(10000));
+            seedScore(date, dailyOnly.getId(), 100.0);
+
+            // when
+            RankingPageInfo result = rankingFacade.getHourlyRankings(new RankingHourlyQueryCondition(dateTime, 1, 20));
+
+            // then
+            assertThat(result.items()).isEmpty();
         }
     }
 }

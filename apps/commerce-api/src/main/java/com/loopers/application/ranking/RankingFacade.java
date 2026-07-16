@@ -5,6 +5,7 @@ import com.loopers.application.product.ProductInfoAssembler;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.ranking.RankingEntry;
+import com.loopers.domain.ranking.RankingHourlyQueryCondition;
 import com.loopers.domain.ranking.RankingQueryCondition;
 import com.loopers.domain.ranking.RankingService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,16 @@ public class RankingFacade {
     public RankingPageInfo getRankings(RankingQueryCondition condition) {
         List<RankingEntry> entries = rankingService.getRankings(condition);
         long totalElements = rankingService.countRankings(condition.date());
+        return toPageInfo(entries, totalElements);
+    }
 
+    public RankingPageInfo getHourlyRankings(RankingHourlyQueryCondition condition) {
+        List<RankingEntry> entries = rankingService.getHourlyRankings(condition);
+        long totalElements = rankingService.countHourlyRankings(condition);
+        return toPageInfo(entries, totalElements);
+    }
+
+    private RankingPageInfo toPageInfo(List<RankingEntry> entries, long totalElements) {
         List<Long> orderedIds = entries.stream().map(RankingEntry::productId).toList();
         Map<Long, ProductModel> productMap = productService.findAllByIds(orderedIds).stream()
                 .collect(Collectors.toMap(ProductModel::getId, p -> p));
