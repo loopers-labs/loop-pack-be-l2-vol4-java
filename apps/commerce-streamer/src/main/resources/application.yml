@@ -29,6 +29,13 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+ranking:
+  view-weight: 0.1
+  like-weight: 0.2
+  order-weight: 0.6
+  ttl-days: 2
+  carry-over-rate: 0.1
+
 ---
 spring:
   config:
