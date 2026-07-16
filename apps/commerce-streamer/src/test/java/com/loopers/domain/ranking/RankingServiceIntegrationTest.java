@@ -293,5 +293,48 @@ class RankingServiceIntegrationTest {
             // then
             assertThat(redisTemplate.opsForZSet().zCard(hourlyKeyOf(target))).isZero();
         }
+
+        @DisplayName("23시에서 다음날 0시로 넘어가는 자정 경계에서도 날짜가 바뀐 키에 정상 반영된다.")
+        @Test
+        void copiesScaledScores_acrossMidnightBoundary() {
+            // given
+            LocalDateTime lastHourOfDay = LocalDateTime.of(2026, 7, 16, 23, 0);
+            LocalDateTime firstHourOfNextDay = LocalDateTime.of(2026, 7, 17, 0, 0);
+            Long productId = 15L;
+            redisTemplate.opsForZSet().add(hourlyKeyOf(lastHourOfDay), String.valueOf(productId), 600.0);
+
+            // when
+            rankingService.carryOverHourlyScores(lastHourOfDay, firstHourOfNextDay, 0.1);
+
+            // then: 600 * 0.1 = 60, 날짜가 바뀐 다음날 0시 키(ranking:hourly:2026071700)에 반영된다
+            assertThat(hourlyScoreOf(firstHourOfNextDay, productId)).isCloseTo(60.0, within(1e-6));
+        }
+    }
+
+    @DisplayName("가중치가 적용된 배치를 반영할 때,")
+    @Nested
+    class WeightAppliedRanking {
+
+        @DisplayName("주문 1건 상품이 좋아요 3건 상품보다 실제 랭킹 ZSET 순위가 높다.")
+        @Test
+        void ranksOrderProductHigherThanTripleLikedProduct_whenBatchApplied() {
+            // given
+            Long orderedProductId = 16L;
+            Long likedProductId = 17L;
+            List<RankingCommand.UpdateRanking> commands = List.of(
+                    RankingCommand.UpdateRanking.order(orderedProductId, 1L, BigDecimal.valueOf(10_000)),
+                    RankingCommand.UpdateRanking.like(likedProductId),
+                    RankingCommand.UpdateRanking.like(likedProductId),
+                    RankingCommand.UpdateRanking.like(likedProductId)
+            );
+
+            // when
+            rankingService.applyBatch(commands);
+
+            // then: 주문 1건(0.6*10000*1=6000) > 좋아요 3건(0.2*3=0.6) → reverseRank가 더 낮은(=더 상위) 값
+            Long orderedRank = redisTemplate.opsForZSet().reverseRank(todayKey(), String.valueOf(orderedProductId));
+            Long likedRank = redisTemplate.opsForZSet().reverseRank(todayKey(), String.valueOf(likedProductId));
+            assertThat(orderedRank).isLessThan(likedRank);
+        }
     }
 }
