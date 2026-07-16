@@ -87,7 +87,7 @@ class OutboxEventHandlerIntegrationTest {
         // given
         OrderPaidEvent event = new OrderPaidEvent(
                 "evt-order-1", 999L, 1L, 5000L,
-                List.of(new OrderPaidEvent.Item(10L, 2)), ZonedDateTime.now()
+                List.of(new OrderPaidEvent.Item(10L, 2, 10000L)), ZonedDateTime.now()
         );
 
         // when (커밋되어야 BEFORE_COMMIT 리스너가 발화)

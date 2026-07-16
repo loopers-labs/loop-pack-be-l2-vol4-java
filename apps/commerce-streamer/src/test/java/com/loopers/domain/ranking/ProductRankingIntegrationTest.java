@@ -70,21 +70,21 @@ class ProductRankingIntegrationTest {
         assertThat(score(100L)).isCloseTo(0.0, within(1e-9));
     }
 
-    @DisplayName("주문 이벤트는 수량만큼 0.7 을 곱해 누적한다 (수량 3 → 2.1).")
+    @DisplayName("주문 이벤트는 0.7 × log10(1 + subtotal) 을 누적한다 (subtotal 9999 → 2.8).")
     @Test
-    void order_addsOrderWeightTimesQuantity() {
+    void order_addsOrderWeightTimesLogSubtotal() {
         // arrange & act
-        productMetricsService.applyOrderPaid("o1", List.of(new ProductMetricsService.OrderItem(100L, 3L)));
+        productMetricsService.applyOrderPaid("o1", List.of(new ProductMetricsService.OrderItem(100L, 1L, 9999L)));
 
         // assert
-        assertThat(score(100L)).isCloseTo(2.1, within(1e-9));
+        assertThat(score(100L)).isCloseTo(2.8, within(1e-9));
     }
 
-    @DisplayName("주문 1건(0.7)이 좋아요 3건(0.6)보다 상위에 랭크된다 (가중치 순서).")
+    @DisplayName("주문 1건이 좋아요 3건(0.6)보다 상위에 랭크된다 (주문 신호 우선).")
     @Test
     void order_ranksAboveThreeLikes() {
         // arrange
-        productMetricsService.applyOrderPaid("o1", List.of(new ProductMetricsService.OrderItem(100L, 1L)));
+        productMetricsService.applyOrderPaid("o1", List.of(new ProductMetricsService.OrderItem(100L, 1L, 10000L)));
         productMetricsService.applyLike("l1", 200L, 1L);
         productMetricsService.applyLike("l2", 200L, 1L);
         productMetricsService.applyLike("l3", 200L, 1L);

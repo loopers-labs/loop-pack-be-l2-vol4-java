@@ -59,7 +59,8 @@ public class ProductMetricsService {
                     .orElseGet(() -> ProductMetricsModel.of(item.productId()));
             metrics.addSales(item.quantity());
             productMetricsRepository.save(metrics);
-            productRanking.addScore(item.productId(), rankingProperties.weight().order() * item.quantity());
+            // 인기 = 수요 + 구매 금액. 매출(subtotal)을 log10 으로 압축해 고가품 1건이 랭킹을 지배하지 못하게 한다
+            productRanking.addScore(item.productId(), rankingProperties.weight().order() * Math.log10(1 + item.subtotal()));
         }
     }
 
@@ -72,5 +73,5 @@ public class ProductMetricsService {
         return false;
     }
 
-    public record OrderItem(Long productId, long quantity) {}
+    public record OrderItem(Long productId, long quantity, long subtotal) {}
 }

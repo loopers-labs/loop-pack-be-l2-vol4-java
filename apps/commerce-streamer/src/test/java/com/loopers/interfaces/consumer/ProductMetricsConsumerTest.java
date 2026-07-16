@@ -70,7 +70,7 @@ class ProductMetricsConsumerTest {
     void routesOrderPaidToApplyOrderPaid() {
         String message = """
                 {"eventId":"e3","eventType":"ORDER_PAID","aggregateId":999,
-                 "payload":{"orderId":999,"items":[{"productId":100,"quantity":2},{"productId":200,"quantity":3}]}}""";
+                 "payload":{"orderId":999,"items":[{"productId":100,"quantity":2,"subtotal":20000},{"productId":200,"quantity":3,"subtotal":30000}]}}""";
 
         consumer.handle(message);
 
@@ -78,8 +78,8 @@ class ProductMetricsConsumerTest {
         ArgumentCaptor<List<ProductMetricsService.OrderItem>> captor = ArgumentCaptor.forClass(List.class);
         verify(productMetricsService).applyOrderPaid(eq("e3"), captor.capture());
         assertThat(captor.getValue()).containsExactly(
-                new ProductMetricsService.OrderItem(100L, 2L),
-                new ProductMetricsService.OrderItem(200L, 3L)
+                new ProductMetricsService.OrderItem(100L, 2L, 20000L),
+                new ProductMetricsService.OrderItem(200L, 3L, 30000L)
         );
     }
 }

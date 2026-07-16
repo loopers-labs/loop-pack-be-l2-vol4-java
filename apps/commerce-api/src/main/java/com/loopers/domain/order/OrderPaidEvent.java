@@ -12,11 +12,11 @@ public record OrderPaidEvent(
         List<Item> items,
         ZonedDateTime occurredAt
 ) {
-    public record Item(Long productId, Integer quantity) {}
+    public record Item(Long productId, Integer quantity, Long subtotal) {}
 
     public static OrderPaidEvent from(OrderModel order) {
         List<Item> items = order.getOrderItems().stream()
-                .map(item -> new Item(item.getProductId(), item.getQuantity()))
+                .map(item -> new Item(item.getProductId(), item.getQuantity(), item.subtotal()))
                 .toList();
         return new OrderPaidEvent(
                 UUID.randomUUID().toString(),

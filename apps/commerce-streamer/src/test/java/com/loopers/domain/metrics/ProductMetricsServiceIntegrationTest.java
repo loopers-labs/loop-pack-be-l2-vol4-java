@@ -67,8 +67,8 @@ class ProductMetricsServiceIntegrationTest {
     @Test
     void aggregatesSalesPerItem() {
         productMetricsService.applyOrderPaid("evt-o1", List.of(
-                new ProductMetricsService.OrderItem(100L, 2L),
-                new ProductMetricsService.OrderItem(200L, 3L)
+                new ProductMetricsService.OrderItem(100L, 2L, 20000L),
+                new ProductMetricsService.OrderItem(200L, 3L, 30000L)
         ));
 
         assertThat(productMetricsRepository.find(100L).orElseThrow().getSalesCount()).isEqualTo(2L);

@@ -12,7 +12,7 @@ public record RankingProperties(
     public record Weight(
             double view,   // 조회 가중치 (0.1)
             double like,   // 좋아요 가중치 (0.2)
-            double order   // 주문 가중치 (0.7) score = order × 수량
+            double order   // 주문 가중치 (0.7) score = order × log10(1 + subtotal)
     ) {
     }
 }
