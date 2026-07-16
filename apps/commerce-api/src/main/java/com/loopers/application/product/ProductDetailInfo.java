@@ -11,7 +11,8 @@ public record ProductDetailInfo(
     String description,
     Long price,
     Integer stock,
-    long likeCount
+    long likeCount,
+    Integer rank // 오늘 랭킹 1-based 순위. 순위 밖/장애 시 null. 캐시에는 항상 null 로 저장된다.
 ) {
     public static ProductDetailInfo from(Product product, Brand brand, long likeCount) {
         return new ProductDetailInfo(
@@ -22,7 +23,13 @@ public record ProductDetailInfo(
             product.getDescription(),
             product.getPrice(),
             product.getStock(),
-            likeCount
+            likeCount,
+            null
         );
+    }
+
+    /** 캐시 조회 이후 실시간 순위를 덧씌운다 — 순위를 캐시에 얼리지 않기 위한 복사 생성. */
+    public ProductDetailInfo withRank(Integer rank) {
+        return new ProductDetailInfo(id, brandId, brandName, name, description, price, stock, likeCount, rank);
     }
 }

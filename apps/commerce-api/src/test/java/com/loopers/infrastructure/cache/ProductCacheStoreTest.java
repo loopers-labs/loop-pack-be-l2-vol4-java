@@ -28,7 +28,7 @@ class ProductCacheStoreTest {
     @DisplayName("put 후 get 하면 동일 값이 복원된다")
     @Test
     void put_then_get_round_trip() {
-        ProductDetailInfo info = new ProductDetailInfo(1L, 7L, "brand", "n", "d", 1000L, 10, 5L);
+        ProductDetailInfo info = new ProductDetailInfo(1L, 7L, "brand", "n", "d", 1000L, 10, 5L, null);
 
         store.putDetail(info, Duration.ofMinutes(10));
 
@@ -44,7 +44,7 @@ class ProductCacheStoreTest {
     @DisplayName("evict 후에는 미스가 된다")
     @Test
     void evict_removes() {
-        ProductDetailInfo info = new ProductDetailInfo(2L, 7L, "b", "n", "d", 1L, 1, 0L);
+        ProductDetailInfo info = new ProductDetailInfo(2L, 7L, "b", "n", "d", 1L, 1, 0L, null);
         store.putDetail(info, Duration.ofMinutes(10));
 
         store.evictDetail(2L);

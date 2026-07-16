@@ -52,7 +52,8 @@ public class ProductV1Dto {
         String description,
         Long price,
         Integer stock,
-        long likeCount
+        long likeCount,
+        Integer rank
     ) {
         public static ProductDetailResponse from(ProductDetailInfo info) {
             return new ProductDetailResponse(
@@ -63,7 +64,8 @@ public class ProductV1Dto {
                 info.description(),
                 info.price(),
                 info.stock(),
-                info.likeCount()
+                info.likeCount(),
+                info.rank()
             );
         }
     }
