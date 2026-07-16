@@ -23,7 +23,7 @@ public class OrderService {
 
     public OrderModel create(Long userId, List<OrderItemData> itemDataList, BigDecimal discountAmount) {
         OrderModel saved = orderRepository.save(OrderModel.create(userId, itemDataList, discountAmount));
-        eventPublisher.publish(OrderCreatedEvent.from(saved));
+        eventPublisher.publish(OrderEvent.OrderCreated.from(saved));
         return saved;
     }
 
