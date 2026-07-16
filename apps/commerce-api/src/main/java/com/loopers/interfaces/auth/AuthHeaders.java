@@ -8,6 +8,8 @@ public final class AuthHeaders {
     public static final String ADMIN_LDAP = "X-Loopers-Ldap";
     public static final String ADMIN_LDAP_VALUE = "loopers.admin";
 
+    public static final String ENTRY_TOKEN = "X-Entry-Token";
+
     private AuthHeaders() {
     }
 }

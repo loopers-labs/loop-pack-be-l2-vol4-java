@@ -8,11 +8,13 @@ import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.coupon.CouponType;
 import com.loopers.domain.order.OrderItem;
 import com.loopers.domain.order.OrderStatus;
+import com.loopers.domain.queue.EntryTokenRepository;
 import com.loopers.infrastructure.order.OrderItemJpaRepository;
 import com.loopers.infrastructure.order.OrderJpaRepository;
 import com.loopers.interfaces.api.order.OrderV1Dto;
 import com.loopers.interfaces.auth.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +30,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -41,6 +44,7 @@ class OrderV1ApiE2ETest {
     private static final String ENDPOINT = "/api/v1/orders";
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Abcd1234!";
+    private static final String ENTRY_TOKEN_VALUE = "entry-token-value";
 
     private final TestRestTemplate testRestTemplate;
     private final BrandFacade brandFacade;
@@ -49,7 +53,9 @@ class OrderV1ApiE2ETest {
     private final OrderJpaRepository orderJpaRepository;
     private final OrderItemJpaRepository orderItemJpaRepository;
     private final CouponService couponService;
+    private final EntryTokenRepository entryTokenRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     private static final ZonedDateTime FAR_FUTURE = ZonedDateTime.parse("2099-12-31T23:59:59+09:00");
 
@@ -65,7 +71,9 @@ class OrderV1ApiE2ETest {
         OrderJpaRepository orderJpaRepository,
         OrderItemJpaRepository orderItemJpaRepository,
         CouponService couponService,
-        DatabaseCleanUp databaseCleanUp
+        EntryTokenRepository entryTokenRepository,
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandFacade = brandFacade;
@@ -74,7 +82,9 @@ class OrderV1ApiE2ETest {
         this.orderJpaRepository = orderJpaRepository;
         this.orderItemJpaRepository = orderItemJpaRepository;
         this.couponService = couponService;
+        this.entryTokenRepository = entryTokenRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @BeforeEach
@@ -88,11 +98,14 @@ class OrderV1ApiE2ETest {
             LocalDate.of(1999, 3, 22),
             "user@example.com"
         )).id();
+        // 대기열을 통과해 입장 토큰을 발급받은 상태를 재현 (검증은 presence 기준이라 헤더 값은 임의).
+        entryTokenRepository.issue(userId, Duration.ofMinutes(5));
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     private HttpHeaders authHeaders() {
@@ -102,11 +115,17 @@ class OrderV1ApiE2ETest {
         return headers;
     }
 
+    private HttpHeaders orderHeaders() {
+        HttpHeaders headers = authHeaders();
+        headers.set(AuthHeaders.ENTRY_TOKEN, ENTRY_TOKEN_VALUE);
+        return headers;
+    }
+
     @DisplayName("POST /api/v1/orders")
     @Nested
     class PlaceOrder {
 
-        @DisplayName("유효한 인증 헤더와 유효한 items 로 요청하면, 200 과 OrderResponse 를 반환하고 orders/order_items 가 생성된다.")
+        @DisplayName("유효한 인증 헤더와 입장 토큰, 유효한 items 로 요청하면, 200 과 OrderResponse 를 반환하고 orders/order_items 가 생성된다.")
         @Test
         void returnsOrderResponse_whenAuthAndItemsAreValid() {
             // given
@@ -117,7 +136,7 @@ class OrderV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
             );
 
             // then
@@ -138,6 +157,24 @@ class OrderV1ApiE2ETest {
             );
         }
 
+        @DisplayName("주문이 성공하면 사용된 입장 토큰은 소비되어 사라진다.")
+        @Test
+        void consumesEntryToken_whenOrderSucceeds() {
+            // given
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(List.of(
+                new OrderV1Dto.PlaceOrderRequest.Item(productAId, 1)
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            testRestTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
+            );
+
+            // then
+            assertThat(entryTokenRepository.find(userId)).isEmpty();
+        }
+
         @DisplayName("couponId 를 함께 보내면, 200 과 함께 응답에 금액 3종(적용 전·할인·최종)과 usedCouponId 가 반영된다.")
         @Test
         void returnsDiscountedOrder_whenCouponIdIsProvided() {
@@ -150,7 +187,7 @@ class OrderV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
             );
 
             // then
@@ -186,6 +223,52 @@ class OrderV1ApiE2ETest {
             );
         }
 
+        @DisplayName("입장 토큰 헤더가 누락되면, BAD_REQUEST 를 반환하고 orders 행이 생성되지 않는다.")
+        @Test
+        void returnsBadRequest_whenEntryTokenHeaderIsMissing() {
+            // given
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(List.of(
+                new OrderV1Dto.PlaceOrderRequest.Item(productAId, 1)
+            ));
+
+            // when - 로그인 헤더만, X-Entry-Token 없음
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(orderJpaRepository.count()).isZero()
+            );
+        }
+
+        @DisplayName("유효한 입장 토큰이 없으면, FORBIDDEN 과 ENTRY_TOKEN_INVALID 코드를 반환하고 orders 행이 생성되지 않는다.")
+        @Test
+        void returnsForbidden_whenEntryTokenIsNotIssued() {
+            // given - 발급된 토큰을 소비해 Redis 에서 제거
+            entryTokenRepository.consume(userId);
+            OrderV1Dto.PlaceOrderRequest request = new OrderV1Dto.PlaceOrderRequest(List.of(
+                new OrderV1Dto.PlaceOrderRequest.Item(productAId, 1)
+            ));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
+            );
+
+            // then
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(response.getBody().meta().result()).isEqualTo(ApiResponse.Metadata.Result.FAIL),
+                () -> assertThat(response.getBody().meta().errorCode()).isEqualTo("ENTRY_TOKEN_INVALID"),
+                () -> assertThat(orderJpaRepository.count()).isZero()
+            );
+        }
+
         @DisplayName("items 가 빈 배열이면, BAD_REQUEST 와 EMPTY_ORDER_ITEMS 코드를 반환한다.")
         @Test
         void returnsBadRequest_whenItemsIsEmpty() {
@@ -195,7 +278,7 @@ class OrderV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
             );
 
             // then
@@ -218,7 +301,7 @@ class OrderV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
             );
 
             // then
@@ -241,7 +324,7 @@ class OrderV1ApiE2ETest {
             // when
             ParameterizedTypeReference<ApiResponse<OrderV1Dto.OrderResponse>> responseType = new ParameterizedTypeReference<>() {};
             ResponseEntity<ApiResponse<OrderV1Dto.OrderResponse>> response = testRestTemplate.exchange(
-                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, authHeaders()), responseType
+                ENDPOINT, HttpMethod.POST, new HttpEntity<>(request, orderHeaders()), responseType
             );
 
             // then
