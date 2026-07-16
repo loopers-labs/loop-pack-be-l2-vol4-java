@@ -10,9 +10,14 @@ public class ProductV1Dto {
         Long price,
         boolean purchasable,
         long likeCount,
-        BrandResponse brand
+        BrandResponse brand,
+        Long rank
     ) {
         public static ProductResponse from(ProductInfo info) {
+            return from(info, null);
+        }
+
+        public static ProductResponse from(ProductInfo info, Long rank) {
             return new ProductResponse(
                 info.id(),
                 info.name(),
@@ -20,7 +25,8 @@ public class ProductV1Dto {
                 info.price(),
                 info.purchasable(),
                 info.likeCount(),
-                BrandResponse.from(info.brand())
+                BrandResponse.from(info.brand()),
+                rank
             );
         }
     }

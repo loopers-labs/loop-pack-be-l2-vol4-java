@@ -2,6 +2,7 @@ package com.loopers.application.ranking;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.ranking.Rank;
 import com.loopers.domain.ranking.RankingEntry;
 import com.loopers.domain.ranking.RankingKey;
 import com.loopers.domain.ranking.RankingRepository;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -26,6 +28,13 @@ public class RankingFacade {
 
     private final RankingRepository rankingRepository;
     private final ProductRepository productRepository;
+
+    /**
+     * 상품의 오늘자 랭킹 순위를 반환한다. 랭킹 밖이면 Optional.empty. 상품 상세에 붙일 때 쓴다(결정 #8).
+     */
+    public Optional<Rank> currentRankOf(long productId) {
+        return rankingRepository.rankOf(RankingKey.of(LocalDate.now()), productId);
+    }
 
     @Transactional(readOnly = true)
     public List<RankingInfo> getRankingPage(LocalDate date, int page, int size) {
