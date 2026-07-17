@@ -9,6 +9,7 @@ import com.loopers.domain.order.OrderModel;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.queue.EntryTokenService;
 import com.loopers.domain.stock.StockService;
 import com.loopers.domain.user.UserModel;
 import com.loopers.domain.user.UserService;
@@ -33,13 +34,15 @@ public class OrderFacade {
     private final OrderService orderService;
     private final IssuedCouponService issuedCouponService;
     private final CouponTemplateService couponTemplateService;
+    private final EntryTokenService entryTokenService;
 
     public record OrderItemDto(Long productId, Long quantity) {
     }
 
     @Transactional
-    public OrderInfo createOrder(String loginId, String loginPw, List<OrderItemDto> orderItems, Long issuedCouponId) {
+    public OrderInfo createOrder(String loginId, String loginPw, String entryToken, List<OrderItemDto> orderItems, Long issuedCouponId) {
         UserModel user = userService.getLoginUser(loginId, loginPw);
+        entryTokenService.verify(user.getId(), entryToken);
 
         List<Long> productIds = orderItems.stream().map(OrderItemDto::productId).toList();
 
@@ -71,6 +74,7 @@ public class OrderFacade {
                 .forEach(cmd -> stockService.decreaseStock(cmd.productId(), cmd.quantity()));
 
         OrderModel saved = orderService.create(user.getId(), itemDataList, discountAmount);
+        entryTokenService.consume(user.getId());
 
         return OrderInfo.from(saved);
     }

@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -129,6 +132,24 @@ public class ApiControllerAdvice {
     public ResponseEntity<ApiResponse<?>> handleConflict(ObjectOptimisticLockingFailureException e) {
         log.warn("OptimisticLockingFailure : {}", e.getMessage());
         return failureResponse(ErrorType.CONFLICT, "요청을 처리하는 중 충돌이 발생했습니다. 다시 시도해주세요.");
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleServiceUnavailable(DataAccessException e) {
+        log.error("DataAccessException : {}", e.getMessage(), e);
+        return failureResponse(ErrorType.SERVICE_UNAVAILABLE, null);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleServiceUnavailable(CallNotPermittedException e) {
+        log.error("CircuitBreaker Open : {}", e.getMessage());
+        return failureResponse(ErrorType.SERVICE_UNAVAILABLE, null);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiResponse<?>> handleTooManyRequests(RequestNotPermitted e) {
+        log.warn("RateLimiter 초과 : {}", e.getMessage());
+        return failureResponse(ErrorType.TOO_MANY_REQUESTS, null);
     }
 
     @ExceptionHandler

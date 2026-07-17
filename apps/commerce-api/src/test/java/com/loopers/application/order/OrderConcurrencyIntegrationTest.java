@@ -19,7 +19,9 @@ import com.loopers.domain.user.UserRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +47,8 @@ class OrderConcurrencyIntegrationTest {
     private static final int THREAD_COUNT = 10;
     private static final String LOGIN_ID = "concurr01";
     private static final String LOGIN_PW = "Password1!";
+    private static final String ENTRY_TOKEN = "test-token";
+    private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
 
     @Autowired
     private OrderFacade orderFacade;
@@ -71,17 +75,30 @@ class OrderConcurrencyIntegrationTest {
     private PasswordEncryptor passwordEncryptor;
 
     @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
+    }
+
+    private void issueEntryToken(Long userId) {
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, ENTRY_TOKEN);
     }
 
     private UserModel saveUser() {
-        return userRepository.save(new UserModel(
+        UserModel user = userRepository.save(new UserModel(
                 LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01",
                 "orderuser@example.com", Gender.MALE, passwordEncryptor));
+        issueEntryToken(user.getId());
+        return user;
     }
 
     private ProductModel saveProduct(BigDecimal price) {
@@ -123,7 +140,7 @@ class OrderConcurrencyIntegrationTest {
                 executor.submit(() -> {
                     try {
                         startGate.await();
-                        orderFacade.createOrder(LOGIN_ID, LOGIN_PW,
+                        orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN,
                                 List.of(new OrderFacade.OrderItemDto(productId, 1L)), issuedCouponId);
                         successCount.incrementAndGet();
                     } catch (CoreException e) {
@@ -173,9 +190,10 @@ class OrderConcurrencyIntegrationTest {
             List<String> loginIds = new ArrayList<>();
             for (int i = 0; i < THREAD_COUNT; i++) {
                 String loginId = String.format("deadlock%02d", i);
-                userRepository.save(new UserModel(
+                UserModel user = userRepository.save(new UserModel(
                         loginId, LOGIN_PW, "유저" + i, "1990-01-01",
                         "deadlock" + i + "@example.com", Gender.MALE, passwordEncryptor));
+                issueEntryToken(user.getId());
                 loginIds.add(loginId);
             }
 
@@ -193,7 +211,7 @@ class OrderConcurrencyIntegrationTest {
                 executor.submit(() -> {
                     try {
                         startGate.await();
-                        orderFacade.createOrder(loginId, LOGIN_PW, items, null);
+                        orderFacade.createOrder(loginId, LOGIN_PW, ENTRY_TOKEN, items, null);
                         successCount.incrementAndGet();
                     } catch (Exception ignored) {
                     } finally {
@@ -228,9 +246,10 @@ class OrderConcurrencyIntegrationTest {
             List<String> loginIds = new ArrayList<>();
             for (int i = 0; i < THREAD_COUNT; i++) {
                 String loginId = String.format("buyer%02d", i);
-                userRepository.save(new UserModel(
+                UserModel user = userRepository.save(new UserModel(
                         loginId, LOGIN_PW, "유저" + i, "1990-01-01",
                         "buyer" + i + "@example.com", Gender.MALE, passwordEncryptor));
+                issueEntryToken(user.getId());
                 loginIds.add(loginId);
             }
 
@@ -245,7 +264,7 @@ class OrderConcurrencyIntegrationTest {
                 executor.submit(() -> {
                     try {
                         startGate.await();
-                        orderFacade.createOrder(loginId, LOGIN_PW,
+                        orderFacade.createOrder(loginId, LOGIN_PW, ENTRY_TOKEN,
                                 List.of(new OrderFacade.OrderItemDto(productId, 1L)), null);
                         successCount.incrementAndGet();
                     } catch (Exception ignored) {

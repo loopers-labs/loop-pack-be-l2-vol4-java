@@ -16,6 +16,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.user.AuthHeaders;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -43,6 +45,8 @@ class OrderAdminV1ApiE2ETest {
     private static final String ADMIN_LDAP = AuthHeaders.ADMIN_LDAP_VALUE;
     private static final String LOGIN_ID = "user01";
     private static final String LOGIN_PW = "Password1!";
+    private static final String ENTRY_TOKEN = "test-token";
+    private static final String ENTRY_TOKEN_KEY_PREFIX = "queue:entry-token:";
 
     @Autowired
     private TestRestTemplate testRestTemplate;
@@ -69,15 +73,28 @@ class OrderAdminV1ApiE2ETest {
     private PasswordEncryptor passwordEncryptor;
 
     @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
+    }
+
+    private void issueEntryToken(Long userId) {
+        redisTemplate.opsForValue().set(ENTRY_TOKEN_KEY_PREFIX + userId, ENTRY_TOKEN);
     }
 
     private UserModel saveUser() {
-        return userRepository.save(new UserModel(LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
+        UserModel user = userRepository.save(new UserModel(LOGIN_ID, LOGIN_PW, "홍길동", "1990-01-01", "user@example.com", Gender.MALE, passwordEncryptor));
+        issueEntryToken(user.getId());
+        return user;
     }
 
     private ProductModel saveProduct(String name, BigDecimal price) {
@@ -103,11 +120,12 @@ class OrderAdminV1ApiE2ETest {
         @Test
         void returnsPagedOrders_whenOrdersExist() {
             // given
-            saveUser();
+            UserModel user = saveUser();
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 10L);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
-            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null);
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 1L)), null);
+            issueEntryToken(user.getId());
+            orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null);
 
             // when
             ParameterizedTypeReference<ApiResponse<PageResponse<OrderAdminV1Dto.OrderListResponse>>> responseType =
@@ -179,7 +197,7 @@ class OrderAdminV1ApiE2ETest {
             UserModel user = saveUser();
             ProductModel product = saveProduct("테스트 상품", BigDecimal.valueOf(10000));
             saveStock(product.getId(), 5L);
-            Long orderId = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null).id();
+            Long orderId = orderFacade.createOrder(LOGIN_ID, LOGIN_PW, ENTRY_TOKEN, java.util.List.of(new OrderFacade.OrderItemDto(product.getId(), 2L)), null).id();
 
             // when
             ParameterizedTypeReference<ApiResponse<OrderAdminV1Dto.OrderDetailResponse>> responseType =

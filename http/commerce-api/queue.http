@@ -1,0 +1,9 @@
+### 대기열 진입
+POST {{commerce-api}}/api/v1/queue/enter
+X-Loopers-LoginId: user01
+X-Loopers-LoginPw: Password1!
+
+### 대기 순번 조회 (polling) — 스케줄러가 배치 발급하면 token 필드가 채워진다
+GET {{commerce-api}}/api/v1/queue/position
+X-Loopers-LoginId: user01
+X-Loopers-LoginPw: Password1!

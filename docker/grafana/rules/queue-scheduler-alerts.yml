@@ -1,0 +1,16 @@
+groups:
+  - name: queue-scheduler
+    rules:
+      # QueueAdmissionScheduler(fixedDelay=100ms)가 멈췄는지 감지한다.
+      # 임계치를 100ms로 잡지 않는 이유: Prometheus 기본 스크레이핑 주기(5s)보다 촘촘한 임계치는
+      # 스크레이핑 타이밍 차이만으로 오탐을 만든다. "마지막 성공 실행으로부터 5~10초 경과"를 기준으로 잡는다.
+      # (근거: docs/week8/design/waiting-queue-runbook.md#스케줄러-장애-감지)
+      # 게이지 값은 epoch millis(QueueAdmissionScheduler.lastExecutionTimestamp)이므로 1000으로 나눠 초 단위로 비교한다.
+      - alert: QueueSchedulerStalled
+        expr: (queue_scheduler_last_execution_timestamp > 0) and (time() - queue_scheduler_last_execution_timestamp / 1000 > 10)
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "대기열 배치 발급 스케줄러가 멈췄습니다"
+          description: "QueueAdmissionScheduler의 마지막 성공 실행으로부터 10초 이상 경과했습니다(정상 주기 100ms)."

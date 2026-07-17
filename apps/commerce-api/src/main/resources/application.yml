@@ -17,6 +17,10 @@ spring:
     name: commerce-api
   profiles:
     active: local
+  task:
+    scheduling:
+      pool:
+        size: 4 # OutboxRelay(1s)·PaymentReconciliationScheduler(5s)·QueueAdmissionScheduler(100ms) 경합 방지
   config:
     import:
       - jpa.yml
@@ -34,6 +38,10 @@ payment-gateway:
   url: http://localhost:8082                                  # pg-simulator (pg-simulator/application.yml: server.port=8082)
   callback-url: http://localhost:8080/api/v1/payments/callback
   user-id: loopers                                            # PG 는 X-USER-ID 헤더만 요구 — 모든 호출에 동일 값 사용(조회 일관성)
+
+queue:
+  scheduler-interval-ms: 100  # 스케줄러 실행 주기 (waiting-queue-capacity-planning.md 산정치)
+  throughput-per-second: 70   # 목표 TPS — estimatedWaitSeconds 계산과 공유
 
 # Feign 타임아웃 (Connect/Read) — 자동 재시도는 끄고(Retryer.NEVER_RETRY) resilience4j 로 일원화
 feign:
@@ -67,6 +75,19 @@ resilience4j:
         minimum-number-of-calls: 10
         failure-rate-threshold: 60
         wait-duration-in-open-state: 10s
+      redis:                             # 대기열 Redis 호출부(WaitingQueue/EntryToken/QueueAdmission) 공통
+        # 실측 데이터(정상 상태 에러율·실제 Redis 호출 TPS·failover 소요 시간)가 아직 없어(waiting-queue-runbook.md)
+        # threshold/window/wait-duration 등은 라이브러리 기본값을 그대로 채택한다. 실측 확보 후 재튜닝.
+        record-exceptions:
+          - org.springframework.dao.DataAccessException
+  ratelimiter:
+    instances:
+      orderCreate:                       # POST /api/v1/orders — 대기열 계산이 어긋난 상황에 대한 최종 백스톱
+        # 목표 TPS(70)가 아니라 이론적 최대 TPS(150, 안전마진 미적용)를 문턱값으로 사용
+        # (근거: waiting-queue-architecture.md#thundering-herd-완화-전략)
+        limit-for-period: 150
+        limit-refresh-period: 1s
+        timeout-duration: 0s             # 대기 없이 즉시 거부 — 초과 요청을 큐잉하지 않는다
   retry:
     instances:
       paymentRequest:
@@ -90,6 +111,18 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트에서는 배치 발급을 각 테스트가 admit()/admitBatch()로 직접, 결정론적으로 트리거한다.
+# 자동 스케줄(100ms)까지 켜두면 테스트 컨텍스트 캐시를 공유하는 다른 테스트가 assertion 하는
+# 동안 대기열 상태를 비결정적으로 바꿔버리므로 test 프로필에서는 자동 실행을 끈다.
+queue:
+  scheduler-enabled: false
 
 ---
 spring:
