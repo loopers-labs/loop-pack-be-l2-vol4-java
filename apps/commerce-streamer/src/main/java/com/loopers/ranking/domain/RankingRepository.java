@@ -14,4 +14,7 @@ public interface RankingRepository {
 
     /** date 판을 내림차순으로 전부 읽는다(finalize 스냅샷용). */
     List<RankingEntry> readDesc(LocalDate date);
+
+    /** date 판을 seeds(절대 점수)로 재구축한다. 임시 키에 쓰고 RENAME 으로 원자 교체한다(라이브 ZINCRBY 레이스 방지). */
+    void rebuild(LocalDate date, List<RankingEntry> seeds);
 }

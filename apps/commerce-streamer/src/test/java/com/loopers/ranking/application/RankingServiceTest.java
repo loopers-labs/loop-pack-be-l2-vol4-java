@@ -33,6 +33,10 @@ class RankingServiceTest {
         public List<RankingEntry> readDesc(LocalDate date) {
             return List.of();
         }
+
+        @Override
+        public void rebuild(LocalDate date, List<RankingEntry> seeds) {
+        }
     }
 
     @DisplayName("같은 날짜·상품의 여러 이벤트는 점수를 합산해 한 delta 로 반영한다")

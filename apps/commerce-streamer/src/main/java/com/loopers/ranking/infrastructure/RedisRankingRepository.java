@@ -73,6 +73,20 @@ public class RedisRankingRepository implements RankingRepository {
                 .toList();
     }
 
+    @Override
+    public void rebuild(LocalDate date, List<RankingEntry> seeds) {
+        if (seeds.isEmpty()) {
+            return;
+        }
+        String tempKey = key(date) + ":rebuild";
+        redisTemplate.delete(tempKey);
+        for (RankingEntry seed : seeds) {
+            redisTemplate.opsForZSet().add(tempKey, member(seed.productId()), seed.score());
+        }
+        redisTemplate.expireAt(tempKey, expireAt(date));
+        redisTemplate.rename(tempKey, key(date));
+    }
+
     private Set<LocalDate> distinctDates(List<RankingScoreDelta> deltas) {
         return deltas.stream().map(RankingScoreDelta::date).collect(Collectors.toSet());
     }
