@@ -6,6 +6,7 @@ import com.loopers.product.application.ProductReadCacheService;
 import com.loopers.product.application.ProductResult;
 import com.loopers.product.application.event.ProductViewedEvent;
 import com.loopers.product.domain.ProductSortOption;
+import com.loopers.ranking.application.RankingReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,14 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductReadCacheService productReadCacheService;
+    private final RankingReader rankingReader;
     private final ApplicationEventPublisher eventPublisher;
 
     @GetMapping("/{productId}")
     @Override
     public ApiResponse<ProductV1Response.Detail> get(@PathVariable("productId") Long productId) {
-        ProductV1Response.Detail detail = ProductV1Response.Detail.from(productReadCacheService.getProduct(productId));
+        ProductResult.Detail result = productReadCacheService.getProduct(productId);
+        Integer todayRank = rankingReader.todayRank(productId); // 순위는 실시간이라 상품 캐시 밖에서 조회
         eventPublisher.publishEvent(new ProductViewedEvent(productId)); // 조회 집계는 비동기 best-effort
-        return ApiResponse.success(detail);
+        return ApiResponse.success(ProductV1Response.Detail.from(result, todayRank));
     }
 
     @GetMapping
