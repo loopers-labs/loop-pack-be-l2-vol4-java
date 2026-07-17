@@ -45,8 +45,15 @@ class ProductApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private org.springframework.data.redis.core.RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private com.loopers.utils.RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
+        redisCleanUp.truncateAll();
         databaseCleanUp.truncateAllTables();
     }
 
@@ -96,6 +103,51 @@ class ProductApiE2ETest {
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody().data().stockQuantity()).isZero();
+        }
+
+        @DisplayName("오늘 랭킹에 올라있는 상품을 조회하면 rank가 함께 반환된다.")
+        @Test
+        void returnsRank_whenProductIsRanked() {
+            // arrange
+            BrandModel brand = brandJpaRepository.save(new BrandModel("나이키"));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, brand.getId()));
+            productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
+            stockJpaRepository.save(new StockModel(product.getId(), 10));
+            String todayKey = "ranking:all:" + java.time.LocalDate.now()
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+            redisTemplate.opsForZSet().add(todayKey, String.valueOf(product.getId()), 5.0);
+
+            // act
+            ResponseEntity<ApiResponse<ProductDto.ProductResponse>> response = testRestTemplate.exchange(
+                "/api/v1/products/" + product.getId(),
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getBody().data().rank()).isEqualTo(1L);
+        }
+
+        @DisplayName("랭킹에 없는 상품을 조회하면 rank는 null이다.")
+        @Test
+        void returnsNullRank_whenProductNotRanked() {
+            // arrange
+            BrandModel brand = brandJpaRepository.save(new BrandModel("나이키"));
+            ProductModel product = productJpaRepository.save(new ProductModel("에어포스1", 139000L, brand.getId()));
+            productLikeViewJpaRepository.save(new ProductLikeViewModel(product.getId()));
+            stockJpaRepository.save(new StockModel(product.getId(), 10));
+
+            // act
+            ResponseEntity<ApiResponse<ProductDto.ProductResponse>> response = testRestTemplate.exchange(
+                "/api/v1/products/" + product.getId(),
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {}
+            );
+
+            // assert
+            assertThat(response.getBody().data().rank()).isNull();
         }
     }
 }

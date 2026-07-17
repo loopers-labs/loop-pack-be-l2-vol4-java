@@ -7,6 +7,9 @@ import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.domain.metrics.ProductMetricsModel;
 import com.loopers.domain.metrics.ProductMetricsRepository;
+import com.loopers.domain.ranking.RankingKeyGenerator;
+import com.loopers.domain.ranking.RankingRepository;
+import com.loopers.domain.ranking.RankingScorePolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -15,6 +18,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -22,6 +27,7 @@ public class OrderEventsConsumer {
 
     private final ProductMetricsRepository productMetricsRepository;
     private final EventHandledRepository eventHandledRepository;
+    private final RankingRepository rankingRepository;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
@@ -47,16 +53,20 @@ public class OrderEventsConsumer {
 
         JsonNode root = objectMapper.readTree(payload);
         JsonNode items = root.get("data").get("items");
+        String rankingKey = RankingKeyGenerator.dailyKey(LocalDate.now());
 
         for (JsonNode item : items) {
             Long productId = item.get("productId").asLong();
             long quantity = item.get("quantity").asLong();
+            long price = item.path("price").asLong(0);
 
             ProductMetricsModel metrics = productMetricsRepository.findByProductId(productId)
                 .orElseGet(() -> ProductMetricsModel.create(productId));
 
             metrics.addSalesCount(quantity);
             productMetricsRepository.save(metrics);
+
+            rankingRepository.incrementScore(rankingKey, productId, RankingScorePolicy.orderScore(price, quantity));
         }
 
         eventHandledRepository.save(EventHandledModel.of(eventId));
