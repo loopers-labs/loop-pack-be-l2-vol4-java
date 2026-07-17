@@ -98,7 +98,7 @@ class ProductCacheServiceIntegrationTest {
         void getList_returnCachedList_afterPut() {
             // arrange
             List<ProductInfo> items = List.of(
-                new ProductInfo(1L, "에어포스1", 139000L, 1L, null, 0, null)
+                new ProductInfo(1L, "에어포스1", 139000L, 1L, null, 0, null, null)
             );
             productCacheService.putList(ProductSort.LATEST, 0, items, items.size());
 
@@ -117,7 +117,7 @@ class ProductCacheServiceIntegrationTest {
         void evictAllList_removesAllNineKeys() {
             // arrange — 3 sorts × 3 pages = 9개 키 저장
             List<ProductInfo> items = List.of(
-                new ProductInfo(1L, "에어포스1", 139000L, 1L, null, 0, null)
+                new ProductInfo(1L, "에어포스1", 139000L, 1L, null, 0, null, null)
             );
             for (ProductSort sort : ProductSort.values()) {
                 for (int page = 0; page < 3; page++) {

@@ -11,6 +11,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductSort;
 import com.loopers.domain.stock.StockModel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
@@ -33,6 +35,7 @@ public class ProductFacade {
     private final ProductDomainService productDomainService;
     private final ProductLikeViewRepository productLikeViewRepository;
     private final ProductCacheService productCacheService;
+    private final com.loopers.domain.ranking.RankingRepository rankingRepository;
 
     @Transactional
     public ProductInfo createProduct(String name, Long price, Long brandId, int stockQuantity) {
@@ -45,11 +48,13 @@ public class ProductFacade {
     }
 
     public ProductInfo getProduct(Long id) {
+        Long rank = getRankSafely(id);
+
         return productCacheService.getDetail(id)
             .map(cached -> {
                 Long price = productService.getById(id).getPrice();
                 int stockQuantity = stockService.getByProductId(id).getQuantity();
-                return new ProductInfo(cached.id(), cached.name(), price, cached.brandId(), cached.brandName(), cached.likeCount(), stockQuantity);
+                return new ProductInfo(cached.id(), cached.name(), price, cached.brandId(), cached.brandName(), cached.likeCount(), stockQuantity, rank);
             })
             .orElseGet(() -> {
                 ProductModel product = productService.getById(id);
@@ -59,8 +64,18 @@ public class ProductFacade {
                     .orElse(0);
                 int stockQuantity = stockService.getByProductId(id).getQuantity();
                 productCacheService.putDetail(id, new ProductCacheItem(id, product.getName(), brand.getId(), brand.getName(), likeCount));
-                return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity));
+                return ProductInfo.from(productDomainService.combineWithBrand(product, brand, likeCount, stockQuantity), rank);
             });
+    }
+
+    private Long getRankSafely(Long id) {
+        try {
+            String rankingKey = com.loopers.domain.ranking.RankingKeyGenerator.dailyKey(java.time.LocalDate.now());
+            return rankingRepository.getRank(rankingKey, id).map(r -> r + 1).orElse(null);
+        } catch (Exception e) {
+            log.warn("[productId={}] 랭킹 조회 실패 — rank 없이 조회를 계속합니다.", id, e);
+            return null;
+        }
     }
 
     public Page<ProductInfo> getProducts(Long brandId, ProductSort sort, Long minPrice, Long maxPrice, Boolean inStock, int page, int size) {
