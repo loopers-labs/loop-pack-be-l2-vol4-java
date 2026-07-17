@@ -65,6 +65,17 @@ outbox:
 pg-simulator:
   base-url: http://localhost:8082
 
+# 대기열(Virtual Waiting Room) — 주문 API 앞단 관문(docs/week8). 값 근거: §9(D1·D2)·§NFR-4.
+# 방류형(rate-based): 매 M초마다 대기열 앞에서 N명을 활성으로 방류. 순간 처리량 = N/M(초당).
+# enabled=false(평시)면 주문 API가 토큰 없이 기존대로 동작. 블랙프라이데이엔 true로 관문 on.
+waiting-queue:
+  enabled: false
+  release-size: 30                # N: 한 주기 방류 인원(DB 지속 처리량에 맞춰 산정)
+  scheduler-interval-seconds: 2   # M: 방류 주기(초) → throughput = 30 / 2 = 15/s
+  token-ttl-seconds: 30           # D1(개정) — TTL 스윕 시뮬레이션 결과 30s가 배수시간 최소·처리량 최고(docs/week8/06)
+  rank-cache-seconds: 2           # D5
+  hard-max-active: 500            # 안전망 상한(선택 B, 0=비활성). 활성이 이 값 도달 시 방류 조임. 정상 footprint(≈N/M×TTL)보다 넉넉히
+
 # PENDING 결제 자동 정리(reconcile) 스케줄러 — 콜백 유실 안전망. 멀티 인스턴스 중복은 ShedLock으로 차단.
 payment:
   reconcile:
