@@ -15,7 +15,7 @@ public interface ProductV1ApiSpec {
 
     @Operation(
             summary = "상품 단건 조회",
-            description = "상품 식별자(productId)로 상품 상세를 반환합니다."
+            description = "상품 식별자(productId)로 상품 상세를 반환합니다. 오늘 랭킹 순위(rank)가 함께 반환되며, 순위에 없다면 null 입니다."
     )
     ApiResponse<ProductV1Dto.DetailResponse> getProduct(Long productId);
 }

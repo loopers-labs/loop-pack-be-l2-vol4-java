@@ -45,7 +45,8 @@ public class ProductAdminV1Controller implements ProductAdminV1ApiSpec {
             @PathVariable("productId") Long productId
     ) {
         ProductInfo.Detail info = productApplicationService.getProduct(productId);
-        return ApiResponse.success(ProductV1Dto.DetailResponse.from(info));
+        // 어드민 상세는 운영 뷰라 랭킹 순위를 붙이지 않는다(rank = null).
+        return ApiResponse.success(ProductV1Dto.DetailResponse.from(info, null));
     }
 
     @PostMapping

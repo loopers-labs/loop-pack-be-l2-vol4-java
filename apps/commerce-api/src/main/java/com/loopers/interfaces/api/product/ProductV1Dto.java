@@ -43,10 +43,15 @@ public final class ProductV1Dto {
             long price,
             int stock,
             long likeCount,
-            boolean soldOut
+            boolean soldOut,
+            Long rank
     ) {
 
-        public static DetailResponse from(ProductInfo.Detail info) {
+        /**
+         * rank 는 캐시되는 {@code ProductInfo.Detail} 밖에서 매 요청 조회해 붙인다 — 순위는 합성 주기마다
+         * 변하는 휘발 값이라 상세 캐시(30s)에 함께 얼리지 않는다. 오늘 보드 미등재면 null.
+         */
+        public static DetailResponse from(ProductInfo.Detail info, Long rank) {
             return new DetailResponse(
                     info.id(),
                     info.brandId(),
@@ -55,7 +60,8 @@ public final class ProductV1Dto {
                     info.price(),
                     info.stock(),
                     info.likeCount(),
-                    info.soldOut()
+                    info.soldOut(),
+                    rank
             );
         }
     }
