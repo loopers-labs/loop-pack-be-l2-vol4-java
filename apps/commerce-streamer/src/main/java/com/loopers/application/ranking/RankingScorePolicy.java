@@ -1,16 +1,13 @@
 package com.loopers.application.ranking;
 
 import com.loopers.application.metrics.CatalogEventMessage;
+import com.loopers.ranking.RankingScoreFormula;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 @Component
 public class RankingScorePolicy {
-    private static final double VIEW_WEIGHT = 0.1;
-    private static final double LIKE_WEIGHT = 0.2;
-    private static final double ORDER_WEIGHT = 0.7;
-
     public void validate(CatalogEventMessage event) {
         if (event == null) {
             throw new IllegalArgumentException("랭킹 이벤트는 null일 수 없습니다.");
@@ -42,9 +39,9 @@ public class RankingScorePolicy {
             return 0.0;
         }
         return switch (event.eventType()) {
-            case "PRODUCT_VIEWED" -> VIEW_WEIGHT * event.viewCountDelta();
-            case "PRODUCT_LIKED", "PRODUCT_UNLIKED" -> LIKE_WEIGHT * event.likeCountDelta();
-            case "PRODUCT_ORDERED" -> ORDER_WEIGHT * event.salesCountDelta();
+            case "PRODUCT_VIEWED" -> RankingScoreFormula.calculate(event.viewCountDelta(), 0, 0);
+            case "PRODUCT_LIKED", "PRODUCT_UNLIKED" -> RankingScoreFormula.calculate(0, event.likeCountDelta(), 0);
+            case "PRODUCT_ORDERED" -> RankingScoreFormula.calculate(0, 0, event.salesCountDelta());
             default -> 0.0;
         };
     }
