@@ -1,6 +1,7 @@
 package com.loopers.interfaces.consumer;
 
 import com.loopers.confg.kafka.KafkaConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
@@ -9,6 +10,8 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
@@ -36,6 +39,7 @@ import java.util.Map;
  * offset 을 전진시킨다 → poison 메시지가 파티션을 영구 정지시키지 못한다. 일시 장애(재시도로 복구)와 poison(결정적)을
  * 시간축으로 구분한다. producer relay 의 무한 재시도(브로커 일시장애 대응)와는 다른 축이다.</p>
  */
+@Slf4j
 @Configuration
 public class KafkaErrorHandlingConfig {
 
@@ -44,6 +48,9 @@ public class KafkaErrorHandlingConfig {
 
     /** 선착순 발급 consumer 전용 record 리스너 팩토리 이름(manual ack). */
     public static final String COUPON_RECORD_LISTENER = "couponRecordListenerFactory";
+
+    /** 랭킹 collector 전용 record 리스너 팩토리 이름(무한 재시도 / poison skip). */
+    public static final String RANKING_RECORD_LISTENER = "rankingRecordListenerFactory";
 
     /** DLQ 토픽 접미사. 실패 레코드는 원본 토픽 이름 + 이 접미사로 격리된다(소스별 자동 분기). */
     public static final String DLT_SUFFIX = ".DLT";
@@ -114,6 +121,68 @@ public class KafkaErrorHandlingConfig {
         factory.setRecordMessageConverter(converter);
         factory.setConcurrency(3);
         factory.setCommonErrorHandler(dlqErrorHandler);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        return factory;
+    }
+
+    /**
+     * 랭킹 collector 전용 에러 핸들러 — DLT 를 쓰는 {@code dlqErrorHandler} 와 실패 분류 축이 다르다.
+     *
+     * <p><b>일시 장애(Redis 연결/타임아웃) = 무한 재시도</b>: 랭킹은 전용 consumer group 이라 offset 미커밋으로
+     * 파티션이 멈춰도 인질이 없다(metrics 그룹은 독립 진행). 장애 동안 랙이 쌓이고 Redis 복구 후 따라잡는다
+     * — 랙이 곧 무손실 버퍼이며, 랭킹의 저장소가 Redis 자신이므로 장애 중 전진해봤자 할 수 있는 일도 없다.</p>
+     *
+     * <p><b>poison(그 외 전부) = 로그 후 skip</b>: 영구 오류는 기다려도 낫지 않으므로 즉시 offset 전진.
+     * DLT 격리는 생략한다 — 같은 메시지가 metrics 그룹에서도 실패해 이미 {@code <topic>.DLT} 에 보존되므로
+     * 랭킹 그룹의 격리는 중복이고, 랭킹은 근사 지표라 재처리 요구도 없다.</p>
+     */
+    @Bean
+    public CommonErrorHandler rankingErrorHandler() {
+        DefaultErrorHandler handler = new DefaultErrorHandler(
+                (record, exception) -> log.error("랭킹 반영 불가 레코드 skip: topic={}, partition={}, offset={}",
+                        record.topic(), record.partition(), record.offset(), exception),
+                new FixedBackOff(0L, 0L)); // 기본(=poison): 재시도 없이 즉시 recoverer(skip)
+        handler.setBackOffFunction((record, exception) ->
+                isTransientRedisFailure(exception)
+                        ? new FixedBackOff(1000L, FixedBackOff.UNLIMITED_ATTEMPTS)
+                        : null); // null = 기본 backOff 사용
+        return handler;
+    }
+
+    /** 리스너 예외는 ListenerExecutionFailedException 으로 감싸여 오므로 cause 체인을 따라 판정한다. */
+    private static boolean isTransientRedisFailure(Exception exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof RedisConnectionFailureException || cause instanceof QueryTimeoutException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 랭킹 collector 전용 record 리스너 팩토리 — 튜닝·컨버터·ack 방식(RECORD)은 collector 팩토리와 같고
+     * 에러 핸들러만 {@code rankingErrorHandler} 로 다르다. 별도 그룹의 존재 이유가 실패 정책의 독립이므로
+     * 팩토리를 공유하지 않는다.
+     */
+    @Bean(name = RANKING_RECORD_LISTENER)
+    public ConcurrentKafkaListenerContainerFactory<String, byte[]> rankingRecordListenerFactory(
+            KafkaProperties kafkaProperties,
+            ByteArrayJsonMessageConverter converter,
+            CommonErrorHandler rankingErrorHandler
+    ) {
+        Map<String, Object> consumerConfig = new HashMap<>(kafkaProperties.buildConsumerProperties());
+        consumerConfig.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, KafkaConfig.MAX_POLLING_SIZE);
+        consumerConfig.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, KafkaConfig.FETCH_MIN_BYTES);
+        consumerConfig.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, KafkaConfig.FETCH_MAX_WAIT_MS);
+        consumerConfig.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, KafkaConfig.SESSION_TIMEOUT_MS);
+        consumerConfig.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, KafkaConfig.HEARTBEAT_INTERVAL_MS);
+        consumerConfig.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, KafkaConfig.MAX_POLL_INTERVAL_MS);
+
+        ConcurrentKafkaListenerContainerFactory<String, byte[]> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(consumerConfig));
+        factory.setRecordMessageConverter(converter);
+        factory.setConcurrency(3);
+        factory.setCommonErrorHandler(rankingErrorHandler);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
         return factory;
     }
