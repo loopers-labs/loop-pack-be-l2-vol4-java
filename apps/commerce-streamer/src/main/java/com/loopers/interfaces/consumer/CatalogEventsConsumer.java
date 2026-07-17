@@ -7,6 +7,9 @@ import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.domain.metrics.ProductMetricsModel;
 import com.loopers.domain.metrics.ProductMetricsRepository;
+import com.loopers.domain.ranking.RankingKeyGenerator;
+import com.loopers.domain.ranking.RankingRepository;
+import com.loopers.domain.ranking.RankingScorePolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -15,6 +18,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -22,6 +27,7 @@ public class CatalogEventsConsumer {
 
     private final ProductMetricsRepository productMetricsRepository;
     private final EventHandledRepository eventHandledRepository;
+    private final RankingRepository rankingRepository;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
@@ -53,10 +59,21 @@ public class CatalogEventsConsumer {
         ProductMetricsModel metrics = productMetricsRepository.findByProductId(productId)
             .orElseGet(() -> ProductMetricsModel.create(productId));
 
+        String rankingKey = RankingKeyGenerator.dailyKey(LocalDate.now());
+
         switch (eventType) {
-            case "LikedEvent" -> metrics.incrementLikeCount();
-            case "UnlikedEvent" -> metrics.decrementLikeCount();
-            case "ProductViewedEvent" -> metrics.incrementViewCount();
+            case "LikedEvent" -> {
+                metrics.incrementLikeCount();
+                rankingRepository.incrementScore(rankingKey, productId, RankingScorePolicy.likeScore());
+            }
+            case "UnlikedEvent" -> {
+                metrics.decrementLikeCount();
+                rankingRepository.incrementScore(rankingKey, productId, -RankingScorePolicy.likeScore());
+            }
+            case "ProductViewedEvent" -> {
+                metrics.incrementViewCount();
+                rankingRepository.incrementScore(rankingKey, productId, RankingScorePolicy.viewScore());
+            }
             default -> throw new IllegalArgumentException("알 수 없는 이벤트 타입: " + eventType);
         }
 

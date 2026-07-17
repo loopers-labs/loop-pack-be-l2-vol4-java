@@ -27,9 +27,16 @@ class CatalogEventsConsumerTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private org.springframework.data.redis.core.RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private com.loopers.utils.RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("catalog-events를 처리할 때,")
@@ -88,6 +95,45 @@ class CatalogEventsConsumerTest {
             catalogEventsConsumer.process("event-1", payload);
 
             assertThat(eventHandledJpaRepository.existsById("event-1")).isTrue();
+        }
+
+        @DisplayName("ProductViewedEvent가 오면 오늘 랭킹 key에 0.1점이 반영된다.")
+        @Test
+        void process_addsViewScore_whenProductViewed() throws Exception {
+            String payload = "{\"eventType\":\"ProductViewedEvent\",\"data\":{\"productId\":10,\"memberId\":1}}";
+            String todayKey = "ranking:all:" + java.time.LocalDate.now()
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+
+            catalogEventsConsumer.process("event-1", payload);
+
+            Double score = redisTemplate.opsForZSet().score(todayKey, "10");
+            assertThat(score).isEqualTo(0.1);
+        }
+
+        @DisplayName("LikedEvent가 오면 오늘 랭킹 key에 0.2점이 반영된다.")
+        @Test
+        void process_addsLikeScore_whenLiked() throws Exception {
+            String payload = "{\"eventType\":\"LikedEvent\",\"data\":{\"productId\":10,\"memberId\":1}}";
+            String todayKey = "ranking:all:" + java.time.LocalDate.now()
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+
+            catalogEventsConsumer.process("event-1", payload);
+
+            Double score = redisTemplate.opsForZSet().score(todayKey, "10");
+            assertThat(score).isEqualTo(0.2);
+        }
+
+        @DisplayName("UnlikedEvent가 오면 오늘 랭킹 key에서 0.2점이 차감된다.")
+        @Test
+        void process_subtractsLikeScore_whenUnliked() throws Exception {
+            String todayKey = "ranking:all:" + java.time.LocalDate.now()
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+            catalogEventsConsumer.process("event-1", "{\"eventType\":\"LikedEvent\",\"data\":{\"productId\":10,\"memberId\":1}}");
+
+            catalogEventsConsumer.process("event-2", "{\"eventType\":\"UnlikedEvent\",\"data\":{\"productId\":10,\"memberId\":1}}");
+
+            Double score = redisTemplate.opsForZSet().score(todayKey, "10");
+            assertThat(score).isEqualTo(0.0);
         }
     }
 }

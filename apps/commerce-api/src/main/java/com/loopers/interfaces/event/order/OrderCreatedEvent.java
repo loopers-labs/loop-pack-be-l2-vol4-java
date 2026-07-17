@@ -13,10 +13,10 @@ public record OrderCreatedEvent(
 ) {
     public static OrderCreatedEvent from(OrderModel order, List<OrderItemModel> orderItems) {
         List<OrderItemInfo> items = orderItems.stream()
-            .map(item -> new OrderItemInfo(item.getProductId(), item.getQuantity()))
+            .map(item -> new OrderItemInfo(item.getProductId(), item.getQuantity(), item.getPrice()))
             .toList();
         return new OrderCreatedEvent(order.getId(), order.getMemberId(), order.getTotalPrice(), items);
     }
 
-    public record OrderItemInfo(Long productId, int quantity) {}
+    public record OrderItemInfo(Long productId, int quantity, Long price) {}
 }
