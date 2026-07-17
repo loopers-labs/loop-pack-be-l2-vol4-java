@@ -29,7 +29,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 랭킹 collector(전용 consumer group)를 실제 Kafka + Redis(Testcontainers)로 못박는 통합 테스트.
+ * 랭킹 collector(전용 consumer group, 배치 리스너)를 실제 Kafka + Redis(Testcontainers)로 못박는 통합 테스트
+ * — 배치 팩토리(BatchMessagingMessageConverter, List 파라미터 변환)가 실제 발행 → raw 보드 반영까지 연결되는지 포함.
+ *
+ * <p>캐시된 기본 컨텍스트를 그대로 쓴다(프로퍼티 오버라이드 없음) — 기본 컨텍스트가 프로덕션 group 의
+ * 단독 소유자라 리밸런스 경합이 없다. earliest 라 스위트 이전 메시지를 재생하지만 상품 ID 가 클래스
+ * 고유라 무해하고, DLQ 테스트의 poison(productId=null, JSON 유효)은 배치 경로의 요소 단위 skip 으로 흡수된다.</p>
  *
  * <p>같은 토픽을 metrics collector 도 소비하므로(그룹 분리 구조의 본질) 메시지가 product_metrics 에도 반영된다
  * — 테스트 격리를 위해 상품 ID 를 테스트마다 다르게 쓰고 DB·Redis 를 모두 정리한다.</p>
@@ -77,15 +82,16 @@ class RankingEventConsumerIntegrationTest {
         }
     }
 
-    @DisplayName("PRODUCT_VIEWED 2건 → view raw 보드 점수 2")
+    @DisplayName("같은 상품 PRODUCT_VIEWED 3건이 배치 경로로 view 보드 3.0 에 수렴한다")
     @Test
     void viewSignal_accumulates() {
         long productId = 8102L;
         try (Producer<String, String> producer = newProducer()) {
             sendCatalog(producer, catalog(CatalogEventType.PRODUCT_VIEWED, productId));
             sendCatalog(producer, catalog(CatalogEventType.PRODUCT_VIEWED, productId));
+            sendCatalog(producer, catalog(CatalogEventType.PRODUCT_VIEWED, productId));
 
-            awaitScore(RankingKeys.raw(RankingSignal.VIEW, TODAY), productId, 2.0);
+            awaitScore(RankingKeys.raw(RankingSignal.VIEW, TODAY), productId, 3.0);
         }
     }
 
@@ -161,6 +167,7 @@ class RankingEventConsumerIntegrationTest {
         return new KafkaProducer<>(props);
     }
 
+    /** 대기 상한 30초 — 그룹 최초 조인 + earliest 전체 재생 시간을 덮는다. */
     private void awaitScore(String key, long productId, double expected) {
         Double score = null;
         for (int i = 0; i < 100; i++) {
@@ -170,7 +177,7 @@ class RankingEventConsumerIntegrationTest {
                 return;
             }
             try {
-                Thread.sleep(200);
+                Thread.sleep(300);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

@@ -5,6 +5,7 @@ import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.ranking.RankingKeys;
 import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.domain.ranking.RankingSignal;
+import com.loopers.domain.ranking.RankingSlot;
 import com.loopers.support.config.RankingProperties;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,8 +66,8 @@ class RankingSchedulerIntegrationTest {
         @DisplayName("raw 신호를 기본 가중치(view 0.1/like 0.2/order 0.7)로 합성해 display 순위를 만든다 — 주문 1건 > 좋아요 3건")
         void composesDisplayBoardWithConfiguredWeights() {
             // 상품 1: 좋아요 3건 = 0.6 / 상품 2: 주문 1건 = 0.7 → 주문 상품이 상위
-            rankingRepository.increment(RankingSignal.LIKE, TODAY, 1L, 3);
-            rankingRepository.increment(RankingSignal.ORDER_COUNT, TODAY, 2L, 1);
+            seed(RankingSignal.LIKE, TODAY, 1L, 3);
+            seed(RankingSignal.ORDER_COUNT, TODAY, 2L, 1);
 
             new RankingComposeScheduler(rankingScoreComposer).compose();
 
@@ -78,7 +80,7 @@ class RankingSchedulerIntegrationTest {
         @Test
         @DisplayName("전일 raw 도 함께 재합성한다 — 자정 이후 도착한 전일 이벤트가 전일 display 에 반영")
         void recomposesYesterdayForLateEvents() {
-            rankingRepository.increment(RankingSignal.VIEW, YESTERDAY, 1L, 10);
+            seed(RankingSignal.VIEW, YESTERDAY, 1L, 10);
 
             new RankingComposeScheduler(rankingScoreComposer).compose();
 
@@ -93,8 +95,8 @@ class RankingSchedulerIntegrationTest {
         @Test
         @DisplayName("당일 raw × 계수(0.1)를 익일 raw 에 미리 시드하고, 재실행은 마커로 skip 된다")
         void seedsOnceGuardedByMarker() {
-            rankingRepository.increment(RankingSignal.ORDER_COUNT, TODAY, 1L, 10);
-            rankingRepository.increment(RankingSignal.ORDER_COUNT, TOMORROW, 1L, 2); // 시드 전 익일 보드에 먼저 쌓인 증분 — 보존돼야 한다
+            seed(RankingSignal.ORDER_COUNT, TODAY, 1L, 10);
+            seed(RankingSignal.ORDER_COUNT, TOMORROW, 1L, 2); // 시드 전 익일 보드에 먼저 쌓인 증분 — 보존돼야 한다
 
             RankingCarryOverScheduler scheduler =
                     new RankingCarryOverScheduler(rankingRepository, rankingScoreComposer, rankingProperties);
@@ -108,7 +110,7 @@ class RankingSchedulerIntegrationTest {
         @Test
         @DisplayName("시드 직후 익일 display 를 즉시 합성한다 — 자정에 키가 전환되는 순간 보드가 이미 존재한다")
         void composesImmediatelyAfterSeed() {
-            rankingRepository.increment(RankingSignal.ORDER_COUNT, TODAY, 1L, 10);
+            seed(RankingSignal.ORDER_COUNT, TODAY, 1L, 10);
 
             new RankingCarryOverScheduler(rankingRepository, rankingScoreComposer, rankingProperties).carryOver();
 
@@ -119,5 +121,10 @@ class RankingSchedulerIntegrationTest {
 
     private Double score(String key, long productId) {
         return redisTemplate.opsForZSet().score(key, String.valueOf(productId));
+    }
+
+    /** 픽스처 시딩용 단건 누적 — 포트는 배치(incrementAll)만 노출하므로 테스트에서 한 슬롯짜리 배치로 감싼다. */
+    private void seed(RankingSignal signal, LocalDate date, long productId, double delta) {
+        rankingRepository.incrementAll(Map.of(new RankingSlot(signal, date, productId), delta));
     }
 }

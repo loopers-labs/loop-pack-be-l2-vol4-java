@@ -4,18 +4,23 @@ import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.ranking.RankingKeys;
 import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.domain.ranking.RankingSignal;
+import com.loopers.domain.ranking.RankingSlot;
 import com.loopers.support.config.RankingProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.zset.Aggregate;
 import org.springframework.data.redis.connection.zset.Weights;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * {@link RankingRepository} 의 Redis ZSET 어댑터. 쓰기 전용이므로 master 템플릿을 고정 사용한다
@@ -43,10 +48,28 @@ public class RankingRedisRepository implements RankingRepository {
     }
 
     @Override
-    public void increment(RankingSignal signal, LocalDate date, long productId, double delta) {
-        String key = RankingKeys.raw(signal, date);
-        redisTemplate.opsForZSet().incrementScore(key, String.valueOf(productId), delta);
-        redisTemplate.expire(key, ttl);
+    public void incrementAll(Map<RankingSlot, Double> deltas) {
+        if (deltas.isEmpty()) {
+            return;
+        }
+        Set<String> touchedKeys = deltas.keySet().stream()
+                .map(slot -> RankingKeys.raw(slot.signal(), slot.date()))
+                .collect(Collectors.toSet());
+        // 파이프라인 = 왕복 1회에 ZINCRBY N개 + 키당 EXPIRE 1개. 트랜잭션(MULTI)이 아니므로 원자성은 없다
+        // — 도중 단절 시 부분 반영 + 배치 재시도 이중 가산은 포트 계약대로 근사 예산.
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (Map.Entry<RankingSlot, Double> entry : deltas.entrySet()) {
+                RankingSlot slot = entry.getKey();
+                connection.zSetCommands().zIncrBy(
+                        RankingKeys.raw(slot.signal(), slot.date()).getBytes(StandardCharsets.UTF_8),
+                        entry.getValue(),
+                        String.valueOf(slot.productId()).getBytes(StandardCharsets.UTF_8));
+            }
+            for (String key : touchedKeys) {
+                connection.keyCommands().expire(key.getBytes(StandardCharsets.UTF_8), ttl.toSeconds());
+            }
+            return null;
+        });
     }
 
     @Override

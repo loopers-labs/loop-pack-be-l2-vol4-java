@@ -20,6 +20,7 @@ import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.converter.BatchMessagingMessageConverter;
 import org.springframework.kafka.support.converter.ByteArrayJsonMessageConverter;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -49,8 +50,8 @@ public class KafkaErrorHandlingConfig {
     /** 선착순 발급 consumer 전용 record 리스너 팩토리 이름(manual ack). */
     public static final String COUPON_RECORD_LISTENER = "couponRecordListenerFactory";
 
-    /** 랭킹 collector 전용 record 리스너 팩토리 이름(무한 재시도 / poison skip). */
-    public static final String RANKING_RECORD_LISTENER = "rankingRecordListenerFactory";
+    /** 랭킹 collector 전용 배치 리스너 팩토리 이름(무한 재시도 / poison 은 서비스가 요소 단위 skip). */
+    public static final String RANKING_BATCH_LISTENER = "rankingBatchListenerFactory";
 
     /** DLQ 토픽 접미사. 실패 레코드는 원본 토픽 이름 + 이 접미사로 격리된다(소스별 자동 분기). */
     public static final String DLT_SUFFIX = ".DLT";
@@ -160,12 +161,15 @@ public class KafkaErrorHandlingConfig {
     }
 
     /**
-     * 랭킹 collector 전용 record 리스너 팩토리 — 튜닝·컨버터·ack 방식(RECORD)은 collector 팩토리와 같고
-     * 에러 핸들러만 {@code rankingErrorHandler} 로 다르다. 별도 그룹의 존재 이유가 실패 정책의 독립이므로
+     * 랭킹 collector 전용 배치 리스너 팩토리 — consumer 튜닝은 collector 팩토리와 같고, 리스너 형태(배치)와
+     * 에러 핸들러({@code rankingErrorHandler})가 다르다. 별도 그룹의 존재 이유가 실패 정책의 독립이므로
      * 팩토리를 공유하지 않는다.
+     * {@link org.springframework.kafka.listener.DefaultErrorHandler} 는 배치 리스너에서 배치 전체를 재시도한다:
+     * transient(Redis 연결/타임아웃)는 무한 backoff — 이 그룹의 실패 정책 그대로. poison 은 서비스가 리스너 안에서
+     * 요소 단위로 skip 하므로 여기까지 올라오지 않는 것이 정상이고, 올라오면(예: 역직렬화) 레코드별 log&skip 된다.
      */
-    @Bean(name = RANKING_RECORD_LISTENER)
-    public ConcurrentKafkaListenerContainerFactory<String, byte[]> rankingRecordListenerFactory(
+    @Bean(name = RANKING_BATCH_LISTENER)
+    public ConcurrentKafkaListenerContainerFactory<String, byte[]> rankingBatchListenerFactory(
             KafkaProperties kafkaProperties,
             ByteArrayJsonMessageConverter converter,
             CommonErrorHandler rankingErrorHandler
@@ -180,10 +184,11 @@ public class KafkaErrorHandlingConfig {
 
         ConcurrentKafkaListenerContainerFactory<String, byte[]> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(consumerConfig));
-        factory.setRecordMessageConverter(converter);
+        factory.setBatchMessageConverter(new BatchMessagingMessageConverter(converter));
+        factory.setBatchListener(true);
         factory.setConcurrency(3);
         factory.setCommonErrorHandler(rankingErrorHandler);
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.BATCH);
         return factory;
     }
 
