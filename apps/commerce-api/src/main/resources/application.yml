@@ -15,14 +15,24 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  kafka:
+    producer:
+      properties:
+        max.block.ms: 500
   profiles:
     active: local
   config:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+
+commerce:
+  kafka:
+    topics:
+      product-activity: commerce.product-activity.v1
 
 springdoc:
   use-fqn: true
