@@ -2,6 +2,7 @@ package com.loopers.application.product;
 
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.brand.Brand;
+import com.loopers.application.ranking.RankingRepository;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductBrandProcessService;
 import com.loopers.domain.product.ProductDetailView;
@@ -11,7 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,6 +90,33 @@ class ProductFacadeTest {
 
         // assert
         assertThat(result.likeCount()).isEqualTo(7);
+    }
+
+    @DisplayName("상품 상세 랭킹 Redis 조회가 실패하면 상품을 반환하고 rank만 null로 둔다.")
+    @Test
+    void returnsProductWithNullRank_whenRankingRedisFails() {
+        RankingRepository rankingRepository = org.mockito.Mockito.mock(RankingRepository.class);
+        Clock clock = Clock.fixed(Instant.parse("2026-07-17T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+        ProductFacade productFacade = new ProductFacade(
+            productService,
+            brandService,
+            productBrandProcessService,
+            productCacheRepository,
+            productLikeCountRepository,
+            event -> {
+            },
+            rankingRepository,
+            clock
+        );
+        ProductInfo cachedProduct = productInfo();
+        when(productCacheRepository.getProduct(1L)).thenReturn(Optional.of(cachedProduct));
+        when(rankingRepository.findRank(java.time.LocalDate.of(2026, 7, 17), 1L))
+            .thenThrow(new DataAccessResourceFailureException("redis unavailable"));
+
+        ProductDetailInfo result = productFacade.getProductDetail(1L);
+
+        assertThat(result.product()).isEqualTo(cachedProduct);
+        assertThat(result.rank()).isNull();
     }
 
     private ProductInfo productInfo() {
