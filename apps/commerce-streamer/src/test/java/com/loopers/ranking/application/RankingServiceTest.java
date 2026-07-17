@@ -15,12 +15,25 @@ import static org.assertj.core.api.Assertions.within;
 
 class RankingServiceTest {
 
+    /** incrBy 인자를 그대로 담아두는 fake. */
+    private static class CapturingRepository implements RankingRepository {
+        final List<RankingScoreDelta> captured = new ArrayList<>();
+
+        @Override
+        public void incrBy(List<RankingScoreDelta> deltas) {
+            captured.addAll(deltas);
+        }
+
+        @Override
+        public void carryOver(LocalDate from, LocalDate to, double weight) {
+        }
+    }
+
     @DisplayName("같은 날짜·상품의 여러 이벤트는 점수를 합산해 한 delta 로 반영한다")
     @Test
     void foldsSameBucket_intoSingleDelta() {
         // Arrange
-        List<RankingScoreDelta> captured = new ArrayList<>();
-        RankingRepository repo = captured::addAll;
+        CapturingRepository repo = new CapturingRepository();
         RankingService service = new RankingService(repo);
         LocalDate date = LocalDate.of(2026, 7, 17);
 
@@ -31,8 +44,8 @@ class RankingServiceTest {
         ));
 
         // Assert
-        assertThat(captured).hasSize(1);
-        RankingScoreDelta delta = captured.get(0);
+        assertThat(repo.captured).hasSize(1);
+        RankingScoreDelta delta = repo.captured.get(0);
         assertThat(delta.date()).isEqualTo(date);
         assertThat(delta.productId()).isEqualTo(101L);
         assertThat(delta.score()).isCloseTo(1.3, within(1e-9));
@@ -42,8 +55,7 @@ class RankingServiceTest {
     @Test
     void separatesDifferentBuckets() {
         // Arrange
-        List<RankingScoreDelta> captured = new ArrayList<>();
-        RankingRepository repo = captured::addAll;
+        CapturingRepository repo = new CapturingRepository();
         RankingService service = new RankingService(repo);
         LocalDate today = LocalDate.of(2026, 7, 17);
         LocalDate yesterday = LocalDate.of(2026, 7, 16);
@@ -56,6 +68,6 @@ class RankingServiceTest {
         ));
 
         // Assert
-        assertThat(captured).hasSize(3);
+        assertThat(repo.captured).hasSize(3);
     }
 }

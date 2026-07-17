@@ -3,6 +3,8 @@ package com.loopers.ranking.infrastructure;
 import com.loopers.ranking.domain.RankingRepository;
 import com.loopers.ranking.domain.RankingScoreDelta;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.connection.zset.Aggregate;
+import org.springframework.data.redis.connection.zset.Weights;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
@@ -12,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -48,6 +51,13 @@ public class RedisRankingRepository implements RankingRepository {
                 return null;
             }
         });
+    }
+
+    @Override
+    public void carryOver(LocalDate from, LocalDate to, double weight) {
+        redisTemplate.opsForZSet().unionAndStore(
+                key(from), Collections.emptyList(), key(to), Aggregate.SUM, Weights.of(weight));
+        redisTemplate.expireAt(key(to), expireAt(to));
     }
 
     private Set<LocalDate> distinctDates(List<RankingScoreDelta> deltas) {
