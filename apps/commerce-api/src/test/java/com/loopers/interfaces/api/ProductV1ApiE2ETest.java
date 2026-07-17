@@ -6,19 +6,26 @@ import com.loopers.application.product.ProductAdminInfo;
 import com.loopers.application.product.ProductApplicationService;
 import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -41,9 +48,22 @@ class ProductV1ApiE2ETest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    @Qualifier("masterRedisTemplate")
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
+    }
+
+    private void seedRanking(LocalDate date, Long productId, double score) {
+        String key = "ranking:all:" + date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        redisTemplate.opsForZSet().add(key, String.valueOf(productId), score);
     }
 
     private BrandInfo createBrand() {
@@ -171,6 +191,41 @@ class ProductV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("오늘 랭킹에 있는 상품이면, 순위(rank)가 함께 반환된다.")
+        @Test
+        void returnsRank_whenProductIsRankedToday() {
+            // arrange
+            BrandInfo brand = createBrand();
+            ProductAdminInfo product = createProduct(brand.id());
+            seedRanking(LocalDate.now(ZoneId.of("Asia/Seoul")), product.id(), 100.0);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.id(), HttpMethod.GET, new HttpEntity<>(null), responseType
+            );
+
+            // assert
+            assertThat(response.getBody().data().rank()).isEqualTo(1L);
+        }
+
+        @DisplayName("오늘 랭킹에 없는 상품이면, 순위(rank)는 null이다.")
+        @Test
+        void returnsNullRank_whenProductIsNotRankedToday() {
+            // arrange
+            BrandInfo brand = createBrand();
+            ProductAdminInfo product = createProduct(brand.id());
+
+            // act
+            ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductResponse>> responseType = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<ProductV1Dto.ProductResponse>> response = testRestTemplate.exchange(
+                ENDPOINT + "/" + product.id(), HttpMethod.GET, new HttpEntity<>(null), responseType
+            );
+
+            // assert
+            assertThat(response.getBody().data().rank()).isNull();
         }
     }
 }

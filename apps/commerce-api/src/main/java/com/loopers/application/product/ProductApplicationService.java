@@ -7,6 +7,7 @@ import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductViewedEvent;
+import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -18,6 +19,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -25,12 +28,15 @@ import java.util.Map;
 @Service
 public class ProductApplicationService {
 
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final LikeRepository likeRepository;
     private final ProductDomainService productDomainService;
     private final ProductCacheService productCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final RankingRepository rankingRepository;
 
     @Transactional(readOnly = true)
     public List<ProductInfo> getProducts(Long brandId, int page, int size, String sort) {
@@ -94,7 +100,8 @@ public class ProductApplicationService {
                 productCacheService.putProductLikeCount(id, count);
                 return count;
             });
-        ProductInfo result = ProductInfo.from(productDomainService.compose(product, brand, likeCount));
+        Long rank = rankingRepository.getRank(LocalDate.now(ZONE), id);
+        ProductInfo result = ProductInfo.from(productDomainService.compose(product, brand, likeCount), rank);
         eventPublisher.publishEvent(new ProductViewedEvent(id));
         return result;
     }

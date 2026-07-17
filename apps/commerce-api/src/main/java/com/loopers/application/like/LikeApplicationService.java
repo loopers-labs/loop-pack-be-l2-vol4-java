@@ -5,6 +5,7 @@ import com.loopers.domain.like.LikeModel;
 import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.infrastructure.outbox.OutboxService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class LikeApplicationService {
     private final LikeRepository likeRepository;
     private final ProductRepository productRepository;
 	private final ApplicationEventPublisher eventPublisher;
+	private final OutboxService outboxService;
 
     @Transactional
     public void like(Long userId, Long productId) {
@@ -33,8 +35,9 @@ public class LikeApplicationService {
             throw new CoreException(ErrorType.CONFLICT, "이미 좋아요한 상품입니다.");
         }
         likeRepository.save(new LikeModel(userId, productId));
+		String eventId = outboxService.saveLikeChanged(productId, LikeChangedEvent.Type.LIKED);
 		eventPublisher.publishEvent(
-			new LikeChangedEvent(userId, productId, LikeChangedEvent.Type.LIKED)
+			new LikeChangedEvent(eventId, userId, productId, LikeChangedEvent.Type.LIKED)
 		);
     }
 
@@ -43,8 +46,9 @@ public class LikeApplicationService {
         LikeModel like = likeRepository.findByUserIdAndProductId(userId, productId)
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요 내역이 없습니다."));
         likeRepository.delete(like.getId());
+		String eventId = outboxService.saveLikeChanged(productId, LikeChangedEvent.Type.UNLIKED);
 		eventPublisher.publishEvent(
-			new LikeChangedEvent(userId, productId, LikeChangedEvent.Type.UNLIKED)
+			new LikeChangedEvent(eventId, userId, productId, LikeChangedEvent.Type.UNLIKED)
 		);
     }
 

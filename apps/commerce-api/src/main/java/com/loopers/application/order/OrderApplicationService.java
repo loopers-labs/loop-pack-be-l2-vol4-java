@@ -55,7 +55,7 @@ public class OrderApplicationService {
         products.values().forEach(productRepository::save);
         products.keySet().forEach(productCacheService::evictProductStock);
 		OrderModel savedOrder = orderRepository.save(order);
-		outboxService.saveOrderCreated(savedOrder, quantities);
+		outboxService.saveOrderCreated(savedOrder);
 		eventPublisher.publishEvent(new OrderCreatedEvent(savedOrder.getId(), userId));
 
 		return OrderInfo.from(savedOrder);

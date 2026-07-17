@@ -2,9 +2,11 @@ package com.loopers.interfaces.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.confg.kafka.KafkaConfig;
+import com.loopers.domain.ranking.RankingScorePolicy;
 import com.loopers.infrastructure.event.EventHandledEntity;
 import com.loopers.infrastructure.event.EventHandledJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
+import com.loopers.infrastructure.ranking.RankingRedisRepository;
 import com.loopers.interfaces.consumer.message.OrderEventMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,8 @@ public class OrderEventConsumer {
     private final ObjectMapper objectMapper;
     private final EventHandledJpaRepository eventHandledRepository;
     private final ProductMetricsJpaRepository productMetricsRepository;
+    private final RankingScorePolicy rankingScorePolicy;
+    private final RankingRedisRepository rankingRedisRepository;
 
     @KafkaListener(topics = "order-events", containerFactory = KafkaConfig.BATCH_LISTENER)
     @Transactional
@@ -48,6 +52,8 @@ public class OrderEventConsumer {
         if ("ORDER_CREATED".equals(message.type())) {
             for (OrderEventMessage.Item item : message.items()) {
                 productMetricsRepository.upsert(item.productId(), 0L, item.quantity(), 0L);
+                double score = rankingScorePolicy.orderScore(item.price(), item.quantity());
+                rankingRedisRepository.addScore(item.productId(), score, message.occurredAt());
                 log.info("[OrderConsumer] sales_count+{} productId={}", item.quantity(), item.productId());
             }
         }

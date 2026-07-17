@@ -35,4 +35,12 @@ public class TopicConfig {
             .replicas(1)
             .build();
     }
+
+    @Bean
+    public NewTopic likeEventsTopic() {
+        return TopicBuilder.name(OutboxService.LIKE_EVENTS_TOPIC)
+            .partitions(3)
+            .replicas(1)
+            .build();
+    }
 }

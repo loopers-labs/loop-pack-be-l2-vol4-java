@@ -10,9 +10,14 @@ public record ProductInfo(
     String description,
     Long price,
     Integer stock,
-    long likeCount
+    long likeCount,
+    Long rank
 ) {
     public static ProductInfo from(ProductDetail detail) {
+        return from(detail, null);
+    }
+
+    public static ProductInfo from(ProductDetail detail, Long rank) {
         return new ProductInfo(
             detail.id(),
             detail.brandId(),
@@ -21,7 +26,8 @@ public record ProductInfo(
             detail.description(),
             detail.price(),
             detail.stock(),
-            detail.likeCount()
+            detail.likeCount(),
+            rank
         );
     }
 }

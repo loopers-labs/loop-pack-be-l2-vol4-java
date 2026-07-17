@@ -2,10 +2,12 @@ package com.loopers.infrastructure.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.coupon.CouponIssueRequestedEvent;
+import com.loopers.domain.like.LikeChangedEvent;
 import com.loopers.domain.order.OrderCreatedEvent;
 import com.loopers.domain.product.ProductViewedEvent;
 import com.loopers.infrastructure.kafka.message.CatalogEventMessage;
 import com.loopers.infrastructure.kafka.message.CouponIssueRequestMessage;
+import com.loopers.infrastructure.kafka.message.LikeEventMessage;
 import com.loopers.infrastructure.kafka.message.OrderEventMessage;
 import com.loopers.infrastructure.outbox.OutboxEntity;
 import com.loopers.infrastructure.outbox.OutboxJpaRepository;
@@ -65,7 +67,7 @@ public class KafkaOutboxRelay {
         String eventId = UUID.randomUUID().toString();
         CatalogEventMessage message = new CatalogEventMessage(eventId, "PRODUCT_VIEWED", event.productId(), ZonedDateTime.now());
         try {
-            kafkaTemplate.send(CATALOG_TOPIC, String.valueOf(event.productId()), message);
+			kafkaTemplate.send(CATALOG_TOPIC, String.valueOf(event.productId()), message);
             log.debug("[Kafka] sent product viewed event productId={}", event.productId());
         } catch (Exception e) {
             log.warn("[Kafka] send failed for productId={}", event.productId(), e);
@@ -91,6 +93,28 @@ public class KafkaOutboxRelay {
 			log.info("[Outbox] sent coupon issue request couponId={}, userId={}", event.couponId(), event.userId());
 		} catch (Exception e) {
 			log.warn("[Outbox] kafka send failed for couponId={}, scheduler will retry", event.couponId(), e);
+		}
+	}
+
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void handle(LikeChangedEvent event) {
+		Optional<OutboxEntity> outboxOpt = outboxJpaRepository.findByEventId(event.eventId());
+
+		if (outboxOpt.isEmpty()) {
+			log.warn("[Outbox] outbox record not found for eventId={}", event.eventId());
+			return;
+		}
+
+		OutboxEntity record = outboxOpt.get();
+		try {
+			LikeEventMessage message = objectMapper.readValue(record.getPayload(), LikeEventMessage.class);
+			kafkaTemplate.send(record.getTopic(), record.getPartitionKey(), message);
+			record.markSent();
+			outboxJpaRepository.save(record);
+			log.info("[Outbox] sent like event productId={}, type={}", event.productId(), event.type());
+		} catch (Exception e) {
+			log.warn("[Outbox] kafka send failed for productId={}, scheduler will retry", event.productId(), e);
 		}
 	}
 }

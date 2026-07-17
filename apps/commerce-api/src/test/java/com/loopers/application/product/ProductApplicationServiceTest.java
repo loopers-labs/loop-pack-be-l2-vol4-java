@@ -6,6 +6,7 @@ import com.loopers.domain.like.LikeRepository;
 import com.loopers.domain.product.ProductDomainService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.infrastructure.cache.ProductCacheService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -37,8 +38,9 @@ class ProductApplicationServiceTest {
     private final ProductDomainService productDomainService = new ProductDomainService();
     private final ProductCacheService productCacheService = mock(ProductCacheService.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final RankingRepository rankingRepository = mock(RankingRepository.class);
     private final ProductApplicationService productApplicationService =
-        new ProductApplicationService(productRepository, brandRepository, likeRepository, productDomainService, productCacheService, eventPublisher);
+        new ProductApplicationService(productRepository, brandRepository, likeRepository, productDomainService, productCacheService, eventPublisher, rankingRepository);
 
     @BeforeEach
     void setUp() {
@@ -46,6 +48,7 @@ class ProductApplicationServiceTest {
         when(productCacheService.getBrand(any())).thenReturn(Optional.empty());
         when(productCacheService.getProductLikeCount(any())).thenReturn(Optional.empty());
         when(productCacheService.getProductList(any(), anyInt(), anyInt(), any())).thenReturn(Optional.empty());
+        when(rankingRepository.getRank(any(), any())).thenReturn(null);
     }
 
     private static final Long PRODUCT_ID = 1L;

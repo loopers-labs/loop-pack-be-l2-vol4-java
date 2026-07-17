@@ -3,6 +3,7 @@ package com.loopers.infrastructure.kafka;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.infrastructure.kafka.message.CatalogEventMessage;
 import com.loopers.infrastructure.kafka.message.CouponIssueRequestMessage;
+import com.loopers.infrastructure.kafka.message.LikeEventMessage;
 import com.loopers.infrastructure.kafka.message.OrderEventMessage;
 import com.loopers.infrastructure.outbox.OutboxEntity;
 import com.loopers.infrastructure.outbox.OutboxJpaRepository;
@@ -55,6 +56,9 @@ public class OutboxRelayScheduler {
 		}
 		if (OutboxService.COUPON_ISSUE_REQUESTS_TOPIC.equals(record.getTopic())) {
 			return objectMapper.readValue(record.getPayload(), CouponIssueRequestMessage.class);
+		}
+		if (OutboxService.LIKE_EVENTS_TOPIC.equals(record.getTopic())) {
+			return objectMapper.readValue(record.getPayload(), LikeEventMessage.class);
 		}
 		throw new IllegalArgumentException("Unknown topic: " + record.getTopic());
 	}

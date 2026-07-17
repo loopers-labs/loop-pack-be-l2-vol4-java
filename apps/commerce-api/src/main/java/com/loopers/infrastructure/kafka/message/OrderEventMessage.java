@@ -11,5 +11,5 @@ public record OrderEventMessage(
     List<Item> items,
     ZonedDateTime occurredAt
 ) {
-    public record Item(Long productId, int quantity) {}
+    public record Item(Long productId, int quantity, Long price) {}
 }
