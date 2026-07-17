@@ -1,0 +1,3 @@
+label,batch_size,failure_point_percent,events,products,expected_total_score,actual_total_score,overcount_percent,products_with_drift,top20_overlap_percent
+local-20260717-event-100k,3000,0,100000,3000,34275578.4000,34275578.4000,0.0000,0,100.0000
+local-20260717-event-100k,3000,75,100000,3000,34275578.4000,35046704.0000,2.2498,2250,100.0000

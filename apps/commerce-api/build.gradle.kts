@@ -38,6 +38,16 @@ val queueBenchmarkOutputDir = providers.gradleProperty("queueBenchmarkOutputDir"
     layout.buildDirectory.dir("reports/waiting-queue").map { it.asFile.absolutePath },
 )
 val queueBenchmarkLabel = providers.gradleProperty("queueBenchmarkLabel").orElse("local")
+val rankingBenchmarkCardinalities = providers.gradleProperty("rankingBenchmarkCardinalities").orElse("1000,10000,100000")
+val rankingBenchmarkPageSizes = providers.gradleProperty("rankingBenchmarkPageSizes").orElse("20,100")
+val rankingBenchmarkConcurrency = providers.gradleProperty("rankingBenchmarkConcurrency").orElse("1")
+val rankingBenchmarkIterations = providers.gradleProperty("rankingBenchmarkIterations").orElse("200")
+val rankingBenchmarkWarmup = providers.gradleProperty("rankingBenchmarkWarmup").orElse("20")
+val rankingBenchmarkRuns = providers.gradleProperty("rankingBenchmarkRuns").orElse("2")
+val rankingBenchmarkOutputDir = providers.gradleProperty("rankingBenchmarkOutputDir").orElse(
+    layout.buildDirectory.dir("reports/ranking-api").map { it.asFile.absolutePath },
+)
+val rankingBenchmarkLabel = providers.gradleProperty("rankingBenchmarkLabel").orElse("local")
 
 tasks.named<Test>("test") {
     useJUnitPlatform {
@@ -75,6 +85,46 @@ tasks.register<Test>("waitingQueueBenchmark") {
     systemProperty("loopers.payment.reconciliation-enabled", "false")
     systemProperty("management.server.port", "0")
     systemProperty("datasource.mysql-jpa.main.maximum-pool-size", queueBenchmarkDbPoolSize.get())
+    jvmArgs("-Xshare:off")
+
+    shouldRunAfter(tasks.named("test"))
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("rankingApiBenchmark") {
+    group = "verification"
+    description = "Runs the Redis repository vs full HTTP ranking API benchmark."
+
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform {
+        includeTags("benchmark")
+        includeEngines("junit-jupiter")
+    }
+    filter {
+        includeTestsMatching("com.loopers.benchmark.ranking.RankingApiBenchmarkTest")
+    }
+
+    systemProperty("rankingBenchmarkCardinalities", rankingBenchmarkCardinalities.get())
+    systemProperty("rankingBenchmarkPageSizes", rankingBenchmarkPageSizes.get())
+    systemProperty("rankingBenchmarkConcurrency", rankingBenchmarkConcurrency.get())
+    systemProperty("rankingBenchmarkIterations", rankingBenchmarkIterations.get())
+    systemProperty("rankingBenchmarkWarmup", rankingBenchmarkWarmup.get())
+    systemProperty("rankingBenchmarkRuns", rankingBenchmarkRuns.get())
+    systemProperty("rankingBenchmarkOutputDir", rankingBenchmarkOutputDir.get())
+    systemProperty("rankingBenchmarkLabel", rankingBenchmarkLabel.get())
+
+    systemProperty("spring.profiles.active", "test")
+    systemProperty("user.timezone", "Asia/Seoul")
+    systemProperty("api.version", System.getProperty("api.version") ?: "1.40")
+    systemProperty("spring.jpa.show-sql", "false")
+    systemProperty("logging.level.org.hibernate.SQL", "OFF")
+    systemProperty("logging.level.org.hibernate.orm.jdbc.bind", "OFF")
+    systemProperty("loopers.waiting-queue.scheduler-enabled", "false")
+    systemProperty("loopers.outbox.relay-enabled", "false")
+    systemProperty("loopers.payment.reconciliation-enabled", "false")
+    systemProperty("management.server.port", "0")
     jvmArgs("-Xshare:off")
 
     shouldRunAfter(tasks.named("test"))

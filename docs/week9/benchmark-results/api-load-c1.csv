@@ -1,0 +1,7 @@
+label,boundary,cardinality,page_size,run,requests,successes,failures,elapsed_ms,throughput_rps,avg_ms,p50_ms,p95_ms,p99_ms,max_ms,redis_memory_bytes,redis_bytes_per_member
+"local-load-c1",redis-repository,100000,20,1,1000,1000,0,96.641,10347.611,0.094,0.081,0.146,0.250,0.464,9307352,93.074
+"local-load-c1",full-http,100000,20,1,1000,1000,0,4179.475,239.265,4.173,3.888,6.187,9.808,25.474,9307352,93.074
+"local-load-c1",redis-repository,100000,20,2,1000,1000,0,92.198,10846.217,0.090,0.078,0.170,0.204,0.395,9307352,93.074
+"local-load-c1",full-http,100000,20,2,1000,1000,0,2616.995,382.118,2.613,2.444,3.937,4.637,12.864,9307352,93.074
+"local-load-c1",redis-repository,100000,20,3,1000,1000,0,94.770,10551.886,0.093,0.079,0.160,0.213,0.696,9307352,93.074
+"local-load-c1",full-http,100000,20,3,1000,1000,0,1878.144,532.441,1.874,1.647,3.267,4.707,14.319,9307352,93.074
