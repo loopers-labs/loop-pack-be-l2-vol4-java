@@ -1,5 +1,6 @@
 package com.loopers.ranking.application;
 
+import com.loopers.ranking.domain.RankingEntry;
 import com.loopers.ranking.domain.RankingRepository;
 import com.loopers.ranking.domain.RankingScoreDelta;
 import com.loopers.ranking.domain.RankingSignal;
@@ -26,6 +27,11 @@ class RankingServiceTest {
 
         @Override
         public void carryOver(LocalDate from, LocalDate to, double weight) {
+        }
+
+        @Override
+        public List<RankingEntry> readDesc(LocalDate date) {
+            return List.of();
         }
     }
 

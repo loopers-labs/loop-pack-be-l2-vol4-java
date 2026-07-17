@@ -1,5 +1,6 @@
 package com.loopers.ranking.infrastructure;
 
+import com.loopers.ranking.domain.RankingEntry;
 import com.loopers.ranking.domain.RankingRepository;
 import com.loopers.ranking.domain.RankingScoreDelta;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.connection.zset.Weights;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -58,6 +60,17 @@ public class RedisRankingRepository implements RankingRepository {
         redisTemplate.opsForZSet().unionAndStore(
                 key(from), Collections.emptyList(), key(to), Aggregate.SUM, Weights.of(weight));
         redisTemplate.expireAt(key(to), expireAt(to));
+    }
+
+    @Override
+    public List<RankingEntry> readDesc(LocalDate date) {
+        Set<TypedTuple<String>> tuples = redisTemplate.opsForZSet().reverseRangeWithScores(key(date), 0, -1);
+        if (tuples == null || tuples.isEmpty()) {
+            return List.of();
+        }
+        return tuples.stream()
+                .map(t -> new RankingEntry(Long.parseLong(t.getValue()), t.getScore() == null ? 0.0 : t.getScore()))
+                .toList();
     }
 
     private Set<LocalDate> distinctDates(List<RankingScoreDelta> deltas) {
