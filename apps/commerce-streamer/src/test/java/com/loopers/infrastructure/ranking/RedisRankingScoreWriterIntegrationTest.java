@@ -111,6 +111,30 @@ class RedisRankingScoreWriterIntegrationTest {
             .isCloseTo(-0.1, within(0.000_001));
     }
 
+    @DisplayName("최종 합계가 0인 이벤트 집합도 Kafka poll 분할과 무관하게 0점 member를 유지한다.")
+    @Test
+    void keepsZeroScoreMemberDeterministicAcrossKafkaPollBoundaries() {
+        String key = "ranking:all:20260717";
+        CatalogEventMessage likeInSinglePoll = event("PRODUCT_LIKED", 1L, Map.of("likeCountDelta", 1));
+        CatalogEventMessage unlikeInSinglePoll = event("PRODUCT_UNLIKED", 1L, Map.of("likeCountDelta", -1));
+        CatalogEventMessage likeInSplitPoll = event("PRODUCT_LIKED", 2L, Map.of("likeCountDelta", 1));
+        CatalogEventMessage unlikeInSplitPoll = event("PRODUCT_UNLIKED", 2L, Map.of("likeCountDelta", -1));
+
+        processor.process(List.of(likeInSinglePoll, unlikeInSinglePoll));
+        processor.process(List.of(likeInSplitPoll));
+        processor.process(List.of(unlikeInSplitPoll));
+
+        Double onePollScore = redisTemplate.opsForZSet().score(key, "1");
+        Double splitPollScore = redisTemplate.opsForZSet().score(key, "2");
+
+        assertThat(onePollScore)
+            .as("한 poll에서 처리한 0점 member")
+            .isCloseTo(0.0, within(0.000_001));
+        assertThat(splitPollScore)
+            .as("여러 poll로 나눠 처리한 0점 member")
+            .isCloseTo(0.0, within(0.000_001));
+    }
+
     private CatalogEventMessage event(String type, Long productId, Map<String, Object> data) {
         return new CatalogEventMessage(
             "event-" + type + "-" + productId,

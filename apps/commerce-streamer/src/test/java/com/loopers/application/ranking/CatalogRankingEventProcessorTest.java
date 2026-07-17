@@ -53,6 +53,23 @@ class CatalogRankingEventProcessorTest {
         verify(writer).increment("ranking:all:20260718", 1L, 0.1);
     }
 
+    @DisplayName("같은 날짜와 상품의 이벤트 합계가 0이어도 Redis에 0점을 기록한다.")
+    @Test
+    void writesZeroWhenAggregatedScoreIsZero() {
+        RankingScoreWriter writer = mock(RankingScoreWriter.class);
+        CatalogRankingEventProcessor processor = new CatalogRankingEventProcessor(
+            new RankingScorePolicy(), writer, new SimpleMeterRegistry()
+        );
+
+        processor.process(List.of(
+            event("PRODUCT_LIKED", "2026-07-17T09:00:00+09:00", Map.of("likeCountDelta", 1)),
+            event("PRODUCT_UNLIKED", "2026-07-17T09:00:00+09:00", Map.of("likeCountDelta", -1))
+        ));
+
+        verify(writer).increment("ranking:all:20260717", 1L, 0.0);
+        verifyNoMoreInteractions(writer);
+    }
+
     @DisplayName("배치에 semantic invalid 이벤트가 하나라도 있으면 Redis를 쓰기 전에 전체 배치를 실패시킨다.")
     @Test
     void validatesWholeBatchBeforeAnyWrite() {

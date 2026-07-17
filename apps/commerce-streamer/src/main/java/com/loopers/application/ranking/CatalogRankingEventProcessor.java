@@ -37,14 +37,12 @@ public class CatalogRankingEventProcessor {
         }
 
         scoreByTarget.forEach((target, score) -> {
-            if (score != 0.0) {
-                try {
-                    rankingScoreWriter.increment(target.rankingKey(), target.productId(), score);
-                    meterRegistry.counter("ranking_redis_update_total", "result", "success").increment();
-                } catch (RuntimeException e) {
-                    meterRegistry.counter("ranking_redis_update_total", "result", "failure").increment();
-                    throw e;
-                }
+            try {
+                rankingScoreWriter.increment(target.rankingKey(), target.productId(), score);
+                meterRegistry.counter("ranking_redis_update_total", "result", "success").increment();
+            } catch (RuntimeException e) {
+                meterRegistry.counter("ranking_redis_update_total", "result", "failure").increment();
+                throw e;
             }
         });
     }
