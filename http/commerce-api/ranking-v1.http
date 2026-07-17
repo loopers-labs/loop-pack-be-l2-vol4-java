@@ -1,0 +1,17 @@
+### 랭킹 페이지 조회 - 오늘 (date 생략)
+GET {{commerce-api}}/api/v1/rankings
+
+### 랭킹 페이지 조회 - 날짜/페이지 지정
+GET {{commerce-api}}/api/v1/rankings?date=20260717&page=1&size=20
+
+### 랭킹 페이지 조회 - 어제 (서빙 창 안)
+GET {{commerce-api}}/api/v1/rankings?date=20260716
+
+### 랭킹 페이지 조회 - 서빙 창 밖(과거) → 404 RANKING_NOT_AVAILABLE
+GET {{commerce-api}}/api/v1/rankings?date=20260101
+
+### 랭킹 페이지 조회 - 형식 오류 → 400 RANKING_INVALID_DATE
+GET {{commerce-api}}/api/v1/rankings?date=2026-07-17
+
+### 상품 상세 - 응답에 todayRank 포함(랭킹에 없으면 생략)
+GET {{commerce-api}}/api/v1/products/1
