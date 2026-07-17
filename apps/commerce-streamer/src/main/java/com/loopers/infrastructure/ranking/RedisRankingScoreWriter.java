@@ -14,10 +14,7 @@ import java.util.List;
 public class RedisRankingScoreWriter implements RankingScoreWriter {
     private static final long TTL_SECONDS = 2L * 24 * 60 * 60;
     private static final DefaultRedisScript<Long> INCREMENT_SCRIPT = new DefaultRedisScript<>("""
-        local score = redis.call('ZINCRBY', KEYS[1], ARGV[2], ARGV[1])
-        if tonumber(score) <= 0 then
-            redis.call('ZREM', KEYS[1], ARGV[1])
-        end
+        redis.call('ZINCRBY', KEYS[1], ARGV[2], ARGV[1])
         redis.call('EXPIRE', KEYS[1], ARGV[3])
         return 1
         """, Long.class);

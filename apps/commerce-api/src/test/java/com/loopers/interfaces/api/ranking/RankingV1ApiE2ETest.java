@@ -108,9 +108,13 @@ class RankingV1ApiE2ETest {
         BrandJpaEntity brand = saveBrand();
         ProductJpaEntity first = saveProduct(brand.getId(), "1위");
         ProductJpaEntity second = saveProduct(brand.getId(), "2위");
+        ProductJpaEntity zero = saveProduct(brand.getId(), "0점");
+        ProductJpaEntity negative = saveProduct(brand.getId(), "음수점");
         String key = DailyRankingKey.from(date);
         redisTemplate.opsForZSet().add(key, first.getId().toString(), 2.0);
         redisTemplate.opsForZSet().add(key, second.getId().toString(), 1.0);
+        redisTemplate.opsForZSet().add(key, zero.getId().toString(), 0.0);
+        redisTemplate.opsForZSet().add(key, negative.getId().toString(), -1.0);
 
         ResponseEntity<ApiResponse<List<RankingDto.Response>>> response = restTemplate.exchange(
             "/api/v1/rankings?date=20260716&page=2&size=1",
@@ -120,6 +124,32 @@ class RankingV1ApiE2ETest {
         assertThat(response.getBody().data()).singleElement().satisfies(item -> {
             assertThat(item.rank()).isEqualTo(2L);
             assertThat(item.product().id()).isEqualTo(second.getId());
+        });
+    }
+
+    @DisplayName("랭킹 목록은 원점수가 양수인 상품만 반환한다.")
+    @Test
+    void excludesNonPositiveScoresFromRankingList() {
+        LocalDate date = LocalDate.of(2026, 7, 16);
+        BrandJpaEntity brand = saveBrand();
+        ProductJpaEntity positive = saveProduct(brand.getId(), "양수점");
+        ProductJpaEntity zero = saveProduct(brand.getId(), "0점");
+        ProductJpaEntity negative = saveProduct(brand.getId(), "음수점");
+        String key = DailyRankingKey.from(date);
+        redisTemplate.opsForZSet().add(key, positive.getId().toString(), 1.0);
+        redisTemplate.opsForZSet().add(key, zero.getId().toString(), 0.0);
+        redisTemplate.opsForZSet().add(key, negative.getId().toString(), -1.0);
+
+        ResponseEntity<ApiResponse<List<RankingDto.Response>>> response = restTemplate.exchange(
+            "/api/v1/rankings?date=20260716&page=1&size=20",
+            HttpMethod.GET,
+            HttpEntity.EMPTY,
+            responseType()
+        );
+
+        assertThat(response.getBody().data()).singleElement().satisfies(item -> {
+            assertThat(item.rank()).isEqualTo(1L);
+            assertThat(item.product().id()).isEqualTo(positive.getId());
         });
     }
 
@@ -144,7 +174,7 @@ class RankingV1ApiE2ETest {
         BrandJpaEntity brand = saveBrand();
         ProductJpaEntity target = saveProduct(brand.getId(), "대상 상품");
         ProductJpaEntity other = saveProduct(brand.getId(), "다른 상품");
-        String key = DailyRankingKey.from(LocalDate.now());
+        String key = DailyRankingKey.from(LocalDate.now(DailyRankingKey.ZONE_ID));
         redisTemplate.opsForZSet().add(key, other.getId().toString(), 2.0);
         redisTemplate.opsForZSet().add(key, target.getId().toString(), 1.0);
 
@@ -174,6 +204,35 @@ class RankingV1ApiE2ETest {
         );
 
         assertThat(response.getBody().data().rank()).isNull();
+    }
+
+    @DisplayName("원점수가 0 이하인 상품은 상세 순위를 null로 반환한다.")
+    @Test
+    void returnsNullRankWhenRawScoreIsNotPositive() {
+        BrandJpaEntity brand = saveBrand();
+        ProductJpaEntity positive = saveProduct(brand.getId(), "양수점 상품");
+        ProductJpaEntity zero = saveProduct(brand.getId(), "0점 상품");
+        ProductJpaEntity negative = saveProduct(brand.getId(), "음수점 상품");
+        String key = DailyRankingKey.from(LocalDate.now(DailyRankingKey.ZONE_ID));
+        redisTemplate.opsForZSet().add(key, positive.getId().toString(), 1.0);
+        redisTemplate.opsForZSet().add(key, zero.getId().toString(), 0.0);
+        redisTemplate.opsForZSet().add(key, negative.getId().toString(), -1.0);
+
+        ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> positiveResponse = restTemplate.exchange(
+            "/api/v1/products/" + positive.getId(), HttpMethod.GET, HttpEntity.EMPTY, productResponseType()
+        );
+        ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> zeroResponse = restTemplate.exchange(
+            "/api/v1/products/" + zero.getId(), HttpMethod.GET, HttpEntity.EMPTY, productResponseType()
+        );
+        ResponseEntity<ApiResponse<ProductDto.Get.V1.Response>> negativeResponse = restTemplate.exchange(
+            "/api/v1/products/" + negative.getId(), HttpMethod.GET, HttpEntity.EMPTY, productResponseType()
+        );
+
+        assertAll(
+            () -> assertThat(positiveResponse.getBody().data().rank()).isEqualTo(1L),
+            () -> assertThat(zeroResponse.getBody().data().rank()).isNull(),
+            () -> assertThat(negativeResponse.getBody().data().rank()).isNull()
+        );
     }
 
     private BrandJpaEntity saveBrand() {

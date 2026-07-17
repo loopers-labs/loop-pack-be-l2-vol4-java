@@ -28,9 +28,14 @@ public class RedisRankingRepository implements RankingRepository {
     @Override
     public List<RankedProduct> findRankedProducts(LocalDate date, int page, int size) {
         long start = (long) (page - 1) * size;
-        long end = start + size - 1;
         Set<ZSetOperations.TypedTuple<String>> tuples = redisTemplate.opsForZSet()
-            .reverseRangeWithScores(DailyRankingKey.from(date), start, end);
+            .reverseRangeByScoreWithScores(
+                DailyRankingKey.from(date),
+                Double.MIN_VALUE,
+                Double.MAX_VALUE,
+                start,
+                size
+            );
         if (tuples == null || tuples.isEmpty()) {
             return List.of();
         }
@@ -48,8 +53,15 @@ public class RedisRankingRepository implements RankingRepository {
 
     @Override
     public OptionalLong findRank(LocalDate date, Long productId) {
+        String key = DailyRankingKey.from(date);
+        String member = DailyRankingKey.member(productId);
+        Double score = redisTemplate.opsForZSet().score(key, member);
+        if (score == null || score <= 0.0) {
+            return OptionalLong.empty();
+        }
+
         Long zeroBasedRank = redisTemplate.opsForZSet()
-            .reverseRank(DailyRankingKey.from(date), DailyRankingKey.member(productId));
+            .reverseRank(key, member);
         return zeroBasedRank == null ? OptionalLong.empty() : OptionalLong.of(zeroBasedRank + 1);
     }
 }

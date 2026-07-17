@@ -32,7 +32,7 @@ public class CatalogRankingEventProcessor {
             meterRegistry.counter(
                 "ranking_score_total",
                 "eventType", event.eventType(),
-                "direction", score > 0 ? "added" : "removed"
+                "direction", score > 0.0 ? "positive" : "negative"
             ).increment(Math.abs(score));
         }
 

@@ -87,10 +87,10 @@ class CatalogRankingEventProcessorTest {
         ));
 
         assertThat(meterRegistry.counter(
-            "ranking_score_total", "eventType", "PRODUCT_LIKED", "direction", "added"
+            "ranking_score_total", "eventType", "PRODUCT_LIKED", "direction", "positive"
         ).count()).isEqualTo(0.2);
         assertThat(meterRegistry.counter(
-            "ranking_score_total", "eventType", "PRODUCT_UNLIKED", "direction", "removed"
+            "ranking_score_total", "eventType", "PRODUCT_UNLIKED", "direction", "negative"
         ).count()).isEqualTo(0.2);
     }
 
