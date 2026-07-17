@@ -1,9 +1,13 @@
 phase,scenario,event_deltas,kafka_poll_count,expected_raw_score,observed_raw_score,observation,evidence
 before,live-one-poll,"-0.2;+0.1",1,-0.1,null,non-positive intermediate score caused member removal,RedisRankingScoreWriterIntegrationTest RED
 before,live-split-poll,"-0.2;+0.1",2,-0.1,0.1,removal reset the accumulated score before the second poll,RedisRankingScoreWriterIntegrationTest RED
+before,net-zero-one-poll,"+0.2;-0.2",1,0.0,null,initial raw-score fix skipped the aggregate-zero writer call,RedisRankingScoreWriterIntegrationTest net-zero RED
+before,net-zero-split-poll,"+0.2;-0.2",2,0.0,0.0,split polls reached Redis separately and retained a zero member,RedisRankingScoreWriterIntegrationTest net-zero RED
 before,daily-batch,"-0.2",n/a,-0.2,null,batch publisher discarded non-positive raw score,DailyRankingSnapshotJobE2ETest PASS with isNull assertion
 after,live-one-poll,"-0.2;+0.1",1,-0.1,-0.1,raw score retained,RedisRankingScoreWriterIntegrationTest GREEN
 after,live-split-poll,"-0.2;+0.1",2,-0.1,-0.1,raw score is independent of poll boundary,RedisRankingScoreWriterIntegrationTest GREEN
+after,net-zero-one-poll,"+0.2;-0.2",1,0.0,0.0,aggregate-zero writer call retains a zero member,RedisRankingScoreWriterIntegrationTest GREEN
+after,net-zero-split-poll,"+0.2;-0.2",2,0.0,0.0,zero raw score is independent of poll boundary,RedisRankingScoreWriterIntegrationTest GREEN
 after,daily-batch,"-0.2",n/a,-0.2,-0.2,batch snapshot retains negative raw score,DailyRankingSnapshotJobE2ETest GREEN
 after,daily-batch,"0.0",n/a,0.0,0.0,batch snapshot retains zero raw score,DailyRankingSnapshotJobE2ETest GREEN
 after,api-list-detail,"-1.0;0.0;+1.0",n/a,n/a,n/a,only positive score is visible and non-positive detail ranks are null,RankingV1ApiE2ETest GREEN

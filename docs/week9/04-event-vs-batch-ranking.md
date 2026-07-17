@@ -5,7 +5,7 @@
 현재 Kafka 마이크로배치 랭킹은 유지하고, 종료된 날짜(`D-1`)를 배치 스냅샷으로 다시 계산해 보정하는 하이브리드가 적합하다.
 
 - 이벤트 경로는 새 행동을 빠르게 반영한다. 같은 Kafka poll 안의 `(날짜, 상품)`을 합친 뒤 Redis `ZINCRBY`로 누적한다.
-- 배치 경로는 `product_metric_hourly`를 기준 데이터로 삼아 SQL `GROUP BY`로 일간 절대 점수를 계산하고, 임시 ZSET을 완성한 뒤 canonical 키로 원자 교체한다.
+- 배치 경로는 `product_metric_hourly`를 기준 데이터로 삼아 SQL `GROUP BY`로 일간 재계산 원점수를 만들고, 임시 ZSET을 완성한 뒤 canonical 키로 원자 교체한다.
 - live와 batch 모두 음수·0을 포함한 원점수를 저장하고 API 조회에서만 `score > 0`을 노출한다. 이 경계는 같은 이벤트가 Kafka poll에 나뉘어도 일간 합계가 달라지지 않게 한다.
 - 이벤트는 신선도를 얻는 대신 at-least-once 재처리 때 중복 점수가 생길 수 있다. 배치는 실행 주기만큼 늦지만 같은 입력의 재실행과 실패 후 복구가 정확하다.
 - 당일 canonical 키를 배치로 교체하면 동시에 들어온 `ZINCRBY`를 잃을 수 있다. Job은 KST 기준 오늘·미래 날짜를 거부하고, 운영에서는 consumer lag 0 확인과 grace period 뒤 `D-1`을 실행한다.
@@ -101,7 +101,7 @@ Top 20 overlap 100%는 **상위 20개 구성원이 같다**는 뜻일 뿐 순서
 | 100,000 | 1,000 | true | true | true |
 | 100,000 | 3,000 | true | true | true |
 
-배치는 `ZINCRBY`가 아니라 계산된 절대 점수를 임시 키에 `ZADD`한다. build 중 실패하면 canonical 키는 건드리지 않고, 재실행이 끝났을 때만 임시 키를 canonical 키로 교체한다. 그래서 동일 입력 재실행 digest, 실패 시 canonical digest, retry 후 digest가 모든 측정 chunk에서 기대값과 같았다.
+배치는 `ZINCRBY`가 아니라 계산이 끝난 일간 원점수를 임시 키에 `ZADD`한다. build 중 실패하면 canonical 키는 건드리지 않고, 재실행이 끝났을 때만 임시 키를 canonical 키로 교체한다. 그래서 동일 입력 재실행 digest, 실패 시 canonical digest, retry 후 digest가 모든 측정 chunk에서 기대값과 같았다.
 
 이 복구 성질은 원천인 `product_metric_hourly`가 정확하고 다시 읽을 수 있다는 전제에 의존한다. 이벤트 중복 방지 비용을 Redis write path가 아니라 MySQL 영속 저장과 unique/upsert로 이동시킨 선택이다.
 

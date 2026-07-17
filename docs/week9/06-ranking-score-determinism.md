@@ -2,9 +2,9 @@
 
 ## 결론
 
-`ZINCRBY` 결과가 0 이하일 때 member를 즉시 `ZREM`하면 같은 이벤트 집합도 Kafka poll 경계에 따라 최종 점수가 달라진다. Redis ZSET에는 음수와 0을 포함한 원점수를 보존하고, 사용자 조회 경계에서만 `score > 0`을 적용하도록 변경했다.
+`ZINCRBY` 결과가 0 이하일 때 member를 즉시 `ZREM`하거나, poll 내부 합계가 0이라는 이유로 Redis 쓰기를 생략하면 같은 이벤트 집합도 Kafka poll 경계에 따라 저장 상태가 달라진다. Redis ZSET에는 음수와 0을 포함한 원점수를 보존하고, 사용자 조회 경계에서만 `score > 0`을 적용하도록 변경했다.
 
-이 변경은 poll 경계에 따른 비결정성을 제거한다. Kafka at-least-once 재전달로 이미 성공한 증가분이 다시 반영되는 문제까지 해결하는 것은 아니며, 그 오차는 종료일 D-1 배치 스냅샷이 보정한다.
+고정된 이벤트 순서가 음수나 0으로 끝나는 재현 사례에서는 poll을 어떻게 나눠도 같은 원점수가 남는다. Kafka at-least-once 재전달로 이미 성공한 증가분이 다시 반영되는 문제까지 해결하는 것은 아니며, 그 오차는 종료일 D-1 배치 스냅샷이 보정한다.
 
 ## 문제 재현
 
@@ -16,22 +16,32 @@
 | 상품 조회 | +0.1 |
 | 일간 합계 | -0.1 |
 
-수정 전 RED 테스트의 관측값은 다음과 같았다.
+음수 합계에 대한 최초 RED 테스트의 관측값은 다음과 같았다.
 
 | 처리 방식 | 기대 원점수 | 수정 전 관측 |
 | --- | ---: | ---: |
 | 한 poll에서 `-0.2 + 0.1` 합산 | -0.1 | member 없음 (`null`) |
 | 두 poll에서 `-0.2`, `+0.1` 순차 처리 | -0.1 | +0.1 |
-| D-1 배치에서 -0.2 절대 점수 발행 | -0.2 | member 없음 (`null`) |
+| D-1 배치에서 -0.2 원점수 발행 | -0.2 | member 없음 (`null`) |
 
 원인은 첫 poll의 -0.2가 반영된 직후 Lua가 member를 제거하면서 누적 상태도 함께 지운 것이다. 다음 poll의 +0.1은 -0.2에 더해지지 않고 새 점수로 시작했다. 배치도 양수만 발행해 종료일 원점수 스냅샷이 같은 정보를 잃었다.
+
+`ZREM`을 제거한 뒤에는 최종 합계가 0인 경우가 추가로 드러났다.
+
+| 처리 방식 | 기대 원점수 | 1차 수정 후 관측 | 최종 수정 후 |
+| --- | ---: | ---: | ---: |
+| 한 poll에서 `+0.2 - 0.2` 합산 | 0.0 | member 없음 (`null`) | 0.0 |
+| 두 poll에서 `+0.2`, `-0.2` 순차 처리 | 0.0 | 0.0 | 0.0 |
+
+한 poll에서는 processor가 상품별 합계 0을 Redis에 전달하지 않았고, 두 poll에서는 `+0.2`와 `-0.2`가 각각 기록돼 0점 member가 남았다. API에서는 둘 다 보이지 않지만, Redis 원점수가 poll 분할에 따라 달라지는 상태였다.
 
 ## 변경한 경계
 
 ### 쓰기 경계
 
-- live consumer는 `ZINCRBY` 결과가 음수나 0이어도 ZSET member를 유지한다.
-- D-1 batch는 계산된 절대 원점수를 음수와 0까지 모두 임시 ZSET에 발행한다.
+- ranking consumer는 `ZINCRBY` 결과가 음수나 0이어도 ZSET member를 유지한다.
+- `CatalogRankingEventProcessor`는 여러 이벤트를 합친 결과가 0이어도 writer에 전달한다. 다만 개별 점수가 0인 이벤트와 랭킹 대상이 아닌 이벤트는 기존처럼 집계에서 제외한다.
+- D-1 배치는 일간 재계산 원점수를 음수와 0까지 모두 임시 ZSET에 발행한다.
 - 두 경로 모두 같은 `RankingScoreFormula`와 같은 원점수 표현을 사용한다.
 
 ### 읽기 경계
@@ -46,8 +56,10 @@
 
 | 검증 | 수정 후 관측 | 결과 |
 | --- | --- | --- |
-| live one-poll | -0.1 | 기대값 일치 |
-| live split-poll | -0.1 | poll 경계와 무관 |
+| 실시간 one-poll | -0.1 | 기대값 일치 |
+| 실시간 split-poll | -0.1 | poll 경계와 무관 |
+| net-zero one-poll | 0.0 | 0점 member 보존 |
+| net-zero split-poll | 0.0 | poll 경계와 무관 |
 | D-1 batch 음수 | -0.2 | 원점수 보존 |
 | D-1 batch 0 | 0.0 | 원점수 보존 |
 | API 목록 | +1.0만 노출 | 0·음수 비노출 |
@@ -67,39 +79,35 @@
     --tests 'com.loopers.job.ranking.DailyRankingSnapshotJobE2ETest'
 ```
 
-수정 후 대상 테스트 실행 결과는 `BUILD SUCCESSFUL in 53s`였다.
+회귀 테스트에는 음수 합계뿐 아니라 최종 합계가 0인 이벤트 집합을 한 poll과 여러 poll로 나눈 경우도 포함했다. processor 단위 테스트에서는 합산 결과 0이 writer에 전달되는지도 확인한다.
 
-전체 랭킹 관련 모듈 회귀도 통과했다.
-
-```text
-./gradlew :modules:ranking:test :apps:commerce-streamer:test \
-  :apps:commerce-api:test :apps:commerce-batch:test
-BUILD SUCCESSFUL in 1m 42s
-37 actionable tasks: 5 executed, 32 up-to-date
-```
-
-실제 별도 JVM과 Kafka broker를 거치는 system E2E도 다시 실행해 양수 점수의 기존 사용자 경로가 유지되는지 확인했다.
+net-zero 보강 뒤 processor 단위 테스트와 Redis 통합 테스트 전체를 다시 실행했다.
 
 ```text
-./gradlew rankingKafkaE2E
-Redis score=0.1
-Ranking API rank=1, score=0.1
-BUILD SUCCESSFUL in 1m 2s
+./gradlew :apps:commerce-streamer:test \
+  --tests 'com.loopers.application.ranking.CatalogRankingEventProcessorTest' \
+  --tests 'com.loopers.infrastructure.ranking.RedisRankingScoreWriterIntegrationTest'
+BUILD SUCCESSFUL in 16s
 ```
 
-전체 저장소 빌드는 Java 21 경로를 명시해 통과했다. 경로를 명시하지 않은 첫 시도는 소스 오류가 아니라 로컬 Gradle toolchain 탐색 실패로 0.6초 만에 종료됐다.
+전체 저장소 빌드와 실제 별도 JVM·Kafka broker를 사용하는 system E2E도 최신 수정본으로 다시 통과했다.
 
 ```text
 JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.11/libexec/openjdk.jdk/Contents/Home \
   ./gradlew build
-BUILD SUCCESSFUL in 1m 52s
-51 actionable tasks: 31 executed, 20 up-to-date
+BUILD SUCCESSFUL in 1m 43s
+51 actionable tasks: 24 executed, 27 up-to-date
+
+./gradlew rankingKafkaE2E
+Redis score=0.1
+Ranking API rank=1, score=0.1
+BUILD SUCCESSFUL in 39s
 ```
 
 ## 트레이드오프와 남은 한계
 
-- 장점: 이벤트 처리 순서가 같다면 poll 분할과 무관하게 덧셈의 원점수가 유지된다.
-- 장점: 종료일 batch가 live와 같은 원점수 표현으로 canonical 키를 교체할 수 있다.
+- 장점: 이벤트 처리 순서가 같다면 음수와 0을 포함한 최종 원점수가 poll 분할과 무관하게 유지된다.
+- 장점: 종료일 배치가 실시간 처리와 같은 원점수 표현으로 공개 키를 교체할 수 있다.
 - 비용: 사용자에게 보이지 않는 음수·0 상품도 TTL 동안 ZSET cardinality와 메모리를 차지한다.
 - 한계: 부동소수점 점수이므로 테스트는 작은 허용 오차로 비교한다.
 - 한계: at-least-once 부분 성공 후 재전달의 중복 증가분은 여전히 발생할 수 있다.
