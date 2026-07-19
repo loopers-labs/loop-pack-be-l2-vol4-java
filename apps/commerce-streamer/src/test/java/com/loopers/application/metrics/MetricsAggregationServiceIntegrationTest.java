@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.LocalDate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -52,7 +54,7 @@ class MetricsAggregationServiceIntegrationTest {
     void increasesLikeCount_whenProductLikedEventAggregated() {
         metricsAggregationService.aggregate("evt-1", "ProductLikedEvent", likePayload(7L));
 
-        ProductMetrics metrics = productMetricsRepository.findByProductId(7L).orElseThrow();
+        ProductMetrics metrics = productMetricsRepository.findByProductIdAndMetricDate(7L, LocalDate.now()).orElseThrow();
         assertThat(metrics.getLikeCount()).isEqualTo(1L);
     }
 
@@ -62,7 +64,7 @@ class MetricsAggregationServiceIntegrationTest {
         metricsAggregationService.aggregate("evt-dup", "ProductLikedEvent", likePayload(7L));
         metricsAggregationService.aggregate("evt-dup", "ProductLikedEvent", likePayload(7L));
 
-        ProductMetrics metrics = productMetricsRepository.findByProductId(7L).orElseThrow();
+        ProductMetrics metrics = productMetricsRepository.findByProductIdAndMetricDate(7L, LocalDate.now()).orElseThrow();
         assertThat(metrics.getLikeCount()).isEqualTo(1L);
     }
 
@@ -71,7 +73,7 @@ class MetricsAggregationServiceIntegrationTest {
     void keepsLikeCountAtZero_whenUnlikeArrivesBeforeLike() {
         metricsAggregationService.aggregate("evt-unlike", "ProductUnlikedEvent", likePayload(7L));
 
-        ProductMetrics metrics = productMetricsRepository.findByProductId(7L).orElseThrow();
+        ProductMetrics metrics = productMetricsRepository.findByProductIdAndMetricDate(7L, LocalDate.now()).orElseThrow();
         assertThat(metrics.getLikeCount()).isZero();
     }
 
@@ -81,7 +83,7 @@ class MetricsAggregationServiceIntegrationTest {
         metricsAggregationService.aggregate("evt-view", "ProductViewedEvent",
             objectMapper.createObjectNode().put("productId", 7L));
 
-        ProductMetrics metrics = productMetricsRepository.findByProductId(7L).orElseThrow();
+        ProductMetrics metrics = productMetricsRepository.findByProductIdAndMetricDate(7L, LocalDate.now()).orElseThrow();
         assertThat(metrics.getViewCount()).isEqualTo(1L);
     }
 
@@ -97,8 +99,8 @@ class MetricsAggregationServiceIntegrationTest {
 
         metricsAggregationService.aggregate("evt-order", "OrderCreatedEvent", payload);
 
-        assertThat(productMetricsRepository.findByProductId(7L).orElseThrow().getSaleCount()).isEqualTo(2L);
-        assertThat(productMetricsRepository.findByProductId(8L).orElseThrow().getSaleCount()).isEqualTo(1L);
+        assertThat(productMetricsRepository.findByProductIdAndMetricDate(7L, LocalDate.now()).orElseThrow().getSaleCount()).isEqualTo(2L);
+        assertThat(productMetricsRepository.findByProductIdAndMetricDate(8L, LocalDate.now()).orElseThrow().getSaleCount()).isEqualTo(1L);
     }
 
     @DisplayName("좋아요 이벤트를 반영하면, 오늘 랭킹 점수가 0.2 증가한다.")
