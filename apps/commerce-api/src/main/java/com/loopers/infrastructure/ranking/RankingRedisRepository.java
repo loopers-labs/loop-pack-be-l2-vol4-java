@@ -1,5 +1,6 @@
 package com.loopers.infrastructure.ranking;
 
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,6 +20,11 @@ import java.util.Set;
 public class RankingRedisRepository implements RankingRepository {
 
     private final RedisTemplate<String, String> redisTemplate;
+
+    @Override
+    public RankingPeriod period() {
+        return RankingPeriod.DAILY;
+    }
 
     @Override
     public List<Long> findProductIds(LocalDate date, int page, int size) {

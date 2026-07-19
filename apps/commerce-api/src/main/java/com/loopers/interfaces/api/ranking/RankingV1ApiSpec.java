@@ -13,11 +13,13 @@ public interface RankingV1ApiSpec {
 
     @Operation(
         summary = "랭킹 페이지 조회",
-        description = "일자별 상품 랭킹을 페이지 단위로 조회합니다. date 생략 시 오늘 날짜를 기준으로 합니다."
+        description = "일간/주간/월간 상품 랭킹을 페이지 단위로 조회합니다. date 생략 시 오늘, period 생략 시 일간(DAILY) 기준입니다."
     )
     ApiResponse<RankingV1Dto.RankingPageResponse> getRankings(
         @Parameter(name = "date", in = ParameterIn.QUERY, description = "조회할 날짜(yyyyMMdd), 생략 시 오늘")
         LocalDate date,
+        @Parameter(name = "period", in = ParameterIn.QUERY, description = "집계 기간(DAILY/WEEKLY/MONTHLY), 생략 시 DAILY")
+        String period,
         @Parameter(name = "page", in = ParameterIn.QUERY, description = "페이지(1부터, 기본 1)")
         int page,
         @Parameter(name = "size", in = ParameterIn.QUERY, description = "페이지 크기(기본 20)")
