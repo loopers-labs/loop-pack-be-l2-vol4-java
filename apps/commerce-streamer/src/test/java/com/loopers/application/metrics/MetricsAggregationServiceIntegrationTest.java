@@ -4,14 +4,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.loopers.domain.metrics.ProductMetrics;
 import com.loopers.domain.metrics.ProductMetricsRepository;
+import com.loopers.infrastructure.ranking.RankingKeys;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 @SpringBootTest
 class MetricsAggregationServiceIntegrationTest {
@@ -24,10 +28,19 @@ class MetricsAggregationServiceIntegrationTest {
     private ObjectMapper objectMapper;
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+    @Autowired
+    private RedisCleanUp redisCleanUp;
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
+    }
+
+    private Double rankingScore(long productId) {
+        return redisTemplate.opsForZSet().score(RankingKeys.today(), String.valueOf(productId));
     }
 
     private ObjectNode likePayload(long productId) {
@@ -77,12 +90,54 @@ class MetricsAggregationServiceIntegrationTest {
     void increasesSaleCount_whenOrderCreatedEventAggregated() {
         ObjectNode payload = objectMapper.createObjectNode().put("orderId", 42L).put("userId", 1L);
         payload.putArray("items")
-            .add(objectMapper.createObjectNode().put("productId", 7L).put("quantity", 2))
-            .add(objectMapper.createObjectNode().put("productId", 8L).put("quantity", 1));
+            .add(objectMapper.createObjectNode().put("productId", 7L).put("quantity", 2)
+                .set("unitPrice", objectMapper.createObjectNode().put("amount", 1000)))
+            .add(objectMapper.createObjectNode().put("productId", 8L).put("quantity", 1)
+                .set("unitPrice", objectMapper.createObjectNode().put("amount", 2000)));
 
         metricsAggregationService.aggregate("evt-order", "OrderCreatedEvent", payload);
 
         assertThat(productMetricsRepository.findByProductId(7L).orElseThrow().getSaleCount()).isEqualTo(2L);
         assertThat(productMetricsRepository.findByProductId(8L).orElseThrow().getSaleCount()).isEqualTo(1L);
+    }
+
+    @DisplayName("좋아요 이벤트를 반영하면, 오늘 랭킹 점수가 0.2 증가한다.")
+    @Test
+    void increasesRankingScore_whenProductLikedEventAggregated() {
+        metricsAggregationService.aggregate("evt-rank-like", "ProductLikedEvent", likePayload(7L));
+
+        assertThat(rankingScore(7L)).isEqualTo(0.2);
+    }
+
+    @DisplayName("좋아요 취소 이벤트를 반영하면, 오늘 랭킹 점수가 0.2 감소한다.")
+    @Test
+    void decreasesRankingScore_whenProductUnlikedEventAggregated() {
+        metricsAggregationService.aggregate("evt-rank-like", "ProductLikedEvent", likePayload(7L));
+        metricsAggregationService.aggregate("evt-rank-unlike", "ProductUnlikedEvent", likePayload(7L));
+
+        assertThat(rankingScore(7L)).isEqualTo(0.0);
+    }
+
+    @DisplayName("조회 이벤트를 반영하면, 오늘 랭킹 점수가 0.1 증가한다.")
+    @Test
+    void increasesRankingScore_whenProductViewedEventAggregated() {
+        metricsAggregationService.aggregate("evt-rank-view", "ProductViewedEvent",
+            objectMapper.createObjectNode().put("productId", 7L));
+
+        assertThat(rankingScore(7L)).isEqualTo(0.1);
+    }
+
+    @DisplayName("주문 생성 이벤트를 반영하면, 품목별로 가중치와 로그 정규화가 적용된 랭킹 점수가 반영된다.")
+    @Test
+    void increasesRankingScore_whenOrderCreatedEventAggregated() {
+        // 999 * 1 + 1 = 1000 → log10(1000) = 3 → 0.7 * 3 = 2.1 (깔끔하게 떨어지는 값으로 검증)
+        ObjectNode payload = objectMapper.createObjectNode().put("orderId", 42L).put("userId", 1L);
+        payload.putArray("items")
+            .add(objectMapper.createObjectNode().put("productId", 7L).put("quantity", 1)
+                .set("unitPrice", objectMapper.createObjectNode().put("amount", 999)));
+
+        metricsAggregationService.aggregate("evt-rank-order", "OrderCreatedEvent", payload);
+
+        assertThat(rankingScore(7L)).isCloseTo(2.1, within(0.0001));
     }
 }
