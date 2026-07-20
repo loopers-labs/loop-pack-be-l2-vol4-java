@@ -13,6 +13,7 @@ public class EventOutbox extends DomainEntity {
     public static final String TOPIC_ORDER_EVENTS = "order-events";
     public static final String TOPIC_COUPON_ISSUE_REQUESTS = "coupon-issue-requests";
     public static final String EVENT_ORDER_PAID = "ORDER_PAID";
+    public static final String EVENT_PRODUCT_VIEWED = "PRODUCT_VIEWED";
     public static final String EVENT_PRODUCT_LIKED = "PRODUCT_LIKED";
     public static final String EVENT_PRODUCT_UNLIKED = "PRODUCT_UNLIKED";
     public static final String EVENT_COUPON_ISSUE_REQUESTED = "COUPON_ISSUE_REQUESTED";

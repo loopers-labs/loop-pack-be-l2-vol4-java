@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.catalog.product;
 import com.loopers.application.catalog.product.ProductQuery;
 import com.loopers.application.catalog.product.ProductQueryService;
 import com.loopers.application.catalog.product.ProductResult;
+import com.loopers.application.catalog.ranking.RankingQueryService;
+import com.loopers.application.event.catalog.ProductViewEventPublisher;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
@@ -21,13 +23,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductV1Controller {
 
     private final ProductQueryService productQueryService;
+    private final RankingQueryService rankingQueryService;
+    private final ProductViewEventPublisher productViewEventPublisher;
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductV1Dto.ProductDetailResponse> getProduct(
         @PathVariable(value = "productId") Long productId,
         @RequestHeader(value = HeaderValidator.LOGIN_ID, required = false) String loginId
     ) {
-        ProductResult result = productQueryService.getOnSaleProduct(productId, loginId);
+        ProductResult result = productQueryService.getOnSaleProduct(productId, loginId)
+            .withRank(rankingQueryService.getTodayRank(productId).orElse(null));
+        productViewEventPublisher.publishSafely(productId, loginId);
         return ApiResponse.success(ProductV1Dto.ProductDetailResponse.from(result));
     }
 

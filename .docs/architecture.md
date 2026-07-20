@@ -1,6 +1,6 @@
 # Architecture Decision
 
-이 문서는 현재 8주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 9주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 결정
 
@@ -14,14 +14,16 @@ com.loopers
       coupon
       ordering
   application
-    catalog
-    coupon
-    ordering
-      queue
+      catalog
+        ranking
+      coupon
+      ordering
+        queue
     payment
     event
   domain
     catalog
+      ranking
     coupon
     ordering
       queue
@@ -29,6 +31,7 @@ com.loopers
     event
   infrastructure
     catalog
+      ranking
     coupon
     ordering
       queue
@@ -42,6 +45,7 @@ com.loopers
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
+| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, 랭킹 조회, 상품 상세 순위 조합 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
@@ -107,6 +111,23 @@ com.loopers
 | 권장 polling 간격 | `recommendedPollingIntervalSeconds`는 예상 대기 시간을 기준으로 1~10초 사이를 반환한다. `READY`는 즉시 진입해야 하므로 0초, `NOT_QUEUED`는 null이다. |
 | 후속 흐름 | 주문 생성 이후 이벤트 발행, Kafka 파이프라인, Metrics 집계는 7주차 구조를 재사용한다. |
 
+## 9주차 랭킹 기준
+
+9주차 구현은 Redis Sorted Set 기반 상품 랭킹 read model을 `catalog.ranking` 하위 경계에 둔다.
+
+| 영역 | 처리 |
+| --- | --- |
+| 도메인 경계 | 랭킹은 상품 조회용 read model이므로 별도 최상위 모듈이 아니라 `catalog.ranking`에 둔다. |
+| API | 랭킹 목록 조회는 `GET /api/v1/rankings?date=yyyyMMdd&page=0&size=20`을 사용한다. |
+| 응답 | 랭킹 목록은 `rank`, `score`, `product`를 포함하고, 상품 상세 응답은 nullable `rank`를 포함한다. |
+| 상품 정보 조합 | Redis에서 랭킹 productId를 조회한 뒤 기존 catalog 상품 조회 구조로 상품 정보를 조합한다. |
+| 반영 이벤트 | 상품 상세 조회 성공 시 신규 `PRODUCT_VIEWED`를 발행하고, 기존 `PRODUCT_LIKED`, `PRODUCT_UNLIKED`, `ORDER_PAID`를 랭킹 점수에 반영한다. |
+| 소비 topic | Ranking consumer는 `catalog-events`와 `order-events`를 소비한다. |
+| Kafka key | `PRODUCT_VIEWED`, `PRODUCT_LIKED`, `PRODUCT_UNLIKED`는 productId를 partition key로 사용하고, `ORDER_PAID`는 기존 orderId partition key를 유지한다. |
+| Redis key | 일간 랭킹은 `ranking:all:{yyyyMMdd}` Sorted Set에 저장하고 TTL은 2일이다. |
+| 점수 계산 | 조회 `+0.1`, 좋아요 `+0.2`, 좋아요 취소 `-0.2`, 주문 완료는 주문 항목별 `lineAmount * 0.6`을 누적한다. |
+| 멱등성 | Ranking consumer는 Redis Lua로 `ranking:handled:{ranking:{eventId}}` SETNX와 ZSET 점수 반영을 원자 처리해 동시 중복 소비의 점수 중복 누적을 막고, DB `event_handled`에는 `ranking:{eventId}`를 처리 이력으로 저장한다. |
+
 ## 외부 경계
 
 | 경계 | 이번 설계에서의 처리 | 이유 |
@@ -146,7 +167,7 @@ com.loopers
 
 ## 현재 코드와의 관계
 
-현재 구현은 기존 5계층 패키지를 유지하고, `catalog`, `coupon`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다. 8주차 대기열은 `ordering.queue` 하위 패키지로 둔다.
+현재 구현은 기존 5계층 패키지를 유지하고, `catalog`, `coupon`, `ordering`, `payment`, `event`는 각 계층 하위 도메인 패키지로 둔다. 8주차 대기열은 `ordering.queue` 하위 패키지로 두고, 9주차 랭킹은 `catalog.ranking` 하위 패키지로 둔다.
 
 구현 대상 도메인은 순수 도메인 엔티티와 infrastructure JPA 엔티티를 분리한다. 기존 예제 코드의 JPA Entity 구조는 과제 핵심 범위가 아니므로 별도 리팩터링 대상에서 제외한다.
 

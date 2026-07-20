@@ -86,6 +86,7 @@ It is a helper document only and is not part of the submission set.
 | `brand` | `BrandSummaryResponse` | Brand summary object. |
 | `likeCount` | `long` | Current like count. |
 | `liked` | `boolean` | Logged-in user liked flag. Anonymous requests return `false`. |
+| `rank` | `long?` | Daily ranking position. Products not in ranking return `null`. |
 
 ### `BrandSummaryResponse`
 
@@ -101,6 +102,22 @@ It is a helper document only and is not part of the submission set.
 | `GET /api/v1/products?brandId&sort&page&size` | `ApiResponse<PageResponse<ProductListItemResponse>>` |
 | `GET /api/v1/products/{productId}` | `ApiResponse<ProductDetailResponse>` |
 | `GET /api/v1/brands/{brandId}` | `ApiResponse<BrandSummaryResponse>` |
+
+## Ranking DTO
+
+### `RankingListItemResponse`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `rank` | `long` | 1-based ranking position. |
+| `score` | `double` | Redis Sorted Set score. |
+| `product` | `ProductListItemResponse` | Ranked product summary. |
+
+### API Mapping
+
+| API | Response DTO |
+| --- | --- |
+| `GET /api/v1/rankings?date=yyyyMMdd&page=0&size=20` | `ApiResponse<PageResponse<RankingListItemResponse>>` |
 
 ## ProductLike DTO
 

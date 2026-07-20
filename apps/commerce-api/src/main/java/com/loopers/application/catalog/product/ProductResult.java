@@ -14,8 +14,24 @@ public record ProductResult(
     Integer stockQuantity,
     Long likeCount,
     ProductStatus status,
-    boolean liked
+    boolean liked,
+    Long rank
 ) {
+    public ProductResult(
+        Long id,
+        Long brandId,
+        String brandName,
+        String name,
+        String description,
+        Long price,
+        Integer stockQuantity,
+        Long likeCount,
+        ProductStatus status,
+        boolean liked
+    ) {
+        this(id, brandId, brandName, name, description, price, stockQuantity, likeCount, status, liked, null);
+    }
+
     public static ProductResult from(Product product, Brand brand) {
         return from(product, brand, false);
     }
@@ -31,7 +47,8 @@ public record ProductResult(
             product.getStockQuantity(),
             product.getLikeCount(),
             product.getStatus(),
-            liked
+            liked,
+            null
         );
     }
 
@@ -46,7 +63,24 @@ public record ProductResult(
             stockQuantity,
             likeCount,
             status,
-            liked
+            liked,
+            rank
+        );
+    }
+
+    public ProductResult withRank(Long rank) {
+        return new ProductResult(
+            id,
+            brandId,
+            brandName,
+            name,
+            description,
+            price,
+            stockQuantity,
+            likeCount,
+            status,
+            liked,
+            rank
         );
     }
 }

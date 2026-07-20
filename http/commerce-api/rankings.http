@@ -1,0 +1,10 @@
+### 오늘의 인기 상품 랭킹 조회
+GET {{commerce-api}}/api/v1/rankings?date=20260712&page=0&size=20
+
+### 로그인 사용자 기준 좋아요 여부 포함 랭킹 조회
+GET {{commerce-api}}/api/v1/rankings?date=20260712&page=0&size=20
+X-Loopers-LoginId: user1
+
+### 상품 상세 조회 - rank 포함
+GET {{commerce-api}}/api/v1/products/1
+X-Loopers-LoginId: user1

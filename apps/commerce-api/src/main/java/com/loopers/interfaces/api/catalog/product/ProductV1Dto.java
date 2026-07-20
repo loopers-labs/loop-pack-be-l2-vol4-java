@@ -35,7 +35,8 @@ public class ProductV1Dto {
         Integer stockQuantity,
         BrandSummaryResponse brand,
         Long likeCount,
-        boolean liked
+        boolean liked,
+        Long rank
     ) {
         public static ProductDetailResponse from(ProductResult result) {
             return new ProductDetailResponse(
@@ -47,7 +48,8 @@ public class ProductV1Dto {
                 result.stockQuantity(),
                 new BrandSummaryResponse(result.brandId(), result.brandName()),
                 result.likeCount(),
-                result.liked()
+                result.liked(),
+                result.rank()
             );
         }
     }

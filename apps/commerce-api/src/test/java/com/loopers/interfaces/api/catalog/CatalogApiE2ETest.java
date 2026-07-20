@@ -6,11 +6,13 @@ import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
 import com.loopers.domain.catalog.product.ProductStatus;
+import com.loopers.domain.catalog.ranking.RankingRepository;
 import com.loopers.interfaces.api.catalog.brand.BrandAdminDto;
 import com.loopers.interfaces.api.catalog.brand.BrandV1Dto;
 import com.loopers.interfaces.api.catalog.like.ProductLikeDto;
 import com.loopers.interfaces.api.catalog.product.ProductAdminDto;
 import com.loopers.interfaces.api.catalog.product.ProductV1Dto;
+import com.loopers.interfaces.api.catalog.ranking.RankingDto;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
@@ -33,6 +35,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +50,7 @@ class CatalogApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
+    private final RankingRepository rankingRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
     private final RedisTemplate<String, String> redisTemplate;
@@ -54,6 +60,7 @@ class CatalogApiE2ETest {
         TestRestTemplate testRestTemplate,
         BrandRepository brandRepository,
         ProductRepository productRepository,
+        RankingRepository rankingRepository,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp,
         @Qualifier("redisTemplateMaster")
@@ -62,6 +69,7 @@ class CatalogApiE2ETest {
         this.testRestTemplate = testRestTemplate;
         this.brandRepository = brandRepository;
         this.productRepository = productRepository;
+        this.rankingRepository = rankingRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
         this.redisTemplate = redisTemplate;
@@ -216,6 +224,12 @@ class CatalogApiE2ETest {
             // arrange
             Brand brand = saveBrand("Loopers", "테스트 브랜드");
             Product product = saveProduct(brand, "상품", 1_000L, 10);
+            rankingRepository.incrementScore(
+                LocalDate.now(ZoneId.of("Asia/Seoul")),
+                product.getId(),
+                3.0,
+                Duration.ofDays(2)
+            );
 
             // act
             ParameterizedTypeReference<ApiResponse<ProductV1Dto.ProductDetailResponse>> responseType =
@@ -233,7 +247,8 @@ class CatalogApiE2ETest {
                 () -> assertThat(response.getBody().data().productId()).isEqualTo(product.getId()),
                 () -> assertThat(response.getBody().data().stockQuantity()).isEqualTo(10),
                 () -> assertThat(response.getBody().data().brand().brandId()).isEqualTo(brand.getId()),
-                () -> assertThat(response.getBody().data().brand().name()).isEqualTo("Loopers")
+                () -> assertThat(response.getBody().data().brand().name()).isEqualTo("Loopers"),
+                () -> assertThat(response.getBody().data().rank()).isEqualTo(1L)
             );
         }
 
@@ -257,6 +272,45 @@ class CatalogApiE2ETest {
                 () -> assertThat(response.getBody().data().productId()).isEqualTo(product.getId()),
                 () -> assertThat(response.getBody().data().likeCount()).isEqualTo(1L),
                 () -> assertThat(response.getBody().data().liked()).isTrue()
+            );
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings")
+    @Nested
+    class GetRankings {
+
+        @DisplayName("Redis 랭킹 순서대로 상품 정보를 조합해 페이지 응답을 반환한다.")
+        @Test
+        void returnsRankedProductsWithProductSummary() {
+            // arrange
+            Brand brand = saveBrand("Loopers", "테스트 브랜드");
+            Product firstProduct = saveProduct(brand, "1위 상품", 1_000L, 10);
+            Product secondProduct = saveProduct(brand, "2위 상품", 2_000L, 10);
+            LocalDate date = LocalDate.of(2026, 7, 12);
+            rankingRepository.incrementScore(date, secondProduct.getId(), 2.0, Duration.ofDays(2));
+            rankingRepository.incrementScore(date, firstProduct.getId(), 5.0, Duration.ofDays(2));
+
+            // act
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingDto.RankingListItemResponse>>> responseType =
+                new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingDto.RankingListItemResponse>>> response =
+                testRestTemplate.exchange(
+                    "/api/v1/rankings?date=20260712&page=0&size=20",
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    responseType
+                );
+
+            // assert
+            assertAll(
+                () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                () -> assertThat(response.getBody().data().items()).hasSize(2),
+                () -> assertThat(response.getBody().data().items()).extracting(RankingDto.RankingListItemResponse::rank)
+                    .containsExactly(1L, 2L),
+                () -> assertThat(response.getBody().data().items()).extracting(item -> item.product().productId())
+                    .containsExactly(firstProduct.getId(), secondProduct.getId()),
+                () -> assertThat(response.getBody().data().pageInfo().totalElements()).isEqualTo(2L)
             );
         }
     }

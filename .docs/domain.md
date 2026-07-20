@@ -1,10 +1,10 @@
 # Domain Glossary
 
-이 문서는 현재 8주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 9주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 문서 목적
 
-- 현재 8주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
+- 현재 9주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
 - `.docs/design`의 4개 제출 문서는 volume-2 설계 이력으로 보존하며 현재 기준으로 덮어쓰지 않는다.
 - 구현 단계에서 패키지, 클래스, 테스트 이름을 정할 때 이 문서를 먼저 확인한다.
 - 이번 주차 설계에는 `Point`/포인트 도메인을 포함하지 않는다.
@@ -51,6 +51,7 @@
 | 4주차 핵심 범위 | 재고, 쿠폰, 주문의 정합성과 동시성 제어 | RDB 트랜잭션과 비관적 row lock으로 처리한다. |
 | 7주차 핵심 범위 | 이벤트 기반 경계 분리, Kafka 파이프라인, Transactional Outbox, 비동기 선착순 쿠폰 발급 | ApplicationEvent, Outbox relay, Consumer 멱등성, Micrometer 지표로 처리한다. |
 | 8주차 핵심 범위 | 주문 API 앞단의 Redis 기반 대기열, 입장 토큰, 스케줄러 기반 순차 입장, polling 순번 조회 | `ordering.queue` 경계에서 처리하고 주문 생성 이후 흐름은 기존 ordering/payment/event 구조를 재사용한다. |
+| 9주차 핵심 범위 | Redis Sorted Set 기반 일간 상품 랭킹, Kafka 이벤트 기반 실시간 점수 반영, 랭킹 조회 API와 상품 상세 순위 제공 | `catalog.ranking` 경계에서 처리하고 상품 정보 조합은 기존 catalog 상품 조회 구조를 재사용한다. |
 | 대기열 | 주문 API 진입 전 사용자를 순서대로 대기시키는 전역 관문 | Redis Sorted Set 기반으로 진입 순서를 관리한다. |
 | 입장 토큰 | 대기열에서 입장이 허용된 사용자에게 발급되는 주문 진입 권한 | TTL을 가지며 주문 API 진입 시 검증하고 주문 완료 후 삭제한다. |
 | 순번 | 대기열 안에서 사용자의 현재 대기 위치 | polling 조회 API 응답에 포함한다. |
@@ -71,6 +72,7 @@
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
+| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, 랭킹 조회, 상품 상세 순위 조합 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
@@ -106,6 +108,15 @@
 | 대기열 응답 | 진입/조회 API는 같은 응답 DTO를 사용한다. 필드는 `status`, `position`, `waitingCount`, `estimatedWaitSeconds`, `recommendedPollingIntervalSeconds`, `token`이다. |
 | 주문 진입 권한 오류 | 주문 API에 `X-Loopers-Queue-Token` 헤더가 없거나 Redis 토큰과 일치하지 않으면 `ORDER_QUEUE_TOKEN_REQUIRED` 403으로 거부한다. |
 | 대기열 구현 이름 | `OrderQueueController`, `OrderQueueDto`, `OrderQueueService`, `OrderQueueAdmissionWorker`, `OrderQueueAdmissionWorkerScheduler`, `OrderQueueRepository`, `RedisOrderQueueRepository`, `OrderQueueStatus`를 사용한다. |
+| 랭킹 도메인 경계 | 랭킹은 상품 조회용 read model이므로 별도 최상위 모듈이 아니라 `catalog.ranking` 하위 경계에 둔다. |
+| 랭킹 API | 랭킹 목록 조회는 `GET /api/v1/rankings?date=yyyyMMdd&page=0&size=20`을 사용한다. |
+| 랭킹 응답 | 랭킹 목록은 `rank`, `score`, `product`를 포함하고, 상품 상세 응답은 nullable `rank`를 포함한다. |
+| 랭킹 반영 이벤트 | 상품 상세 조회 성공 시 `PRODUCT_VIEWED`를 새로 발행하고, 기존 `PRODUCT_LIKED`, `PRODUCT_UNLIKED`, `ORDER_PAID` 이벤트를 랭킹 점수에 반영한다. |
+| 랭킹 소비 topic | Ranking consumer는 `catalog-events`와 `order-events`를 소비한다. |
+| 랭킹 Redis key | 일간 랭킹 key는 `ranking:all:{yyyyMMdd}`, member는 상품 ID 문자열, TTL은 2일이다. |
+| 랭킹 날짜 기준 | EventMessage `occurredAt`을 Asia/Seoul 날짜로 변환해 일간 key를 계산한다. |
+| 랭킹 점수 | 조회 `+0.1`, 좋아요 `+0.2`, 좋아요 취소 `-0.2`, 주문 완료는 주문 항목별 `lineAmount * 0.6`을 반영한다. |
+| 랭킹 멱등성 | Ranking consumer는 Redis `ranking:handled:{ranking:{eventId}}`와 랭킹 ZSET 점수 반영을 Lua로 원자 처리하고, DB `event_handled`에는 `ranking:{eventId}`를 처리 이력 ID로 저장한다. |
 | 대기열 조회 우선순위 | 입장 토큰이 있으면 `READY`를 우선 반환한다. 토큰이 없고 대기열에 있으면 `WAITING`, 둘 다 없으면 `NOT_QUEUED`를 반환한다. |
 | 예상 대기 시간 계산 | `ceil(position / admitBatchSize) * schedulerIntervalSeconds`로 계산한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
 | 권장 polling 간격 계산 | `WAITING`은 예상 대기 시간을 기준으로 1~10초 사이를 반환한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
@@ -152,6 +163,7 @@
 | `OrderLine` | 주문 항목 | 주문 당시 상품명, 단가, 수량 스냅샷을 보관한다. |
 | 대기열 | 주문 대기열 | 주문 API 앞단에서 사용자 진입 순서와 입장 권한을 관리한다. |
 | 입장 토큰 | 주문 입장 토큰 | 대기열에서 입장이 허용된 사용자가 주문 API에 진입할 수 있음을 나타낸다. |
+| `Ranking` | 상품 랭킹 | 상품 조회, 좋아요, 주문 이벤트 점수를 Redis Sorted Set에 누적한 일간 상품 순위 read model이다. |
 | `Payment` | 결제 | 결제 요청과 외부 결제 결과를 기록한다. |
 | `EventOutbox` | 이벤트 아웃박스 | Kafka로 보낼 주문/카탈로그 이벤트를 저장한다. |
 | `PaymentGateway` | 외부 결제 시스템 | 결제 승인, 매입, 승인 취소를 수행하는 외부 시스템이다. |
@@ -232,6 +244,7 @@
 | 좋아요 등록/취소/조회 | `ProductLikeController` | `ProductLikeService` | `ProductLikeRepository` |
 | 주문 생성/조회 | `OrderController` | `OrderFacade`, `OrderService`, `StockService` | `OrderRepository`, `ProductRepository` |
 | 대기열 진입/순번 조회 | `OrderQueueController` | `OrderQueueService`, `OrderQueueAdmissionWorker` | `OrderQueueRepository`, `RedisOrderQueueRepository` |
+| 랭킹 목록/상품 상세 순위 조회 | `RankingController` | `RankingQueryService` | `RankingRepository`, `RedisRankingRepository` |
 | 쿠폰 발급 요청/결과 조회/내 쿠폰 조회 | `CouponV1Controller` | `CouponCommandService`, `CouponQueryService`, `CouponIssueRequestEventService` | `CouponTemplateRepository`, `CouponIssueRequestRepository`, `IssuedCouponRepository` |
 | 쿠폰 ADMIN | `CouponAdminController` | `CouponCommandService`, `CouponQueryService` | `CouponTemplateRepository`, `IssuedCouponRepository` |
 | 주문 ADMIN 조회 | `OrderAdminController` | `OrderService` | `OrderRepository` |
