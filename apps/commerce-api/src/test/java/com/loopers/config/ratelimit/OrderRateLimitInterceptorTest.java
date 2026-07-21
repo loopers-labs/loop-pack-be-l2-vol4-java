@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,8 +20,8 @@ import static org.mockito.Mockito.when;
 /**
  * OrderRateLimitInterceptor 단위 테스트.
  *
- * <p>Redis 연동 없이 {@link RateLimitRedisStore} 를 목으로 대체해 POST/GET 분기와
- * 한도 초과 시 예외 매핑만 검증한다.
+ * <p>Redis 연동 없이 {@link RateLimitRedisStore} 를 목으로 대체해 POST/GET 분기, 한도 초과 시
+ * 예외 매핑, Redis 장애 시 fail-open 동작을 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class OrderRateLimitInterceptorTest {
@@ -31,13 +30,15 @@ class OrderRateLimitInterceptorTest {
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
 
+    private OrderRateLimitInterceptor newInterceptor() {
+        return new OrderRateLimitInterceptor(rateLimitRedisStore, new RateLimitProperties(100, 1));
+    }
+
     @DisplayName("POST 요청에서 저장소가 false 를 반환하면 TOO_MANY_REQUESTS 예외를 던진다")
     @Test
     void throwsTooManyRequests_whenStoreReturnsFalse_forPostRequest() {
         // Arrange
-        OrderRateLimitInterceptor interceptor = new OrderRateLimitInterceptor(rateLimitRedisStore);
-        ReflectionTestUtils.setField(interceptor, "limit", 100);
-        ReflectionTestUtils.setField(interceptor, "windowSeconds", 1);
+        OrderRateLimitInterceptor interceptor = newInterceptor();
         when(request.getMethod()).thenReturn("POST");
         when(rateLimitRedisStore.tryAcquire(anyString(), anyInt(), anyInt())).thenReturn(false);
 
@@ -52,10 +53,24 @@ class OrderRateLimitInterceptorTest {
     @Test
     void returnsTrueWithoutThrowing_forGetRequest_regardlessOfStoreResult() {
         // Arrange
-        OrderRateLimitInterceptor interceptor = new OrderRateLimitInterceptor(rateLimitRedisStore);
-        ReflectionTestUtils.setField(interceptor, "limit", 100);
-        ReflectionTestUtils.setField(interceptor, "windowSeconds", 1);
+        OrderRateLimitInterceptor interceptor = newInterceptor();
         when(request.getMethod()).thenReturn("GET");
+
+        // Act
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        // Assert
+        assertThat(result).isTrue();
+    }
+
+    @DisplayName("POST 요청 중 저장소가 예외를 던지면(Redis 장애) 막지 않고 통과시킨다(fail-open)")
+    @Test
+    void returnsTrueWithoutThrowing_whenStoreThrows_failOpen() {
+        // Arrange
+        OrderRateLimitInterceptor interceptor = newInterceptor();
+        when(request.getMethod()).thenReturn("POST");
+        when(rateLimitRedisStore.tryAcquire(anyString(), anyInt(), anyInt()))
+            .thenThrow(new RuntimeException("redis down"));
 
         // Act
         boolean result = interceptor.preHandle(request, response, new Object());

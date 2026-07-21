@@ -105,6 +105,11 @@ class OutboxEventListenerTest {
         assertThat(payload.get("transactionKey").asText()).isEqualTo("TX-1");
         assertThat(payload.get("amount").asLong()).isEqualTo(40_000L);
         assertThat(payload.get("items")).hasSize(2);
+        // 랭킹 점수(price*amount) 계산을 위해 단가가 항목에 실린다.
+        JsonNode firstItem = payload.get("items").get(0);
+        assertThat(firstItem.get("productId").asLong()).isEqualTo(100L);
+        assertThat(firstItem.get("quantity").asInt()).isEqualTo(2);
+        assertThat(firstItem.get("price").asLong()).isEqualTo(10_000L);
     }
 
     @DisplayName("쿠폰 발급 이벤트는 coupon topic, userId partition key, requestId eventId로 기록한다.")

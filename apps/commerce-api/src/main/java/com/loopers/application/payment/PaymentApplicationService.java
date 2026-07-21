@@ -160,8 +160,15 @@ public class PaymentApplicationService {
             // 결제 확정 부가작업(데이터 플랫폼 전송 등)은 이벤트로 분리 — 커밋 후 리스너가 비동기 처리
             eventPublisher.publishEvent(new PaymentCompletedEvent(orderId, transactionKey, payment.getAmount()));
             // 대기열 게이트 대상이 아닌 상품에 대한 consume은 안전한 no-op이므로 게이트 여부를 따로 확인하지 않는다.
+            // consume은 Redis 호출이라 이 트랜잭션의 커밋 여부에 영향을 주면 안 된다 — 실패해도
+            // 결제 확정 자체는 롤백하지 않고 로그만 남긴다. 토큰은 최악의 경우 TTL로 자연 정리된다.
             for (OrderInfo.OrderItemInfo item : orderInfo.items()) {
-                queueApplicationService.consume(item.productId(), orderInfo.userId());
+                try {
+                    queueApplicationService.consume(item.productId(), orderInfo.userId());
+                } catch (Exception e) {
+                    log.warn("[Payment] 대기열 토큰 소비 실패 — TTL 만료로 자연 정리됨. productId={}, userId={}",
+                        item.productId(), orderInfo.userId(), e);
+                }
             }
         } else {
             payment.markFailed(reason != null ? reason : "결제 실패");

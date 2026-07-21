@@ -4,9 +4,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.TimeZone;
 
+@EnableScheduling   // 랭킹 콜드스타트 이월 스케줄러 (RankingCarryOverScheduler)
 @ConfigurationPropertiesScan
 @SpringBootApplication
 public class CommerceStreamerApplication {
