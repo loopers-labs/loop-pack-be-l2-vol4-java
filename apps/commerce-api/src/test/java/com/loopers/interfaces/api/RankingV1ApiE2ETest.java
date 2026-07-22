@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 
@@ -35,6 +36,7 @@ class RankingV1ApiE2ETest {
     private final TestRestTemplate testRestTemplate;
     private final ProductJpaRepository productJpaRepository;
     private final RedisTemplate<String, String> masterRedisTemplate;
+    private final JdbcTemplate jdbcTemplate;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
 
@@ -43,12 +45,14 @@ class RankingV1ApiE2ETest {
         TestRestTemplate testRestTemplate,
         ProductJpaRepository productJpaRepository,
         @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> masterRedisTemplate,
+        JdbcTemplate jdbcTemplate,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.productJpaRepository = productJpaRepository;
         this.masterRedisTemplate = masterRedisTemplate;
+        this.jdbcTemplate = jdbcTemplate;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
     }
@@ -65,6 +69,13 @@ class RankingV1ApiE2ETest {
 
     private void seedScore(long productId, double score) {
         masterRedisTemplate.opsForZSet().add(KEY.value(), String.valueOf(productId), score);
+    }
+
+    private void seedWeeklyRank(String yearWeek, long productId, double score, int rankNo) {
+        jdbcTemplate.update(
+            "INSERT INTO mv_product_rank_weekly (year_week, product_id, score, rank_no) VALUES (?, ?, ?, ?)",
+            yearWeek, productId, score, rankNo
+        );
     }
 
     @DisplayName("GET /api/v1/rankings 는 점수 순서대로 상품정보를 붙여 200 으로 반환한다.")
@@ -92,6 +103,45 @@ class RankingV1ApiE2ETest {
             () -> assertThat(response.getBody().data().rankings().get(0).score()).isEqualTo(3.0),
             () -> assertThat(response.getBody().data().rankings().get(1).product().name()).isEqualTo("2위상품")
         );
+    }
+
+    @DisplayName("period=weekly 는 그 날짜가 속한 ISO 주(2025-W36)의 MV 랭킹을 rank 순서로 상품정보와 함께 반환한다.")
+    @Test
+    void returnsWeeklyRankingFromMv() {
+        // given : 2025-09-06 은 2025-W36 (주간 MV 에 2건 적재)
+        ProductModel first = save("주간1위", 5_000L);
+        ProductModel second = save("주간2위", 4_000L);
+        seedWeeklyRank("2025-W36", first.getId(), 7.0, 1);
+        seedWeeklyRank("2025-W36", second.getId(), 3.0, 2);
+
+        // when
+        ParameterizedTypeReference<ApiResponse<RankingV1Dto.RankingPageResponse>> responseType = new ParameterizedTypeReference<>() {};
+        ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response = testRestTemplate.exchange(
+            "/api/v1/rankings?period=weekly&date=" + DATE_PARAM + "&page=0&size=10", HttpMethod.GET, null, responseType
+        );
+
+        // then
+        assertAll(
+            () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+            () -> assertThat(response.getBody().data().rankings()).hasSize(2),
+            () -> assertThat(response.getBody().data().rankings().get(0).rank()).isEqualTo(1L),
+            () -> assertThat(response.getBody().data().rankings().get(0).product().name()).isEqualTo("주간1위"),
+            () -> assertThat(response.getBody().data().rankings().get(0).score()).isEqualTo(7.0),
+            () -> assertThat(response.getBody().data().rankings().get(1).product().name()).isEqualTo("주간2위")
+        );
+    }
+
+    @DisplayName("정의되지 않은 period 는 400 을 반환한다.")
+    @Test
+    void returnsBadRequestWhenPeriodUnknown() {
+        // when
+        ParameterizedTypeReference<ApiResponse<Object>> responseType = new ParameterizedTypeReference<>() {};
+        ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+            "/api/v1/rankings?period=yearly&date=" + DATE_PARAM + "&page=0&size=10", HttpMethod.GET, null, responseType
+        );
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @DisplayName("date 파라미터가 없으면 400 을 반환한다.")

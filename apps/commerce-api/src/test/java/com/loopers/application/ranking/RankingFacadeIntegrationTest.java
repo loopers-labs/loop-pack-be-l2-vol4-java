@@ -3,6 +3,7 @@ package com.loopers.application.ranking;
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.ranking.RankingKey;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
@@ -72,7 +73,7 @@ class RankingFacadeIntegrationTest {
         seedScore(third.getId(), 1.0);
 
         // when
-        List<RankingInfo> page = rankingFacade.getRankingPage(DATE, 0, 10);
+        List<RankingInfo> page = rankingFacade.getRankingPage(RankingPeriod.DAILY, DATE, 0, 10);
 
         // then
         assertThat(page).extracting(RankingInfo::rank).containsExactly(1L, 2L, 3L);
@@ -97,7 +98,7 @@ class RankingFacadeIntegrationTest {
         seedScore(third.getId(), 1.0);
 
         // when
-        List<RankingInfo> page = rankingFacade.getRankingPage(DATE, 0, 10);
+        List<RankingInfo> page = rankingFacade.getRankingPage(RankingPeriod.DAILY, DATE, 0, 10);
 
         // then
         assertThat(page).extracting(info -> info.product().id())
@@ -119,7 +120,7 @@ class RankingFacadeIntegrationTest {
         seedScore(p4.getId(), 2.0);
 
         // when
-        List<RankingInfo> secondPage = rankingFacade.getRankingPage(DATE, 1, 2);
+        List<RankingInfo> secondPage = rankingFacade.getRankingPage(RankingPeriod.DAILY, DATE, 1, 2);
 
         // then
         assertThat(secondPage).extracting(RankingInfo::rank).containsExactly(3L, 4L);

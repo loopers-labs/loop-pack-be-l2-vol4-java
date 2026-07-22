@@ -5,6 +5,7 @@ import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.ranking.Rank;
 import com.loopers.domain.ranking.RankingEntry;
 import com.loopers.domain.ranking.RankingKey;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,14 +20,15 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * 랭킹 페이지 조립: ZSET 에서 Top-N (id·score) 를 얻고, 상품정보는 DB(SSOT)에서 배치로 hydrate 해
- * ZSET 순서 그대로 병합한다. 삭제(누락)된 상품은 건너뛴다(guide 결정 #7).
+ * 랭킹 페이지 조립: 기간별 Reader 에서 Top-N (id·score) 를 얻고, 상품정보는 DB(SSOT)에서 배치로 hydrate 해
+ * 순위 순서 그대로 병합한다. 삭제(누락)된 상품은 건너뛴다(guide 결정 #7). 저장소(Redis/MV) 분기는 Reader 라우팅이 흡수한다.
  */
 @Component
 @RequiredArgsConstructor
 public class RankingFacade {
 
     private final RankingRepository rankingRepository;
+    private final RankingReaderRouter rankingReaderRouter;
     private final ProductRepository productRepository;
 
     /**
@@ -37,9 +39,8 @@ public class RankingFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<RankingInfo> getRankingPage(LocalDate date, int page, int size) {
-        RankingKey key = RankingKey.of(date);
-        List<RankingEntry> entries = rankingRepository.topN(key, page, size);
+    public List<RankingInfo> getRankingPage(RankingPeriod period, LocalDate date, int page, int size) {
+        List<RankingEntry> entries = rankingReaderRouter.route(period).topN(date, page, size);
         List<Long> productIds = entries.stream().map(RankingEntry::productId).toList();
         List<ProductModel> products = productRepository.findAllActiveByIds(productIds);
         return mergeInRankingOrder(entries, products, page, size);
