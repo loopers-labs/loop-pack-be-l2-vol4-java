@@ -3,6 +3,7 @@ package com.loopers.interfaces.consumer;
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,23 +27,27 @@ class CatalogEventsConsumerIntegrationTest {
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
+    private final RedisCleanUp redisCleanUp;
 
     @Autowired
     CatalogEventsConsumerIntegrationTest(
         CatalogEventsConsumer catalogEventsConsumer,
         ProductMetricsJpaRepository productMetricsJpaRepository,
         EventHandledJpaRepository eventHandledJpaRepository,
-        DatabaseCleanUp databaseCleanUp
+        DatabaseCleanUp databaseCleanUp,
+        RedisCleanUp redisCleanUp
     ) {
         this.catalogEventsConsumer = catalogEventsConsumer;
         this.productMetricsJpaRepository = productMetricsJpaRepository;
         this.eventHandledJpaRepository = eventHandledJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
+        this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
+        redisCleanUp.truncateAll();
     }
 
     @DisplayName("LIKED 이벤트를 받으면 product_metrics.like_count 가 1 증가하고 event_handled 에 1건 기록된다.")

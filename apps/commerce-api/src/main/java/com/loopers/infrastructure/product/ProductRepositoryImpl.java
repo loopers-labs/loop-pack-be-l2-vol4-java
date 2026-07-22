@@ -50,6 +50,11 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<ProductModel> findAllActiveByIds(List<Long> ids) {
+        return productJpaRepository.findAllByIdInAndDeletedAtIsNull(ids);
+    }
+
+    @Override
     public int incrementLikeCount(Long id) {
         return productJpaRepository.incrementLikeCount(id);
     }

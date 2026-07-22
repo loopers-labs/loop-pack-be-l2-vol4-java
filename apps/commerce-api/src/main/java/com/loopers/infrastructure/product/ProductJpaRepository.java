@@ -17,6 +17,8 @@ public interface ProductJpaRepository extends JpaRepository<ProductModel, Long> 
 
     List<ProductModel> findAllByBrandIdAndDeletedAtIsNull(Long brandId);
 
+    List<ProductModel> findAllByIdInAndDeletedAtIsNull(List<Long> ids);
+
     @Query("""
         select p from ProductModel p
          where p.deletedAt is null

@@ -1,14 +1,21 @@
 package com.loopers.application.catalog;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.loopers.application.ranking.RankingScoreReflector;
 import com.loopers.domain.idempotency.EventHandledRepository;
 import com.loopers.domain.metrics.CatalogEventType;
 import com.loopers.domain.metrics.ProductMetricsRepository;
+import com.loopers.domain.ranking.RankingKey;
+import com.loopers.domain.ranking.RankingScorePolicy;
+import com.loopers.domain.ranking.RankingSignal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -16,18 +23,30 @@ public class CatalogEventFacade {
 
     private final EventHandledRepository eventHandledRepository;
     private final ProductMetricsRepository productMetricsRepository;
+    private final RankingScorePolicy rankingScorePolicy;
+    private final RankingScoreReflector rankingScoreReflector;
 
     /**
      * 한 배치를 한 트랜잭션으로 처리한다 (batch + manual ack 함정 대비 — 항목별 멱등이 필수).
      * 처음 보는 이벤트면 표시(markIfFirst)와 집계 반영을 같은 TX 로 묶어 원자성을 보장한다.
+     * 랭킹 점수는 커밋 후에만 반영하도록 델타만 모아 reflector 에 넘긴다(결정 #4).
      */
     @Transactional
     public void handle(List<CatalogEventMessage> messages) {
+        Map<Long, Double> scoreDeltas = new HashMap<>();
         for (CatalogEventMessage message : messages) {
             if (eventHandledRepository.markIfFirst(message.eventId())) {
                 applyMetric(message);
+                accumulateScore(message, scoreDeltas);
             }
         }
+        rankingScoreReflector.reflectAfterCommit(RankingKey.of(LocalDate.now()), scoreDeltas);
+    }
+
+    private void accumulateScore(CatalogEventMessage message, Map<Long, Double> scoreDeltas) {
+        RankingSignal.fromCatalogEventType(message.eventType())
+            .ifPresent(signal -> scoreDeltas.merge(
+                message.aggregateId(), rankingScorePolicy.scoreFor(signal, 0), Double::sum));
     }
 
     private static final String STOCK_CHANGED = "STOCK_CHANGED";

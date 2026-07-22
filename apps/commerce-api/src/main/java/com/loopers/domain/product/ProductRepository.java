@@ -26,6 +26,12 @@ public interface ProductRepository {
     List<ProductModel> findAllActiveByBrandId(Long brandId);
 
     /**
+     * 주어진 id 들의 active 상품을 한 번에 조회한다(N+1 방지 배치 조회). 랭킹 hydrate 등에 쓰인다.
+     * 삭제된 상품과 존재하지 않는 id 는 결과에서 빠진다.
+     */
+    List<ProductModel> findAllActiveByIds(List<Long> ids);
+
+    /**
      * active 상품의 like_count 를 1 증가시킨다.
      * @return 영향 행 수 (0 또는 1)
      */
