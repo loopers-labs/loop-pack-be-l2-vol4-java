@@ -1,6 +1,7 @@
 package com.loopers.interfaces.consumer;
 
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository;
+import com.loopers.infrastructure.metrics.DailyProductMetricsJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +27,7 @@ class CatalogEventsConsumerIntegrationTest {
 
     private final CatalogEventsConsumer catalogEventsConsumer;
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
+    private final DailyProductMetricsJpaRepository dailyProductMetricsJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
@@ -33,12 +36,14 @@ class CatalogEventsConsumerIntegrationTest {
     CatalogEventsConsumerIntegrationTest(
         CatalogEventsConsumer catalogEventsConsumer,
         ProductMetricsJpaRepository productMetricsJpaRepository,
+        DailyProductMetricsJpaRepository dailyProductMetricsJpaRepository,
         EventHandledJpaRepository eventHandledJpaRepository,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp
     ) {
         this.catalogEventsConsumer = catalogEventsConsumer;
         this.productMetricsJpaRepository = productMetricsJpaRepository;
+        this.dailyProductMetricsJpaRepository = dailyProductMetricsJpaRepository;
         this.eventHandledJpaRepository = eventHandledJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
@@ -181,6 +186,60 @@ class CatalogEventsConsumerIntegrationTest {
 
         // then
         assertThat(loadViewCount(productId)).isEqualTo(2L);
+    }
+
+    @DisplayName("LIKED 이벤트를 받으면 daily_product_metrics 의 오늘 날짜 행에 like_count 가 1 증가한다.")
+    @Test
+    void incrementsDailyLikeCount_whenLikedConsumed() {
+        // given
+        long productId = 1L;
+        LocalDate today = LocalDate.now();
+
+        // when
+        catalogEventsConsumer.consume(List.of(record("evt-1", "LIKED", productId)), NO_OP_ACK);
+
+        // then
+        assertThat(loadDailyLikeCount(productId, today)).isEqualTo(1L);
+    }
+
+    @DisplayName("VIEWED 이벤트를 받으면 daily_product_metrics 의 오늘 날짜 행에 view_count 가 누적된다.")
+    @Test
+    void incrementsDailyViewCount_whenViewedConsumed() {
+        // given
+        long productId = 1L;
+        LocalDate today = LocalDate.now();
+
+        // when
+        catalogEventsConsumer.consume(List.of(viewRecord("evt-1", productId)), NO_OP_ACK);
+        catalogEventsConsumer.consume(List.of(viewRecord("evt-2", productId)), NO_OP_ACK);
+
+        // then
+        assertThat(loadDailyViewCount(productId, today)).isEqualTo(2L);
+    }
+
+    @DisplayName("같은 event_id 를 두 번 받아도 daily like_count 는 한 번만 반영된다 — 멱등.")
+    @Test
+    void appliesDailyOnce_whenSameEventConsumedTwice() {
+        // given
+        long productId = 1L;
+        LocalDate today = LocalDate.now();
+
+        // when
+        catalogEventsConsumer.consume(List.of(record("evt-1", "LIKED", productId)), NO_OP_ACK);
+        catalogEventsConsumer.consume(List.of(record("evt-1", "LIKED", productId)), NO_OP_ACK);
+
+        // then
+        assertThat(loadDailyLikeCount(productId, today)).isEqualTo(1L);
+    }
+
+    private long loadDailyLikeCount(long productId, LocalDate metricDate) {
+        return dailyProductMetricsJpaRepository.findByProductIdAndMetricDate(productId, metricDate)
+            .orElseThrow().getLikeCount();
+    }
+
+    private long loadDailyViewCount(long productId, LocalDate metricDate) {
+        return dailyProductMetricsJpaRepository.findByProductIdAndMetricDate(productId, metricDate)
+            .orElseThrow().getViewCount();
     }
 
     private long loadLikeCount(long productId) {

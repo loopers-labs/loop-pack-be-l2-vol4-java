@@ -1,22 +1,25 @@
 package com.loopers.domain.metrics;
 
+import java.time.LocalDate;
+
 public interface ProductMetricsRepository {
 
     /**
      * 상품의 좋아요 수에 delta(+1/-1)를 원자적으로 반영한다.
      * 행이 없으면 생성, 있으면 누적 — 동시 소비자 환경에서도 read-modify-write 경합이 없도록 DB upsert 로 처리한다.
+     * 누적 스냅샷(product_metrics)과 함께 (상품, metricDate) 일자별 집계(daily_product_metrics)에도 같은 delta 를 반영한다.
      */
-    void applyLikeDelta(Long productId, long delta);
+    void applyLikeDelta(Long productId, LocalDate metricDate, long delta);
 
     /**
      * 상품의 판매량에 delta(주문 수량)를 원자적으로 누적한다. 좋아요와 같은 delta 방식 — 순서 무관, 멱등으로 중복 방지.
      */
-    void applySalesDelta(Long productId, long delta);
+    void applySalesDelta(Long productId, LocalDate metricDate, long delta);
 
     /**
      * 상품의 조회수에 delta 를 누적한다. 조회는 유실 허용(fire-and-forget) 지표라 정확도보다 처리량을 우선한다.
      */
-    void applyViewDelta(Long productId, long delta);
+    void applyViewDelta(Long productId, LocalDate metricDate, long delta);
 
     /**
      * 재고 수량의 '절대 상태'를 최신 버전만 반영한다(state-overwrite).

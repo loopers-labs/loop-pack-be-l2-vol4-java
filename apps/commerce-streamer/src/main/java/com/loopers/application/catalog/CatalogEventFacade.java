@@ -33,14 +33,15 @@ public class CatalogEventFacade {
      */
     @Transactional
     public void handle(List<CatalogEventMessage> messages) {
+        LocalDate today = LocalDate.now();
         Map<Long, Double> scoreDeltas = new HashMap<>();
         for (CatalogEventMessage message : messages) {
             if (eventHandledRepository.markIfFirst(message.eventId())) {
-                applyMetric(message);
+                applyMetric(message, today);
                 accumulateScore(message, scoreDeltas);
             }
         }
-        rankingScoreReflector.reflectAfterCommit(RankingKey.of(LocalDate.now()), scoreDeltas);
+        rankingScoreReflector.reflectAfterCommit(RankingKey.of(today), scoreDeltas);
     }
 
     private void accumulateScore(CatalogEventMessage message, Map<Long, Double> scoreDeltas) {
@@ -52,18 +53,18 @@ public class CatalogEventFacade {
     private static final String STOCK_CHANGED = "STOCK_CHANGED";
     private static final String VIEWED = "VIEWED";
 
-    private void applyMetric(CatalogEventMessage message) {
+    private void applyMetric(CatalogEventMessage message, LocalDate today) {
         if (STOCK_CHANGED.equals(message.eventType())) {
             applyStockState(message);
             return;
         }
         if (VIEWED.equals(message.eventType())) {
-            productMetricsRepository.applyViewDelta(message.aggregateId(), 1);
+            productMetricsRepository.applyViewDelta(message.aggregateId(), today, 1);
             return;
         }
         // like/unlike 처럼 '누적(delta)'되는 이벤트: 순서와 무관(commutative)해 멱등만으로 정확.
         CatalogEventType.from(message.eventType())
-            .ifPresent(type -> productMetricsRepository.applyLikeDelta(message.aggregateId(), type.likeDelta()));
+            .ifPresent(type -> productMetricsRepository.applyLikeDelta(message.aggregateId(), today, type.likeDelta()));
     }
 
     // 재고는 '절대 상태'라 delta 가 아니라 최신 값으로 덮어쓴다 — version 으로 최신성을 가드한다.
