@@ -32,9 +32,14 @@ public class ProductV1Response {
         long price,
         ProductDisplayStatus displayStatus,
         String thumbnailUrl,
-        long likeCount
+        long likeCount,
+        Integer todayRank
     ) {
         public static Detail from(ProductResult.Detail result) {
+            return from(result, null);
+        }
+
+        public static Detail from(ProductResult.Detail result, Integer todayRank) {
             return new Detail(
                 result.id(),
                 result.brandId(),
@@ -44,7 +49,8 @@ public class ProductV1Response {
                 result.price(),
                 result.displayStatus(),
                 result.thumbnailUrl(),
-                result.likeCount()
+                result.likeCount(),
+                todayRank
             );
         }
     }
