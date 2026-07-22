@@ -14,6 +14,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     basePackages = {"com.loopers"},
     excludeFilters = @Filter(
         type = FilterType.REGEX,
-        pattern = "com\\.loopers\\.(?![^.]+\\.infrastructure\\.).*"))
+        pattern = "com\\.loopers\\.(?!(?:[^.]+\\.)?infrastructure\\.).*"))
 public class JpaConfig {
 }

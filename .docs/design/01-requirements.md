@@ -188,7 +188,7 @@
 
 API Prefix:
 - 대고객 : `/api/v1`
-  - 유저 로그인이 필요한 기능은 아래 헤더를 통해 유저를 식별해 제공합니다. 
+  - 유저 로그인이 필요한 기능은 아래 헤더를 통해 유저를 식별해 제공합니다.
   - 유저 식별 헤더: `X-Loopers-LoginId`, `X-Loopers-LoginPw`
 - 관리자 : `/api-admin/v1`
   - 관리자 식별 헤더: `X-Loopers-Ldap: loopers.admin`

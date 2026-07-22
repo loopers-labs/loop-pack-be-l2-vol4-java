@@ -1,0 +1,13 @@
+### 좋아요 등록 (멱등 — 중복 등록해도 like_count 는 1 회만 증가)
+POST {{commerce-api}}/api/v1/products/777/likes
+X-USER-ID: user-1
+
+### 좋아요 취소 (멱등 — 좋아요 상태가 아니면 no-op 성공)
+DELETE {{commerce-api}}/api/v1/products/777/likes
+X-USER-ID: user-1
+
+### 좋아요 후 상세 조회 — likeCount 반영 확인 (캐시 무효화 검증)
+GET {{commerce-api}}/api/v1/products/777
+
+### X-USER-ID 누락 — 400 BAD_REQUEST
+POST {{commerce-api}}/api/v1/products/777/likes

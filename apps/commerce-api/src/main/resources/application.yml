@@ -15,14 +15,24 @@ spring:
     web-application-type: servlet
   application:
     name: commerce-api
+  kafka:
+    producer:
+      properties:
+        max.block.ms: 500
   profiles:
     active: local
   config:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+
+commerce:
+  kafka:
+    topics:
+      product-activity: commerce.product-activity.v1
 
 springdoc:
   use-fqn: true
@@ -34,6 +44,10 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+loopers:
+  seed:
+    enabled: false # local 프로파일에서 true 로 켜면 기동 시 대량 상품 데이터를 시딩한다.
 
 ---
 spring:

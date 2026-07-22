@@ -21,7 +21,7 @@
 
 각 레이어는 다음 책임을 가진다.
 
-예: 
+예:
 - **interfaces** (presentation 레이어): 외부 요청/응답 계약, 입력 검증, HTTP 표현
 - **application** (application 레이어): 유스케이스 흐름, 트랜잭션 경계, 여러 도메인 조합
 - **domain** (domain 레이어): 도메인 객체, 비즈니스 규칙, Repository 계약

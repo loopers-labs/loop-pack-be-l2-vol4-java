@@ -7,6 +7,7 @@ import com.loopers.member.application.MemberService;
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductDisplayService;
 import com.loopers.product.application.ProductService;
+import com.loopers.product.application.event.ProductActivityEventPublisher;
 import com.loopers.product.domain.Product;
 import com.loopers.product.domain.ProductSortType;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +27,16 @@ public class LikeFacade {
     private final ProductService productService;
     private final BrandService brandService;
     private final InventoryService inventoryService;
+    private final ProductActivityEventPublisher activityEventPublisher;
     private final ProductDisplayService productDisplayService = new ProductDisplayService();
 
     public void registerLike(Long memberId, Long productId) {
         memberService.get(memberId);
         productService.get(productId);
-        likeService.like(memberId, productId);
+        boolean inserted = likeService.like(memberId, productId);
+        if (inserted) {
+            activityEventPublisher.publishLiked(productId);
+        }
     }
 
     public void cancelLike(Long memberId, Long productId) {

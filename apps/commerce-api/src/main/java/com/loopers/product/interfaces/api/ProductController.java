@@ -4,6 +4,8 @@ import com.loopers.common.interfaces.api.ApiResponse;
 import com.loopers.common.interfaces.api.PagedResponse;
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductFacade;
+import com.loopers.product.application.ProductRankingFacade;
+import com.loopers.product.application.RankedProductDetailInfo;
 import com.loopers.product.domain.ProductSortType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
     private final ProductFacade productFacade;
+    private final ProductRankingFacade productRankingFacade;
 
     @GetMapping
     public ApiResponse<PagedResponse<ProductDetailResponse>> getProducts(
@@ -29,9 +32,9 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ApiResponse<ProductDetailResponse> getProduct(
+    public ApiResponse<RankedProductDetailResponse> getProduct(
         @PathVariable("productId") Long productId) {
-        ProductDetailInfo info = productFacade.getProductDetail(productId);
-        return ApiResponse.success(ProductDetailResponse.from(info));
+        RankedProductDetailInfo info = productRankingFacade.getProductDetail(productId);
+        return ApiResponse.success(RankedProductDetailResponse.from(info));
     }
 }
