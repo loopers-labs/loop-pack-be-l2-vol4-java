@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDate;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -24,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 @SpringBatchTest
 @TestPropertySource(properties = "spring.batch.job.name=" + DemoJobConfig.JOB_NAME)
 class DemoJobE2ETest {
+
+    private static final AtomicLong RUN_ID = new AtomicLong(System.currentTimeMillis());
 
     // IDE 정적 분석 상 [SpringBatchTest] 의 주입보다 [SpringBootTest] 의 주입이 우선되어, 해당 컴포넌트는 없으므로 오류처럼 보일 수 있음.
     // [SpringBatchTest] 자체가 Scope 기반으로 주입하기 때문에 정상 동작함.
@@ -46,7 +49,9 @@ class DemoJobE2ETest {
         jobLauncherTestUtils.setJob(job);
 
         // act
-        var jobExecution = jobLauncherTestUtils.launchJob();
+        var jobExecution = jobLauncherTestUtils.launchJob(new JobParametersBuilder()
+            .addLong("run.id", nextRunId())
+            .toJobParameters());
 
         // assert
         assertAll(
@@ -64,6 +69,7 @@ class DemoJobE2ETest {
         // act
         var jobParameters = new JobParametersBuilder()
             .addLocalDate("requestDate", LocalDate.now())
+            .addLong("run.id", nextRunId())
             .toJobParameters();
         var jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
 
@@ -72,5 +78,9 @@ class DemoJobE2ETest {
                 () -> assertThat(jobExecution).isNotNull(),
                 () -> assertThat(jobExecution.getExitStatus().getExitCode()).isEqualTo(ExitStatus.COMPLETED.getExitCode())
         );
+    }
+
+    private long nextRunId() {
+        return RUN_ID.incrementAndGet();
     }
 }

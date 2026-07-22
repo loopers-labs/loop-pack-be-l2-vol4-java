@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.catalog.ranking;
 import com.loopers.application.catalog.ranking.RankingQuery;
 import com.loopers.application.catalog.ranking.RankingQueryService;
 import com.loopers.application.catalog.ranking.RankingResult;
+import com.loopers.domain.catalog.ranking.RankingPeriod;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.interfaces.api.support.HeaderValidator;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 
 @RequiredArgsConstructor
 @RestController
@@ -33,13 +35,14 @@ public class RankingController {
 
     @GetMapping
     public ApiResponse<PageResponse<RankingDto.RankingListItemResponse>> getRankings(
+        @RequestParam(defaultValue = "daily") String period,
         @RequestParam(required = false) String date,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size,
         @RequestHeader(value = HeaderValidator.LOGIN_ID, required = false) String loginId
     ) {
         PageResult<RankingResult> result = rankingQueryService.getRankings(
-            new RankingQuery.Search(parseDate(date), page, size, loginId)
+            new RankingQuery.Search(parseDate(date), parsePeriod(period), page, size, loginId)
         );
 
         return ApiResponse.success(PageResponse.from(result, RankingDto.RankingListItemResponse::from));
@@ -54,6 +57,18 @@ public class RankingController {
             return LocalDate.parse(date, DATE_FORMATTER);
         } catch (DateTimeParseException e) {
             throw new CoreException(ErrorType.BAD_REQUEST, "랭킹 조회 날짜는 yyyyMMdd 형식이어야 합니다.");
+        }
+    }
+
+    private RankingPeriod parsePeriod(String period) {
+        if (period == null || period.isBlank()) {
+            return RankingPeriod.DAILY;
+        }
+
+        try {
+            return RankingPeriod.valueOf(period.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "랭킹 기간은 daily, weekly, monthly 중 하나여야 합니다.");
         }
     }
 }

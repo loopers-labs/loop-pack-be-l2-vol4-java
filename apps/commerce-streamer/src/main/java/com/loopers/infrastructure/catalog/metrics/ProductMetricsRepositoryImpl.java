@@ -5,6 +5,7 @@ import com.loopers.domain.catalog.metrics.ProductMetricsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -16,7 +17,7 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     @Override
     public ProductMetrics save(ProductMetrics metrics) {
         ProductMetricsJpaEntity entity = metrics.isNew()
-            ? productMetricsJpaRepository.findByProductId(metrics.getProductId())
+            ? productMetricsJpaRepository.findByMetricDateAndProductId(metrics.getMetricDate(), metrics.getProductId())
                 .orElseGet(() -> ProductMetricsJpaEntity.from(metrics))
             : productMetricsJpaRepository.findById(metrics.getId()).orElseGet(() -> ProductMetricsJpaEntity.from(metrics));
         entity.apply(metrics);
@@ -24,7 +25,8 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     }
 
     @Override
-    public Optional<ProductMetrics> findByProductId(Long productId) {
-        return productMetricsJpaRepository.findByProductId(productId).map(ProductMetricsJpaEntity::toDomain);
+    public Optional<ProductMetrics> findByMetricDateAndProductId(LocalDate metricDate, Long productId) {
+        return productMetricsJpaRepository.findByMetricDateAndProductId(metricDate, productId)
+            .map(ProductMetricsJpaEntity::toDomain);
     }
 }

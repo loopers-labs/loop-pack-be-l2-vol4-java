@@ -6,6 +6,9 @@ import com.loopers.domain.catalog.brand.BrandRepository;
 import com.loopers.domain.catalog.like.ProductLikeRepository;
 import com.loopers.domain.catalog.product.Product;
 import com.loopers.domain.catalog.product.ProductRepository;
+import com.loopers.domain.catalog.ranking.ProductRankMvRepository;
+import com.loopers.domain.catalog.ranking.RankingPeriod;
+import com.loopers.domain.catalog.ranking.RankingPeriodRange;
 import com.loopers.domain.catalog.ranking.RankingRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -32,6 +35,7 @@ public class RankingQueryService {
     private static final ZoneId RANKING_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RankingRepository rankingRepository;
+    private final ProductRankMvRepository productRankMvRepository;
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
     private final ProductLikeRepository productLikeRepository;
@@ -39,19 +43,25 @@ public class RankingQueryService {
     @Transactional(readOnly = true)
     public PageResult<RankingResult> getRankings(RankingQuery.Search query) {
         LocalDate date = query.date() == null ? LocalDate.now(RANKING_ZONE) : query.date();
-        List<RankingResult> visibleRankings = getVisibleRankings(date, query.userId(), query.size());
-        int fromIndex = Math.min(query.page() * query.size(), visibleRankings.size());
-        int toIndex = Math.min(fromIndex + query.size(), visibleRankings.size());
+        List<RankingResult> visibleRankings = query.period() == RankingPeriod.DAILY
+            ? getVisibleDailyRankings(date, query.userId(), query.size())
+            : getVisibleMaterializedRankings(query.period(), date, query.userId());
 
+        return page(visibleRankings, query.page(), query.size());
+    }
+
+    private PageResult<RankingResult> page(List<RankingResult> visibleRankings, int page, int size) {
+        int fromIndex = Math.min(page * size, visibleRankings.size());
+        int toIndex = Math.min(fromIndex + size, visibleRankings.size());
         return PageResult.of(
             visibleRankings.subList(fromIndex, toIndex),
-            query.page(),
-            query.size(),
+            page,
+            size,
             visibleRankings.size()
         );
     }
 
-    private List<RankingResult> getVisibleRankings(LocalDate date, String userId, int size) {
+    private List<RankingResult> getVisibleDailyRankings(LocalDate date, String userId, int size) {
         long totalRankingCount = rankingRepository.count(date);
         if (totalRankingCount == 0) {
             return List.of();
@@ -70,6 +80,24 @@ public class RankingQueryService {
         }
 
         return visibleRankings;
+    }
+
+    private List<RankingResult> getVisibleMaterializedRankings(RankingPeriod period, LocalDate date, String userId) {
+        RankingPeriodRange range = RankingPeriodRange.of(period, date);
+        long totalRankingCount = productRankMvRepository.count(period, range.startDate(), range.endDate());
+        if (totalRankingCount == 0) {
+            return List.of();
+        }
+
+        int fetchSize = Math.toIntExact(Math.min(totalRankingCount, 100L));
+        List<RankingRepository.Entry> rankingEntries = productRankMvRepository.findRankings(
+            period,
+            range.startDate(),
+            range.endDate(),
+            0,
+            fetchSize
+        );
+        return toVisibleResults(rankingEntries, userId);
     }
 
     private List<RankingResult> toVisibleResults(List<RankingRepository.Entry> rankingEntries, String userId) {

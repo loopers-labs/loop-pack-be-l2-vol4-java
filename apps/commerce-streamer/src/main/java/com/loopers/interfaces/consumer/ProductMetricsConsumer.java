@@ -19,25 +19,28 @@ import java.util.List;
 @Component
 public class ProductMetricsConsumer {
 
-    private static final String TOPIC_CATALOG_EVENTS = "catalog-events";
+    private static final String TOPIC_PRODUCT_METRICS_EVENTS = "product-metrics-events";
 
     private final ProductMetricsEventService productMetricsEventService;
     private final ObjectMapper objectMapper;
     private final EventMetrics eventMetrics;
 
     @KafkaListener(
-        topics = {"${loopers.kafka.topics.catalog-events:catalog-events}"},
+        topics = {
+            "${loopers.kafka.topics.catalog-events:catalog-events}",
+            "${loopers.kafka.topics.order-events:order-events}"
+        },
         groupId = "${loopers.kafka.consumer-groups.product-metrics:product-metrics-consumer}",
         containerFactory = KafkaConfig.BATCH_LISTENER
     )
     public void consume(List<ConsumerRecord<Object, Object>> messages, Acknowledgment acknowledgment) {
         try {
             for (ConsumerRecord<Object, Object> message : messages) {
-                productMetricsEventService.process(toEventMessage(message.value()));
+                productMetricsEventService.process(message.topic(), toEventMessage(message.value()));
             }
             acknowledgment.acknowledge();
         } catch (RuntimeException e) {
-            eventMetrics.recordKafkaConsumerFailure(TOPIC_CATALOG_EVENTS, "UNKNOWN");
+            eventMetrics.recordKafkaConsumerFailure(TOPIC_PRODUCT_METRICS_EVENTS, "UNKNOWN");
             throw e;
         }
     }
@@ -53,7 +56,7 @@ public class ProductMetricsConsumer {
             return deserialize(text);
         }
 
-        eventMetrics.recordKafkaConsumerFailure(TOPIC_CATALOG_EVENTS, "UNKNOWN");
+        eventMetrics.recordKafkaConsumerFailure(TOPIC_PRODUCT_METRICS_EVENTS, "UNKNOWN");
         throw new IllegalArgumentException("지원하지 않는 Kafka 메시지 형식입니다.");
     }
 
@@ -61,7 +64,7 @@ public class ProductMetricsConsumer {
         try {
             return objectMapper.readValue(text, EventMessage.class);
         } catch (JsonProcessingException e) {
-            eventMetrics.recordKafkaConsumerFailure(TOPIC_CATALOG_EVENTS, "UNKNOWN");
+            eventMetrics.recordKafkaConsumerFailure(TOPIC_PRODUCT_METRICS_EVENTS, "UNKNOWN");
             throw new IllegalArgumentException("Kafka 메시지 해석에 실패했습니다.", e);
         }
     }

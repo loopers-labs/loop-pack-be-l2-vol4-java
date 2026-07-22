@@ -117,7 +117,15 @@ It is a helper document only and is not part of the submission set.
 
 | API | Response DTO |
 | --- | --- |
-| `GET /api/v1/rankings?date=yyyyMMdd&page=0&size=20` | `ApiResponse<PageResponse<RankingListItemResponse>>` |
+| `GET /api/v1/rankings?period=daily\|weekly\|monthly&date=yyyyMMdd&page=0&size=20` | `ApiResponse<PageResponse<RankingListItemResponse>>` |
+
+Rules:
+
+- `period` is optional and defaults to `daily`.
+- `date` is optional and defaults to today in Asia/Seoul.
+- `daily` rankings are read from Redis daily ranking.
+- `weekly` and `monthly` rankings are read from ranking MV tables.
+- Response DTO stays `rank`, `score`, and `product` for every period.
 
 ## ProductLike DTO
 

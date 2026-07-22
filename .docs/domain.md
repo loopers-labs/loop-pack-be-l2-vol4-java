@@ -1,10 +1,10 @@
 # Domain Glossary
 
-이 문서는 현재 9주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 10주차 구현의 도메인 용어/상태명 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 문서 목적
 
-- 현재 9주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
+- 현재 10주차 구현에서 도메인명, 상태명, API명, 클래스명을 같은 이름으로 쓰기 위한 기준이다.
 - `.docs/design`의 4개 제출 문서는 volume-2 설계 이력으로 보존하며 현재 기준으로 덮어쓰지 않는다.
 - 구현 단계에서 패키지, 클래스, 테스트 이름을 정할 때 이 문서를 먼저 확인한다.
 - 이번 주차 설계에는 `Point`/포인트 도메인을 포함하지 않는다.
@@ -52,6 +52,11 @@
 | 7주차 핵심 범위 | 이벤트 기반 경계 분리, Kafka 파이프라인, Transactional Outbox, 비동기 선착순 쿠폰 발급 | ApplicationEvent, Outbox relay, Consumer 멱등성, Micrometer 지표로 처리한다. |
 | 8주차 핵심 범위 | 주문 API 앞단의 Redis 기반 대기열, 입장 토큰, 스케줄러 기반 순차 입장, polling 순번 조회 | `ordering.queue` 경계에서 처리하고 주문 생성 이후 흐름은 기존 ordering/payment/event 구조를 재사용한다. |
 | 9주차 핵심 범위 | Redis Sorted Set 기반 일간 상품 랭킹, Kafka 이벤트 기반 실시간 점수 반영, 랭킹 조회 API와 상품 상세 순위 제공 | `catalog.ranking` 경계에서 처리하고 상품 정보 조합은 기존 catalog 상품 조회 구조를 재사용한다. |
+| 10주차 핵심 범위 | `product_metrics` 일간 행동 집계를 기반으로 Spring Batch 주간/월간 TOP 100 랭킹 MV를 생성하고 Ranking API를 기간별로 확장 | Batch 구현은 `apps/commerce-batch`의 `catalog.ranking` Job 경계에 둔다. |
+| 상품 메트릭 | 상품별 일간 행동 집계 원천 데이터 | `product_metrics(metric_date, product_id)` 기준으로 조회수, 좋아요 수, 판매 수량, 판매 금액을 저장한다. |
+| 랭킹 기간 | Ranking API 조회 원천을 결정하는 기간 구분 | `daily`, `weekly`, `monthly`를 사용한다. 기본값은 `daily`다. |
+| 주간 랭킹 MV | 주간 TOP 100 상품 랭킹 read model | `mv_product_rank_weekly` 테이블에 저장한다. |
+| 월간 랭킹 MV | 월간 TOP 100 상품 랭킹 read model | `mv_product_rank_monthly` 테이블에 저장한다. |
 | 대기열 | 주문 API 진입 전 사용자를 순서대로 대기시키는 전역 관문 | Redis Sorted Set 기반으로 진입 순서를 관리한다. |
 | 입장 토큰 | 대기열에서 입장이 허용된 사용자에게 발급되는 주문 진입 권한 | TTL을 가지며 주문 API 진입 시 검증하고 주문 완료 후 삭제한다. |
 | 순번 | 대기열 안에서 사용자의 현재 대기 위치 | polling 조회 API 응답에 포함한다. |
@@ -72,7 +77,7 @@
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
-| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, 랭킹 조회, 상품 상세 순위 조합 |
+| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, Batch 기반 주간/월간 랭킹 MV, 기간별 랭킹 조회, 상품 상세 순위 조합 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
@@ -117,6 +122,15 @@
 | 랭킹 날짜 기준 | EventMessage `occurredAt`을 Asia/Seoul 날짜로 변환해 일간 key를 계산한다. |
 | 랭킹 점수 | 조회 `+0.1`, 좋아요 `+0.2`, 좋아요 취소 `-0.2`, 주문 완료는 주문 항목별 `lineAmount * 0.6`을 반영한다. |
 | 랭킹 멱등성 | Ranking consumer는 Redis `ranking:handled:{ranking:{eventId}}`와 랭킹 ZSET 점수 반영을 Lua로 원자 처리하고, DB `event_handled`에는 `ranking:{eventId}`를 처리 이력 ID로 저장한다. |
+| 10주차 Batch 위치 | 주간/월간 랭킹 집계 Job은 `apps/commerce-batch`의 `batch.job.catalog.ranking` 하위에 둔다. |
+| Batch Job 계약 | Job 이름은 `productRankingAggregationJob`, 파라미터는 `period=weekly|monthly`, `baseDate=yyyyMMdd`를 사용한다. |
+| Batch 기간 계산 | `weekly`는 `baseDate`가 속한 주의 월요일부터 일요일, `monthly`는 해당 월의 1일부터 말일까지 집계한다. |
+| Batch 실행 주기 | 이번 범위에서는 스케줄러를 추가하지 않고 외부 실행 시 JobParameter로 실행한다. |
+| 주간/월간 점수 | `product_metrics` 기간 합산값으로 `view_count * 0.1 + like_count * 0.2 + sales_amount * 0.6`을 계산한다. |
+| 주간/월간 MV 컬럼 | `period_start_date`, `period_end_date`, `rank`, `product_id`, `score`와 감사 컬럼을 저장한다. |
+| 주간/월간 MV 재실행 | 같은 기간 결과를 먼저 삭제한 뒤 TOP 100을 재적재한다. |
+| Ranking API 기간 | `GET /api/v1/rankings?period=daily|weekly|monthly&date=yyyyMMdd&page=0&size=20`을 사용한다. |
+| Ranking API 기본값 | `period` 생략 시 `daily`, `date` 생략 시 Asia/Seoul 기준 오늘을 사용한다. |
 | 대기열 조회 우선순위 | 입장 토큰이 있으면 `READY`를 우선 반환한다. 토큰이 없고 대기열에 있으면 `WAITING`, 둘 다 없으면 `NOT_QUEUED`를 반환한다. |
 | 예상 대기 시간 계산 | `ceil(position / admitBatchSize) * schedulerIntervalSeconds`로 계산한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
 | 권장 polling 간격 계산 | `WAITING`은 예상 대기 시간을 기준으로 1~10초 사이를 반환한다. `READY`는 0초, `NOT_QUEUED`는 null이다. |
@@ -244,7 +258,8 @@
 | 좋아요 등록/취소/조회 | `ProductLikeController` | `ProductLikeService` | `ProductLikeRepository` |
 | 주문 생성/조회 | `OrderController` | `OrderFacade`, `OrderService`, `StockService` | `OrderRepository`, `ProductRepository` |
 | 대기열 진입/순번 조회 | `OrderQueueController` | `OrderQueueService`, `OrderQueueAdmissionWorker` | `OrderQueueRepository`, `RedisOrderQueueRepository` |
-| 랭킹 목록/상품 상세 순위 조회 | `RankingController` | `RankingQueryService` | `RankingRepository`, `RedisRankingRepository` |
+| 랭킹 목록/상품 상세 순위 조회 | `RankingController` | `RankingQueryService` | `RankingRepository`, `RedisRankingRepository`, `ProductRankMvRepository` |
+| 주간/월간 랭킹 Batch | - | `ProductRankingAggregationJob` | `ProductMetricsReader`, `ProductRankMvWriter` |
 | 쿠폰 발급 요청/결과 조회/내 쿠폰 조회 | `CouponV1Controller` | `CouponCommandService`, `CouponQueryService`, `CouponIssueRequestEventService` | `CouponTemplateRepository`, `CouponIssueRequestRepository`, `IssuedCouponRepository` |
 | 쿠폰 ADMIN | `CouponAdminController` | `CouponCommandService`, `CouponQueryService` | `CouponTemplateRepository`, `IssuedCouponRepository` |
 | 주문 ADMIN 조회 | `OrderAdminController` | `OrderService` | `OrderRepository` |

@@ -1,6 +1,6 @@
 # Architecture Decision
 
-이 문서는 현재 9주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
+이 문서는 현재 10주차 구현의 아키텍처 기준 문서다. 제출 커밋에는 포함하지 않는다.
 
 ## 결정
 
@@ -45,7 +45,7 @@ com.loopers
 | 모듈 | 포함 도메인 | 책임 |
 | --- | --- | --- |
 | `catalog` | `Brand`, `Product`, `ProductLike` | 상품 탐색, 상품 상태, 재고 수량, 좋아요 |
-| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, 랭킹 조회, 상품 상세 순위 조합 |
+| `catalog.ranking` | `Ranking` | 상품 행동 이벤트 기반 일간 랭킹 read model, Batch 기반 주간/월간 랭킹 MV, 기간별 랭킹 조회, 상품 상세 순위 조합 |
 | `coupon` | `CouponTemplate`, `CouponIssueRequest`, `IssuedCoupon` | 쿠폰 템플릿 관리, 비동기 발급 요청, 실제 발급, 할인 계산, 사용과 복구 |
 | `ordering` | `Order`, `OrderLine`, 대기열 | 주문 생성, 주문 상태, 주문 항목 스냅샷, 주문 API 앞단 입장 제어 |
 | `payment` | `Payment`, `PaymentGateway` | 결제 요청, 결제 결과, 결제 실패/취소 처리 |
@@ -127,6 +127,25 @@ com.loopers
 | Redis key | 일간 랭킹은 `ranking:all:{yyyyMMdd}` Sorted Set에 저장하고 TTL은 2일이다. |
 | 점수 계산 | 조회 `+0.1`, 좋아요 `+0.2`, 좋아요 취소 `-0.2`, 주문 완료는 주문 항목별 `lineAmount * 0.6`을 누적한다. |
 | 멱등성 | Ranking consumer는 Redis Lua로 `ranking:handled:{ranking:{eventId}}` SETNX와 ZSET 점수 반영을 원자 처리해 동시 중복 소비의 점수 중복 누적을 막고, DB `event_handled`에는 `ranking:{eventId}`를 처리 이력으로 저장한다. |
+
+## 10주차 랭킹 Batch 기준
+
+10주차 구현은 `product_metrics` 일간 집계를 원천으로 주간/월간 TOP 100 랭킹 Materialized View를 생성한다.
+
+| 영역 | 처리 |
+| --- | --- |
+| 앱 경계 | Batch 구현은 기존 `apps/commerce-batch` 모듈에 두고 API/streamer 실행 책임과 분리한다. |
+| 패키지 | 랭킹 Batch 코드는 `com.loopers.batch.job.catalog.ranking` 하위에 둔다. |
+| Job | 단일 Job `productRankingAggregationJob`을 사용한다. |
+| JobParameter | `period=weekly|monthly`, `baseDate=yyyyMMdd`를 필수 파라미터로 받는다. |
+| 기간 계산 | `weekly`는 `baseDate`가 속한 주의 월요일부터 일요일, `monthly`는 해당 월의 1일부터 말일까지 집계한다. |
+| 실행 주기 | 이번 범위에서는 스케줄러를 추가하지 않고 외부 실행 시 JobParameter로 실행한다. |
+| Reader/Processor/Writer | `product_metrics`를 Chunk-Oriented 방식으로 읽고 상품별 점수를 계산한 뒤 MV 테이블에 쓴다. |
+| 점수 계산 | 기간 내 `view_count * 0.1 + like_count * 0.2 + sales_amount * 0.6` 합산 점수로 순위를 계산한다. |
+| MV 테이블 | 주간은 `mv_product_rank_weekly`, 월간은 `mv_product_rank_monthly`를 사용한다. |
+| MV 컬럼 | `period_start_date`, `period_end_date`, `rank`, `product_id`, `score`, 감사 컬럼을 저장한다. |
+| 재실행 정책 | 같은 기간 결과를 먼저 삭제한 뒤 TOP 100을 재적재해 중복 적재를 방지한다. |
+| API 조회 | `period=daily`는 Redis, `period=weekly/monthly`는 MV 테이블을 조회하고 기존 응답 DTO를 유지한다. |
 
 ## 외부 경계
 
