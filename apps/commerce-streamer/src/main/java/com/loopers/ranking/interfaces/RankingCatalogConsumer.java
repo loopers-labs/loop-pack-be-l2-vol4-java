@@ -55,6 +55,7 @@ public class RankingCatalogConsumer {
             switch (classification.verdict()) {
                 case IN_WINDOW -> events.add(new RankingEvent(classification.date(), message.productId(), signal, message.delta()));
                 case FUTURE -> deadLetterPublisher.publish(record, new IllegalStateException("ranking future occurredAt=" + message.occurredAt()));
+                case UNDATED -> deadLetterPublisher.publish(record, new IllegalStateException("ranking occurredAt 없음 productId=" + message.productId()));
                 case TOO_OLD -> log.warn("ranking drop reason=too_old productId={} occurredAt={}", message.productId(), message.occurredAt());
             }
         }

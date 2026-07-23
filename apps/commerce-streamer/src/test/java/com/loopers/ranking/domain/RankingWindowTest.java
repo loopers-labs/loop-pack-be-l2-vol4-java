@@ -44,4 +44,13 @@ class RankingWindowTest {
         var c = RankingWindow.classify(ZonedDateTime.of(2026, 7, 15, 12, 0, 0, 0, SEOUL), today);
         assertThat(c.verdict()).isEqualTo(Verdict.TOO_OLD);
     }
+
+    @DisplayName("발생시각이 없으면 UNDATED 로 판정한다 — 터지지 않고 값으로 돌려준다")
+    @Test
+    void givenNullOccurredAt_whenClassify_thenUndated() {
+        var c = RankingWindow.classify(null, today);
+
+        assertThat(c.verdict()).isEqualTo(Verdict.UNDATED);
+        assertThat(c.date()).isNull();
+    }
 }
