@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <configuration>
-    <springProfile name="local,local-dev,test">
+    <springProfile name="local,local-dev,test,docker">
         <include resource="appenders/plain-console-appender.xml"/>
         <logger name="com.loopers" level="DEBUG"/>
         <root level="INFO">

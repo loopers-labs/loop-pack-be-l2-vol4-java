@@ -1,0 +1,27 @@
+services:
+  product-ranking-batch:
+    image: ${BATCH_IMAGE:-loopers/commerce-batch:approved}
+    pull_policy: never
+    restart: "no"
+    profiles:
+      - batch
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JOB_NAME: productRankingAggregationJob
+      TZ: Asia/Seoul
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
+      MYSQL_PWD: ${MYSQL_PWD:?MYSQL_PWD is required}
+      DATASOURCE_MYSQL_JPA_MAIN_JDBC_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-loopers}
+      REDIS_MASTER_HOST: redis-master
+      REDIS_MASTER_PORT: "6379"
+      REDIS_REPLICA_1_HOST: redis-readonly
+      REDIS_REPLICA_1_PORT: "6379"
+    depends_on:
+      mysql:
+        condition: service_started
+      redis-master:
+        condition: service_healthy
+      redis-readonly:
+        condition: service_healthy
