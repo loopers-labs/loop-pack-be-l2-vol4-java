@@ -53,7 +53,8 @@ public class ProductMetricsConsumer {
                 for (JsonNode item : envelope.payload().get("items")) {
                     items.add(new ProductMetricsService.OrderItem(
                             item.get("productId").asLong(),
-                            item.get("quantity").asLong()
+                            item.get("quantity").asLong(),
+                            item.get("subtotal").asLong()
                     ));
                 }
                 productMetricsService.applyOrderPaid(envelope.eventId(), items);

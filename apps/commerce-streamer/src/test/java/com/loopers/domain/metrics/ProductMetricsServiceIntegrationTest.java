@@ -1,6 +1,7 @@
 package com.loopers.domain.metrics;
 
 import com.loopers.utils.DatabaseCleanUp;
+import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,8 +26,12 @@ class ProductMetricsServiceIntegrationTest {
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
 
+    @Autowired
+    private RedisCleanUp redisCleanUp;
+
     @AfterEach
     void tearDown() {
+        redisCleanUp.truncateAll();
         databaseCleanUp.truncateAllTables();
     }
 
@@ -62,8 +67,8 @@ class ProductMetricsServiceIntegrationTest {
     @Test
     void aggregatesSalesPerItem() {
         productMetricsService.applyOrderPaid("evt-o1", List.of(
-                new ProductMetricsService.OrderItem(100L, 2L),
-                new ProductMetricsService.OrderItem(200L, 3L)
+                new ProductMetricsService.OrderItem(100L, 2L, 20000L),
+                new ProductMetricsService.OrderItem(200L, 3L, 30000L)
         ));
 
         assertThat(productMetricsRepository.find(100L).orElseThrow().getSalesCount()).isEqualTo(2L);

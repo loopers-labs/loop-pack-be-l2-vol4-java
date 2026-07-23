@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductSummaryInfo;
+import com.loopers.application.ranking.RankingFacade;
 import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.product.ProductStatus;
 import com.loopers.interfaces.api.ApiResponse;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductV1Controller {
 
     private final ProductFacade productFacade;
+    private final RankingFacade rankingFacade;
 
     @GetMapping
     public ApiResponse<Page<ProductV1Dto.ProductSummaryResponse>> getProducts(
@@ -41,7 +43,8 @@ public class ProductV1Controller {
     ) {
         ProductDetailInfo info = productFacade.getProductDetail(productId);
         productFacade.recordView(productId, null);
-        ProductV1Dto.ProductDetailResponse response = ProductV1Dto.ProductDetailResponse.from(info);
+        Long rank = rankingFacade.getRank(productId);
+        ProductV1Dto.ProductDetailResponse response = ProductV1Dto.ProductDetailResponse.from(info, rank);
         return ApiResponse.success(response);
     }
 }

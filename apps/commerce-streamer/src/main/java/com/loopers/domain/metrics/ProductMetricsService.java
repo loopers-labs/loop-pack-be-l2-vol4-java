@@ -1,5 +1,7 @@
 package com.loopers.domain.metrics;
 
+import com.loopers.config.RankingProperties;
+import com.loopers.domain.ranking.ProductRanking;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,8 @@ public class ProductMetricsService {
 
     private final ProductMetricsRepository productMetricsRepository;
     private final EventHandledRepository eventHandledRepository;
+    private final ProductRanking productRanking;
+    private final RankingProperties rankingProperties;
 
     @Transactional
     public void applyLike(String eventId, Long productId, long delta) {
@@ -30,6 +34,7 @@ public class ProductMetricsService {
                 .orElseGet(() -> ProductMetricsModel.of(productId));
         metrics.addLike(delta);
         productMetricsRepository.save(metrics);
+        productRanking.addScore(productId, delta * rankingProperties.weight().like());
     }
 
     @Transactional
@@ -41,6 +46,7 @@ public class ProductMetricsService {
                 .orElseGet(() -> ProductMetricsModel.of(productId));
         metrics.addView();
         productMetricsRepository.save(metrics);
+        productRanking.addScore(productId, rankingProperties.weight().view());
     }
 
     @Transactional
@@ -53,6 +59,8 @@ public class ProductMetricsService {
                     .orElseGet(() -> ProductMetricsModel.of(item.productId()));
             metrics.addSales(item.quantity());
             productMetricsRepository.save(metrics);
+            // 인기 = 수요 + 구매 금액. 매출(subtotal)을 log10 으로 압축해 고가품 1건이 랭킹을 지배하지 못하게 한다
+            productRanking.addScore(item.productId(), rankingProperties.weight().order() * Math.log10(1 + item.subtotal()));
         }
     }
 
@@ -65,5 +73,5 @@ public class ProductMetricsService {
         return false;
     }
 
-    public record OrderItem(Long productId, long quantity) {}
+    public record OrderItem(Long productId, long quantity, long subtotal) {}
 }
