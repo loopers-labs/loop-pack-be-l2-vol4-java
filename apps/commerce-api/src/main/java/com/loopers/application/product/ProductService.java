@@ -85,6 +85,33 @@ public class ProductService {
         });
     }
 
+    /**
+     * ID 목록으로 활성 상품 정보를 일괄 조회한다 (랭킹 페이지의 상품정보 Aggregation 용도).
+     * 결과 순서는 보장하지 않으며, 삭제된 상품은 결과에서 빠진다 — 호출자가 원하는 순서로 재조립한다.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductInfo> getAllByIds(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<ProductModel> products = productRepository.findAllActiveByIds(ids);
+
+        List<Long> foundIds = products.stream()
+            .map(ProductModel::getId)
+            .toList();
+        Map<Long, StockModel> stockByProductId = stockRepository.findAllByProductIds(foundIds)
+            .stream()
+            .collect(Collectors.toMap(s -> s.getProduct().getId(), s -> s));
+
+        return products.stream()
+            .map(product -> {
+                StockModel stock = Optional.ofNullable(stockByProductId.get(product.getId()))
+                    .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "재고 정보를 찾을 수 없습니다."));
+                return ProductInfo.from(productDomainService.assembleDetail(product, stock));
+            })
+            .toList();
+    }
+
     @Caching(evict = {
         @CacheEvict(value = CacheConfig.PRODUCT_DETAIL, key = "#id"),
         @CacheEvict(value = CacheConfig.PRODUCT_LIST,   allEntries = true)

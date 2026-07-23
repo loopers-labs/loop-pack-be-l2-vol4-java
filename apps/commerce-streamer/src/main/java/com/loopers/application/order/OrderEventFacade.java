@@ -2,6 +2,7 @@ package com.loopers.application.order;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
@@ -24,6 +25,7 @@ public class OrderEventFacade {
 
     private final EventHandledRepository eventHandledRepository;
     private final ProductMetricsRepository productMetricsRepository;
+    private final RankingScoreUpdater rankingScoreUpdater;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -48,6 +50,7 @@ public class OrderEventFacade {
             ProductMetricsModel metrics = productMetricsRepository.findByProductId(item.productId())
                 .orElseGet(() -> productMetricsRepository.save(new ProductMetricsModel(item.productId())));
             metrics.incrementSalesCount(item.quantity());
+            rankingScoreUpdater.onOrderPaid(item.productId(), item.price(), item.quantity());
         }
     }
 

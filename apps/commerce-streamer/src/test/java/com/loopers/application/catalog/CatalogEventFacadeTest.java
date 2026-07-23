@@ -1,6 +1,7 @@
 package com.loopers.application.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
@@ -30,6 +31,7 @@ class CatalogEventFacadeTest {
 
     @Mock private EventHandledRepository eventHandledRepository;
     @Mock private ProductMetricsRepository productMetricsRepository;
+    @Mock private RankingScoreUpdater rankingScoreUpdater;
 
     private static final String EVENT_ID = "event-1";
     private static final Long USER_ID = 1L;
@@ -37,7 +39,7 @@ class CatalogEventFacadeTest {
 
     @BeforeEach
     void setUp() {
-        facade = new CatalogEventFacade(eventHandledRepository, productMetricsRepository, new ObjectMapper());
+        facade = new CatalogEventFacade(eventHandledRepository, productMetricsRepository, rankingScoreUpdater, new ObjectMapper());
     }
 
     private String toJson(String eventId, String eventType, Long userId, Long productId) {
@@ -72,6 +74,7 @@ class CatalogEventFacadeTest {
             ArgumentCaptor<EventHandledModel> handledCaptor = ArgumentCaptor.forClass(EventHandledModel.class);
             then(eventHandledRepository).should().save(handledCaptor.capture());
             assertThat(handledCaptor.getValue().getEventId()).isEqualTo(EVENT_ID);
+            then(rankingScoreUpdater).should().onProductLiked(PRODUCT_ID);
         }
 
         @DisplayName("기존 product_metrics가 있는 상태에서 PRODUCT_LIKED 수신 시 likeCount가 1 증가한다.")
@@ -92,7 +95,7 @@ class CatalogEventFacadeTest {
             then(productMetricsRepository).should(never()).save(any());
         }
 
-        @DisplayName("PRODUCT_UNLIKED 수신 시 likeCount가 1 감소한다.")
+        @DisplayName("PRODUCT_UNLIKED 수신 시 likeCount가 1 감소하고 랭킹 감점이 반영된다.")
         @Test
         void decrementsLikeCount_whenUnliked() {
             // arrange
@@ -108,6 +111,7 @@ class CatalogEventFacadeTest {
 
             // assert
             assertThat(existing.getLikeCount()).isEqualTo(1);
+            then(rankingScoreUpdater).should().onProductUnliked(PRODUCT_ID);
         }
 
         @DisplayName("PRODUCT_VIEWED 수신 시 viewCount가 1 증가한다 (userId 없이도 처리된다).")
@@ -124,9 +128,10 @@ class CatalogEventFacadeTest {
 
             // assert
             assertThat(existing.getViewCount()).isEqualTo(1);
+            then(rankingScoreUpdater).should().onProductViewed(PRODUCT_ID);
         }
 
-        @DisplayName("이미 처리된 eventId면 집계 반영 없이 멱등하게 무시한다.")
+        @DisplayName("이미 처리된 eventId면 집계·랭킹 반영 없이 멱등하게 무시한다.")
         @Test
         void skipsProcessing_whenEventAlreadyHandled() {
             // arrange
@@ -139,6 +144,7 @@ class CatalogEventFacadeTest {
             // assert
             then(productMetricsRepository).should(never()).findByProductId(any());
             then(eventHandledRepository).should(never()).save(any());
+            then(rankingScoreUpdater).shouldHaveNoInteractions();
         }
 
         @DisplayName("지원하지 않는 eventType이면 IllegalArgumentException이 발생한다.")

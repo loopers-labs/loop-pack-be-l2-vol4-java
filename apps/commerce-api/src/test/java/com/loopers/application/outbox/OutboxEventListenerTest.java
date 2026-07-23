@@ -132,15 +132,15 @@ class OutboxEventListenerTest {
     @Nested
     class OnPaymentCompleted {
 
-        @DisplayName("order-events 토픽, orderId를 key로 하는 outbox 레코드가 상품별 수량과 함께 저장된다.")
+        @DisplayName("order-events 토픽, orderId를 key로 하는 outbox 레코드가 상품별 수량·단가와 함께 저장된다.")
         @Test
         void savesOutboxEvent_withOrderTopicAndItems() {
             // arrange
             ArgumentCaptor<OutboxEventModel> captor = ArgumentCaptor.forClass(OutboxEventModel.class);
             given(outboxEventRepository.save(captor.capture())).willReturn(null);
             List<PaymentCompletedEvent.Item> items = List.of(
-                new PaymentCompletedEvent.Item(PRODUCT_ID, 2),
-                new PaymentCompletedEvent.Item(PRODUCT_ID + 1, 1)
+                new PaymentCompletedEvent.Item(PRODUCT_ID, 2, 5_000),
+                new PaymentCompletedEvent.Item(PRODUCT_ID + 1, 1, 3_000)
             );
 
             // act
@@ -153,8 +153,8 @@ class OutboxEventListenerTest {
             assertThat(saved.getPayload())
                 .contains("\"eventType\":\"ORDER_PAID\"")
                 .contains("\"orderId\":" + ORDER_ID)
-                .contains("\"productId\":" + PRODUCT_ID + ",\"quantity\":2")
-                .contains("\"productId\":" + (PRODUCT_ID + 1) + ",\"quantity\":1");
+                .contains("\"productId\":" + PRODUCT_ID + ",\"quantity\":2,\"price\":5000")
+                .contains("\"productId\":" + (PRODUCT_ID + 1) + ",\"quantity\":1,\"price\":3000");
         }
     }
 

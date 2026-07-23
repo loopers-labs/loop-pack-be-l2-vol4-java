@@ -177,7 +177,7 @@ public class PaymentFacade {
         order.confirm();
 
         List<PaymentCompletedEvent.Item> items = order.getItems().stream()
-            .map(item -> new PaymentCompletedEvent.Item(item.getProductId(), item.getQuantity()))
+            .map(item -> new PaymentCompletedEvent.Item(item.getProductId(), item.getQuantity(), item.getUnitPrice()))
             .toList();
         eventPublisher.publishEvent(
             new PaymentCompletedEvent(payment.getId(), payment.getOrderId(), payment.getUserId(), items));

@@ -1,6 +1,7 @@
 package com.loopers.application.order;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
@@ -32,6 +33,7 @@ class OrderEventFacadeTest {
 
     @Mock private EventHandledRepository eventHandledRepository;
     @Mock private ProductMetricsRepository productMetricsRepository;
+    @Mock private RankingScoreUpdater rankingScoreUpdater;
 
     private static final String EVENT_ID = "order-event-1";
     private static final Long USER_ID = 1L;
@@ -40,7 +42,7 @@ class OrderEventFacadeTest {
 
     @BeforeEach
     void setUp() {
-        facade = new OrderEventFacade(eventHandledRepository, productMetricsRepository, new ObjectMapper());
+        facade = new OrderEventFacade(eventHandledRepository, productMetricsRepository, rankingScoreUpdater, new ObjectMapper());
     }
 
     private String toJson(String eventId, String eventType, Long orderId, Long userId, List<OrderEventPayload.Item> items) {
@@ -55,13 +57,13 @@ class OrderEventFacadeTest {
     @Nested
     class Handle {
 
-        @DisplayName("ORDER_PAID 수신 시 상품별 수량만큼 salesCount가 증가한다 (신규 상품 포함).")
+        @DisplayName("ORDER_PAID 수신 시 상품별 수량만큼 salesCount가 증가하고, 단가·수량 기반 랭킹 반영이 호출된다 (신규 상품 포함).")
         @Test
         void incrementsSalesCountPerItem_whenOrderPaid() {
             // arrange
             List<OrderEventPayload.Item> items = List.of(
-                new OrderEventPayload.Item(PRODUCT_ID, 2),
-                new OrderEventPayload.Item(PRODUCT_ID + 1, 3)
+                new OrderEventPayload.Item(PRODUCT_ID, 2, 5_000),
+                new OrderEventPayload.Item(PRODUCT_ID + 1, 3, 10_000)
             );
             String payload = toJson(EVENT_ID, OrderEventPayload.ORDER_PAID, ORDER_ID, USER_ID, items);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
@@ -82,6 +84,9 @@ class OrderEventFacadeTest {
             ArgumentCaptor<EventHandledModel> handledCaptor = ArgumentCaptor.forClass(EventHandledModel.class);
             then(eventHandledRepository).should().save(handledCaptor.capture());
             assertThat(handledCaptor.getValue().getEventId()).isEqualTo(EVENT_ID);
+
+            then(rankingScoreUpdater).should().onOrderPaid(PRODUCT_ID, 5_000, 2);
+            then(rankingScoreUpdater).should().onOrderPaid(PRODUCT_ID + 1, 10_000, 3);
         }
 
         @DisplayName("기존 product_metrics가 있는 상품은 salesCount가 기존 값에 수량만큼 더해진다.")
@@ -90,7 +95,7 @@ class OrderEventFacadeTest {
             // arrange
             ProductMetricsModel existing = new ProductMetricsModel(PRODUCT_ID);
             existing.incrementSalesCount(5);
-            List<OrderEventPayload.Item> items = List.of(new OrderEventPayload.Item(PRODUCT_ID, 2));
+            List<OrderEventPayload.Item> items = List.of(new OrderEventPayload.Item(PRODUCT_ID, 2, 5_000));
             String payload = toJson(EVENT_ID, OrderEventPayload.ORDER_PAID, ORDER_ID, USER_ID, items);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
             given(productMetricsRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(existing));
@@ -103,11 +108,11 @@ class OrderEventFacadeTest {
             then(productMetricsRepository).should(never()).save(any());
         }
 
-        @DisplayName("이미 처리된 eventId면 집계 반영 없이 멱등하게 무시한다.")
+        @DisplayName("이미 처리된 eventId면 집계·랭킹 반영 없이 멱등하게 무시한다.")
         @Test
         void skipsProcessing_whenEventAlreadyHandled() {
             // arrange
-            List<OrderEventPayload.Item> items = List.of(new OrderEventPayload.Item(PRODUCT_ID, 1));
+            List<OrderEventPayload.Item> items = List.of(new OrderEventPayload.Item(PRODUCT_ID, 1, 5_000));
             String payload = toJson(EVENT_ID, OrderEventPayload.ORDER_PAID, ORDER_ID, USER_ID, items);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(true);
 
@@ -117,6 +122,7 @@ class OrderEventFacadeTest {
             // assert
             then(productMetricsRepository).should(never()).findByProductId(any());
             then(eventHandledRepository).should(never()).save(any());
+            then(rankingScoreUpdater).shouldHaveNoInteractions();
         }
 
         @DisplayName("지원하지 않는 eventType이면 IllegalArgumentException이 발생한다.")

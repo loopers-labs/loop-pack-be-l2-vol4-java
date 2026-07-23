@@ -49,7 +49,7 @@ public class OutboxEventListener {
     @EventListener
     public void on(PaymentCompletedEvent event) {
         List<OrderEventPayload.Item> items = event.items().stream()
-            .map(item -> new OrderEventPayload.Item(item.productId(), item.quantity()))
+            .map(item -> new OrderEventPayload.Item(item.productId(), item.quantity(), item.unitPrice()))
             .toList();
 
         String eventId = UUID.randomUUID().toString();

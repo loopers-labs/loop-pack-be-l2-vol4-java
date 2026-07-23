@@ -1,0 +1,32 @@
+### 랭킹 Page 조회 (오늘, 기본 20개)
+GET {{commerce-api}}/api/v1/rankings
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 랭킹 Page 조회 (날짜 지정 — 전일 랭킹, TTL 2일 이내)
+GET {{commerce-api}}/api/v1/rankings?date=20260714&size=20&page=1
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 랭킹 Page 조회 (페이지네이션)
+GET {{commerce-api}}/api/v1/rankings?size=10&page=2
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 랭킹 Page 조회 — 잘못된 date 형식 (400)
+GET {{commerce-api}}/api/v1/rankings?date=2026-07-14
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!
+
+---
+
+### 상품 상세 조회 — 오늘 랭킹 순위(rank) 포함, 순위에 없으면 null
+GET {{commerce-api}}/api/v1/products/1
+X-Loopers-LoginId: user123
+X-Loopers-LoginPw: Password1!

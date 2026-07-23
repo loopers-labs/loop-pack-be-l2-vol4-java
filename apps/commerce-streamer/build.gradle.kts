@@ -20,4 +20,7 @@ dependencies {
     testImplementation(testFixtures(project(":modules:jpa")))
     testImplementation(testFixtures(project(":modules:redis")))
     testImplementation(testFixtures(project(":modules:kafka")))
+
+    // E2E — 실제 Kafka 브로커 컨테이너로 발행→컨슘 파이프라인 검증
+    testImplementation("org.testcontainers:kafka")
 }

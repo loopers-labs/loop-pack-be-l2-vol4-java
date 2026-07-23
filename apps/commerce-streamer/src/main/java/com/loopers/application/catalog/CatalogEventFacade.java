@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
+import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
 import com.loopers.domain.productmetrics.ProductMetricsRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class CatalogEventFacade {
 
     private final EventHandledRepository eventHandledRepository;
     private final ProductMetricsRepository productMetricsRepository;
+    private final RankingScoreUpdater rankingScoreUpdater;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -41,9 +43,18 @@ public class CatalogEventFacade {
             .orElseGet(() -> productMetricsRepository.save(new ProductMetricsModel(payload.productId())));
 
         switch (payload.eventType()) {
-            case CatalogEventPayload.PRODUCT_LIKED -> metrics.incrementLikeCount();
-            case CatalogEventPayload.PRODUCT_UNLIKED -> metrics.decrementLikeCount();
-            case CatalogEventPayload.PRODUCT_VIEWED -> metrics.incrementViewCount();
+            case CatalogEventPayload.PRODUCT_LIKED -> {
+                metrics.incrementLikeCount();
+                rankingScoreUpdater.onProductLiked(payload.productId());
+            }
+            case CatalogEventPayload.PRODUCT_UNLIKED -> {
+                metrics.decrementLikeCount();
+                rankingScoreUpdater.onProductUnliked(payload.productId());
+            }
+            case CatalogEventPayload.PRODUCT_VIEWED -> {
+                metrics.incrementViewCount();
+                rankingScoreUpdater.onProductViewed(payload.productId());
+            }
             default -> throw new IllegalArgumentException("지원하지 않는 catalog 이벤트 타입입니다: " + payload.eventType());
         }
 

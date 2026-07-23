@@ -245,7 +245,7 @@ class PaymentFacadeTest {
         }
 
         @Test
-        @DisplayName("주문에 상품이 포함된 경우 PaymentCompletedEvent에 상품별 수량이 함께 전달된다.")
+        @DisplayName("주문에 상품이 포함된 경우 PaymentCompletedEvent에 상품별 수량·단가가 함께 전달된다.")
         void publishesEventWithItems_whenOrderHasItems() {
             // arrange
             PaymentModel payment = createPaymentWithStatus(PaymentStatus.IN_PROGRESS);
@@ -261,7 +261,7 @@ class PaymentFacadeTest {
 
             // assert
             then(eventPublisher).should().publishEvent(new PaymentCompletedEvent(PAYMENT_ID, ORDER_ID, USER_ID,
-                List.of(new PaymentCompletedEvent.Item(1L, 2), new PaymentCompletedEvent.Item(2L, 1))));
+                List.of(new PaymentCompletedEvent.Item(1L, 2, 5_000), new PaymentCompletedEvent.Item(2L, 1, 3_000))));
         }
 
         @Test
