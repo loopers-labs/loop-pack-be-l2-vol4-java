@@ -2,9 +2,12 @@ package com.loopers.ranking.application;
 
 import com.loopers.product.domain.ProductModel;
 import com.loopers.product.domain.ProductRepository;
+import com.loopers.ranking.domain.RankPeriod;
 import com.loopers.ranking.domain.RankedEntry;
 import com.loopers.ranking.domain.RankingKey;
 import com.loopers.ranking.domain.RankingRepository;
+import com.loopers.ranking.infrastructure.MonthlyProductRankJpaRepository;
+import com.loopers.ranking.infrastructure.WeeklyProductRankJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,7 +33,12 @@ class RankingFacadeTest {
     void setUp() {
         rankingRepository = mock(RankingRepository.class);
         productRepository = mock(ProductRepository.class);
-        rankingFacade = new RankingFacade(rankingRepository, productRepository);
+        rankingFacade = new RankingFacade(
+            rankingRepository,
+            productRepository,
+            mock(WeeklyProductRankJpaRepository.class),
+            mock(MonthlyProductRankJpaRepository.class)
+        );
     }
 
     private ProductModel product(Long id, String name, Long price) {
@@ -60,7 +68,7 @@ class RankingFacadeTest {
             when(productRepository.findAllByIds(List.of(10L, 20L))).thenReturn(List.of(p10, p20));
 
             // act
-            List<RankingInfo> result = rankingFacade.getRankings(date, 1, 20);
+            List<RankingInfo> result = rankingFacade.getRankings(RankPeriod.DAILY, date, 1, 20);
 
             // assert
             assertThat(result).hasSize(2);
@@ -86,7 +94,7 @@ class RankingFacadeTest {
             when(productRepository.findAllByIds(List.of(30L))).thenReturn(List.of(p30));
 
             // act
-            List<RankingInfo> result = rankingFacade.getRankings(date, 2, 20);
+            List<RankingInfo> result = rankingFacade.getRankings(RankPeriod.DAILY, date, 2, 20);
 
             // assert
             assertThat(result).hasSize(1);
@@ -102,7 +110,7 @@ class RankingFacadeTest {
             when(rankingRepository.findPage(RankingKey.daily(date), 0, 20)).thenReturn(List.of());
 
             // act
-            List<RankingInfo> result = rankingFacade.getRankings(date, 1, 20);
+            List<RankingInfo> result = rankingFacade.getRankings(RankPeriod.DAILY, date, 1, 20);
 
             // assert
             assertThat(result).isEmpty();

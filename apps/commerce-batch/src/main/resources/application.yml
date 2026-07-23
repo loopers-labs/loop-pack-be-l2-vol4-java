@@ -22,6 +22,13 @@ management:
     defaults:
       enabled: false
 
+# 랭킹 점수 가중치 (streamer와 동일 키 — 카운트 기반 집계에 사용)
+ranking:
+  weight:
+    view: 0.1
+    like: 0.2
+    order: 0.6
+
 ---
 spring:
   config:
