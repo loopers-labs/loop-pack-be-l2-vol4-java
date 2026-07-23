@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.ranking;
 
 import com.loopers.application.ranking.RankingFacade;
 import com.loopers.application.ranking.RankingItemInfo;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,12 +25,13 @@ public class RankingV1Controller {
 
     @GetMapping
     public ApiResponse<Page<RankingV1Dto.RankingItemResponse>> getRankings(
+            @RequestParam(value = "period", required = false, defaultValue = "DAILY") final RankingPeriod period,
             @RequestParam(value = "date", required = false)
             @DateTimeFormat(pattern = "yyyyMMdd") final LocalDate date,
             @PageableDefault(size = 20) final Pageable pageable
     ) {
         LocalDate targetDate = date != null ? date : LocalDate.now();
-        Page<RankingItemInfo> infos = rankingFacade.getRankings(targetDate, pageable);
+        Page<RankingItemInfo> infos = rankingFacade.getRankings(period, targetDate, pageable);
         Page<RankingV1Dto.RankingItemResponse> response = infos.map(RankingV1Dto.RankingItemResponse::from);
         return ApiResponse.success(response);
     }

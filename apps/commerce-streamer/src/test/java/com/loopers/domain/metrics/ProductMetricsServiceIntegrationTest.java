@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,7 +61,7 @@ class ProductMetricsServiceIntegrationTest {
         productMetricsService.applyView("evt-v1", 100L);
         productMetricsService.applyView("evt-v2", 100L);
 
-        assertThat(productMetricsRepository.find(100L).orElseThrow().getViewCount()).isEqualTo(2L);
+        assertThat(productMetricsRepository.find(100L, LocalDate.now()).orElseThrow().getViewCount()).isEqualTo(2L);
     }
 
     @DisplayName("주문 결제 이벤트의 각 품목 수량만큼 판매 수를 누적한다.")
@@ -71,8 +72,27 @@ class ProductMetricsServiceIntegrationTest {
                 new ProductMetricsService.OrderItem(200L, 3L, 30000L)
         ));
 
-        assertThat(productMetricsRepository.find(100L).orElseThrow().getSalesCount()).isEqualTo(2L);
-        assertThat(productMetricsRepository.find(200L).orElseThrow().getSalesCount()).isEqualTo(3L);
+        assertThat(productMetricsRepository.find(100L, LocalDate.now()).orElseThrow().getSalesCount()).isEqualTo(2L);
+        assertThat(productMetricsRepository.find(200L, LocalDate.now()).orElseThrow().getSalesCount()).isEqualTo(3L);
+    }
+
+    @DisplayName("같은 상품이라도 날짜가 다르면 별도의 일별 행으로 집계된다.")
+    @Test
+    void separatesRowsByMetricDate() {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        ProductMetricsModel todayRow = ProductMetricsModel.of(100L, today);
+        todayRow.addView();
+        productMetricsRepository.save(todayRow);
+
+        ProductMetricsModel yesterdayRow = ProductMetricsModel.of(100L, yesterday);
+        yesterdayRow.addView();
+        yesterdayRow.addView();
+        productMetricsRepository.save(yesterdayRow);
+
+        assertThat(productMetricsRepository.find(100L, today).orElseThrow().getViewCount()).isEqualTo(1L);
+        assertThat(productMetricsRepository.find(100L, yesterday).orElseThrow().getViewCount()).isEqualTo(2L);
     }
 
     @DisplayName("좋아요 수는 음수가 되지 않는다.")
@@ -84,6 +104,6 @@ class ProductMetricsServiceIntegrationTest {
     }
 
     private long productMetricsService_likeCount(Long productId) {
-        return productMetricsRepository.find(productId).orElseThrow().getLikeCount();
+        return productMetricsRepository.find(productId, LocalDate.now()).orElseThrow().getLikeCount();
     }
 }

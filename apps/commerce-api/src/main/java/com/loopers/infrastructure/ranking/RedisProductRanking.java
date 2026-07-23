@@ -2,12 +2,12 @@ package com.loopers.infrastructure.ranking;
 
 import com.loopers.domain.ranking.ProductRanking;
 import com.loopers.domain.ranking.RankedProduct;
+import com.loopers.domain.ranking.RankingPeriod;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,7 +17,6 @@ import java.util.Set;
 public class RedisProductRanking implements ProductRanking {  // 랭킹 조회 포트의 Redis Sorted Set 어댑터. 근사 지표라 replica 허용(default 템플릿)으로 읽기 오프로드
 
     static final String KEY_PREFIX = "ranking:all:";
-    private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd
 
     private final RedisTemplate<String, String> redisTemplate;
 
@@ -56,6 +55,6 @@ public class RedisProductRanking implements ProductRanking {  // 랭킹 조회 �
     }
 
     static String keyOf(LocalDate date) {
-        return KEY_PREFIX + date.format(YYYYMMDD);
+        return KEY_PREFIX + RankingPeriod.DAILY.periodKey(date);  // 일별 버킷 키(yyyyMMdd) 규칙은 RankingPeriod 가 단일 출처
     }
 }
