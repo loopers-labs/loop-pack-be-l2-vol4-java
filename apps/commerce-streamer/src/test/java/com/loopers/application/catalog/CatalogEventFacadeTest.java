@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
+import com.loopers.domain.productmetrics.ProductMetricsDailyModel;
+import com.loopers.domain.productmetrics.ProductMetricsDailyRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
 import com.loopers.domain.productmetrics.ProductMetricsRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +34,7 @@ class CatalogEventFacadeTest {
 
     @Mock private EventHandledRepository eventHandledRepository;
     @Mock private ProductMetricsRepository productMetricsRepository;
+    @Mock private ProductMetricsDailyRepository productMetricsDailyRepository;
     @Mock private RankingScoreUpdater rankingScoreUpdater;
 
     private static final String EVENT_ID = "event-1";
@@ -39,7 +43,7 @@ class CatalogEventFacadeTest {
 
     @BeforeEach
     void setUp() {
-        facade = new CatalogEventFacade(eventHandledRepository, productMetricsRepository, rankingScoreUpdater, new ObjectMapper());
+        facade = new CatalogEventFacade(eventHandledRepository, productMetricsRepository, productMetricsDailyRepository, rankingScoreUpdater, new ObjectMapper());
     }
 
     private String toJson(String eventId, String eventType, Long userId, Long productId) {
@@ -62,6 +66,8 @@ class CatalogEventFacadeTest {
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
             given(productMetricsRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.empty());
             given(productMetricsRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+            given(productMetricsDailyRepository.findByProductIdAndMetricDate(any(), any())).willReturn(Optional.empty());
+            given(productMetricsDailyRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
             // act
             facade.handle(payload);
@@ -70,6 +76,13 @@ class CatalogEventFacadeTest {
             ArgumentCaptor<ProductMetricsModel> metricsCaptor = ArgumentCaptor.forClass(ProductMetricsModel.class);
             then(productMetricsRepository).should().save(metricsCaptor.capture());
             assertThat(metricsCaptor.getValue().getLikeCount()).isEqualTo(1);
+
+            // 일간 롤업도 오늘 날짜로 생성되고 likeCount가 1 증가한다.
+            ArgumentCaptor<ProductMetricsDailyModel> dailyCaptor = ArgumentCaptor.forClass(ProductMetricsDailyModel.class);
+            then(productMetricsDailyRepository).should().save(dailyCaptor.capture());
+            assertThat(dailyCaptor.getValue().getLikeCount()).isEqualTo(1);
+            assertThat(dailyCaptor.getValue().getMetricDate()).isEqualTo(LocalDate.now());
+            assertThat(dailyCaptor.getValue().getProductId()).isEqualTo(PRODUCT_ID);
 
             ArgumentCaptor<EventHandledModel> handledCaptor = ArgumentCaptor.forClass(EventHandledModel.class);
             then(eventHandledRepository).should().save(handledCaptor.capture());
@@ -83,16 +96,21 @@ class CatalogEventFacadeTest {
             // arrange
             ProductMetricsModel existing = new ProductMetricsModel(PRODUCT_ID);
             existing.incrementLikeCount(); // 기존 likeCount = 1
+            ProductMetricsDailyModel existingDaily = new ProductMetricsDailyModel(PRODUCT_ID, LocalDate.now());
+            existingDaily.incrementLikeCount(); // 오늘 일간 likeCount = 1
             String payload = toJson(EVENT_ID, CatalogEventPayload.PRODUCT_LIKED, USER_ID, PRODUCT_ID);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
             given(productMetricsRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(existing));
+            given(productMetricsDailyRepository.findByProductIdAndMetricDate(any(), any())).willReturn(Optional.of(existingDaily));
 
             // act
             facade.handle(payload);
 
             // assert
             assertThat(existing.getLikeCount()).isEqualTo(2);
+            assertThat(existingDaily.getLikeCount()).isEqualTo(2);
             then(productMetricsRepository).should(never()).save(any());
+            then(productMetricsDailyRepository).should(never()).save(any());
         }
 
         @DisplayName("PRODUCT_UNLIKED 수신 시 likeCount가 1 감소하고 랭킹 감점이 반영된다.")
@@ -102,15 +120,20 @@ class CatalogEventFacadeTest {
             ProductMetricsModel existing = new ProductMetricsModel(PRODUCT_ID);
             existing.incrementLikeCount();
             existing.incrementLikeCount(); // likeCount = 2
+            ProductMetricsDailyModel existingDaily = new ProductMetricsDailyModel(PRODUCT_ID, LocalDate.now());
+            existingDaily.incrementLikeCount();
+            existingDaily.incrementLikeCount(); // 오늘 일간 likeCount = 2
             String payload = toJson(EVENT_ID, CatalogEventPayload.PRODUCT_UNLIKED, USER_ID, PRODUCT_ID);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
             given(productMetricsRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(existing));
+            given(productMetricsDailyRepository.findByProductIdAndMetricDate(any(), any())).willReturn(Optional.of(existingDaily));
 
             // act
             facade.handle(payload);
 
             // assert
             assertThat(existing.getLikeCount()).isEqualTo(1);
+            assertThat(existingDaily.getLikeCount()).isEqualTo(1);
             then(rankingScoreUpdater).should().onProductUnliked(PRODUCT_ID);
         }
 
@@ -119,15 +142,18 @@ class CatalogEventFacadeTest {
         void incrementsViewCount_whenViewed() {
             // arrange
             ProductMetricsModel existing = new ProductMetricsModel(PRODUCT_ID);
+            ProductMetricsDailyModel existingDaily = new ProductMetricsDailyModel(PRODUCT_ID, LocalDate.now());
             String payload = toJson(EVENT_ID, CatalogEventPayload.PRODUCT_VIEWED, null, PRODUCT_ID);
             given(eventHandledRepository.existsByEventId(EVENT_ID)).willReturn(false);
             given(productMetricsRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(existing));
+            given(productMetricsDailyRepository.findByProductIdAndMetricDate(any(), any())).willReturn(Optional.of(existingDaily));
 
             // act
             facade.handle(payload);
 
             // assert
             assertThat(existing.getViewCount()).isEqualTo(1);
+            assertThat(existingDaily.getViewCount()).isEqualTo(1);
             then(rankingScoreUpdater).should().onProductViewed(PRODUCT_ID);
         }
 

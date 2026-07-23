@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.ranking.RankingScoreUpdater;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
+import com.loopers.domain.productmetrics.ProductMetricsDailyModel;
+import com.loopers.domain.productmetrics.ProductMetricsDailyRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
 import com.loopers.domain.productmetrics.ProductMetricsRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -25,6 +28,7 @@ public class OrderEventFacade {
 
     private final EventHandledRepository eventHandledRepository;
     private final ProductMetricsRepository productMetricsRepository;
+    private final ProductMetricsDailyRepository productMetricsDailyRepository;
     private final RankingScoreUpdater rankingScoreUpdater;
     private final ObjectMapper objectMapper;
 
@@ -46,10 +50,16 @@ public class OrderEventFacade {
     }
 
     private void applySales(List<OrderEventPayload.Item> items) {
+        LocalDate today = LocalDate.now();
         for (OrderEventPayload.Item item : items) {
             ProductMetricsModel metrics = productMetricsRepository.findByProductId(item.productId())
                 .orElseGet(() -> productMetricsRepository.save(new ProductMetricsModel(item.productId())));
             metrics.incrementSalesCount(item.quantity());
+
+            ProductMetricsDailyModel daily = productMetricsDailyRepository.findByProductIdAndMetricDate(item.productId(), today)
+                .orElseGet(() -> productMetricsDailyRepository.save(new ProductMetricsDailyModel(item.productId(), today)));
+            daily.incrementSalesCount(item.quantity());
+
             rankingScoreUpdater.onOrderPaid(item.productId(), item.price(), item.quantity());
         }
     }

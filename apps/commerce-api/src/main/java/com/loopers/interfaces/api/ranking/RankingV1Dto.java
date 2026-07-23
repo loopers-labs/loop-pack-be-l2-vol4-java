@@ -9,6 +9,7 @@ import java.util.List;
 public class RankingV1Dto {
 
     public record RankingPageResponse(
+        String period,
         String date,
         int page,
         int size,
@@ -17,7 +18,9 @@ public class RankingV1Dto {
     ) {
         public static RankingPageResponse from(RankingPageInfo info) {
             return new RankingPageResponse(
-                info.date().format(DateTimeFormatter.BASIC_ISO_DATE),
+                info.period().name(),
+                // DAILY=대상 날짜, WEEKLY/MONTHLY=조회된 스냅샷의 period_end. 스냅샷이 없으면 null (NON_NULL 정책으로 생략)
+                info.date() == null ? null : info.date().format(DateTimeFormatter.BASIC_ISO_DATE),
                 info.page(),
                 info.size(),
                 info.totalCount(),

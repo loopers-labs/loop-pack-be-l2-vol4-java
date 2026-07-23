@@ -5,12 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.eventhandled.EventHandledModel;
 import com.loopers.domain.eventhandled.EventHandledRepository;
 import com.loopers.application.ranking.RankingScoreUpdater;
+import com.loopers.domain.productmetrics.ProductMetricsDailyModel;
+import com.loopers.domain.productmetrics.ProductMetricsDailyRepository;
 import com.loopers.domain.productmetrics.ProductMetricsModel;
 import com.loopers.domain.productmetrics.ProductMetricsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 
 /**
  * catalog-events 처리 — product_metrics 집계 반영 + event_handled 멱등 기록을 한 트랜잭션으로 묶는다.
@@ -27,6 +31,7 @@ public class CatalogEventFacade {
 
     private final EventHandledRepository eventHandledRepository;
     private final ProductMetricsRepository productMetricsRepository;
+    private final ProductMetricsDailyRepository productMetricsDailyRepository;
     private final RankingScoreUpdater rankingScoreUpdater;
     private final ObjectMapper objectMapper;
 
@@ -45,20 +50,30 @@ public class CatalogEventFacade {
         switch (payload.eventType()) {
             case CatalogEventPayload.PRODUCT_LIKED -> {
                 metrics.incrementLikeCount();
+                todayDailyMetrics(payload.productId()).incrementLikeCount();
                 rankingScoreUpdater.onProductLiked(payload.productId());
             }
             case CatalogEventPayload.PRODUCT_UNLIKED -> {
                 metrics.decrementLikeCount();
+                todayDailyMetrics(payload.productId()).decrementLikeCount();
                 rankingScoreUpdater.onProductUnliked(payload.productId());
             }
             case CatalogEventPayload.PRODUCT_VIEWED -> {
                 metrics.incrementViewCount();
+                todayDailyMetrics(payload.productId()).incrementViewCount();
                 rankingScoreUpdater.onProductViewed(payload.productId());
             }
             default -> throw new IllegalArgumentException("지원하지 않는 catalog 이벤트 타입입니다: " + payload.eventType());
         }
 
         eventHandledRepository.save(new EventHandledModel(payload.eventId()));
+    }
+
+    /** 오늘(처리일) 일간 롤업 행을 조회하거나, 없으면 생성한다 — 주간·월간 배치의 기간별 집계 원천. */
+    private ProductMetricsDailyModel todayDailyMetrics(Long productId) {
+        LocalDate today = LocalDate.now();
+        return productMetricsDailyRepository.findByProductIdAndMetricDate(productId, today)
+            .orElseGet(() -> productMetricsDailyRepository.save(new ProductMetricsDailyModel(productId, today)));
     }
 
     private CatalogEventPayload parse(String rawPayload) {
