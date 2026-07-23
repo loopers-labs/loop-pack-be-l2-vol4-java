@@ -1,0 +1,4 @@
+services:
+  product-ranking-batch:
+    cpus: "${PERF_CPUS:-2.0}"
+    mem_limit: "${PERF_MEMORY:-2g}"
