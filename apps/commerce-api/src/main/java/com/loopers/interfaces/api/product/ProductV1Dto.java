@@ -84,7 +84,9 @@ public class ProductV1Dto {
         Long likesCount,
         Long brandId,
         String brandName,
-        boolean liked
+        boolean liked,
+        Long rank,
+        Long rankYesterday
     ) {
         public static ProductDetailResponse from(ProductDetailInfo info) {
             return new ProductDetailResponse(
@@ -97,7 +99,9 @@ public class ProductV1Dto {
                 info.likesCount(),
                 info.brandId(),
                 info.brandName(),
-                info.liked()
+                info.liked(),
+                info.rank(),
+                info.rankYesterday()
             );
         }
     }

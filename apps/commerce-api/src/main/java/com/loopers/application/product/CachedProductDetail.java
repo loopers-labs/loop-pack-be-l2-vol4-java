@@ -32,8 +32,16 @@ public record CachedProductDetail(
         );
     }
 
-    /** 캐시된 사용자 무관 데이터에 사용자별 liked를 합쳐 최종 응답 DTO를 만든다. */
-    public ProductDetailInfo toInfo(boolean liked) {
-        return new ProductDetailInfo(id, name, description, imageUrl, price, inStock, likesCount, brandId, brandName, liked);
+    /**
+     * 캐시된 사용자 무관 데이터에 사용자별 liked + 실시간 rank(오늘 랭킹 순위, 없으면 null)를 합쳐 최종 응답 DTO를 만든다.
+     * rank는 캐시에 담지 않는다(실시간 값이라 매 조회 Facade가 조합).
+     */
+    // 원본 보존(week8 랭킹 rank 추가 전):
+    // public ProductDetailInfo toInfo(boolean liked) {
+    //     return new ProductDetailInfo(id, name, description, imageUrl, price, inStock, likesCount, brandId, brandName, liked);
+    // }
+    // week9 최초: toInfo(boolean liked, Long rank) — 오늘 순위만 덧붙였다. rankYesterday 는 추세 노출로 추가.
+    public ProductDetailInfo toInfo(boolean liked, Long rank, Long rankYesterday) {
+        return new ProductDetailInfo(id, name, description, imageUrl, price, inStock, likesCount, brandId, brandName, liked, rank, rankYesterday);
     }
 }

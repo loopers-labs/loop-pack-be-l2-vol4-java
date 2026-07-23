@@ -23,3 +23,11 @@ create index idx_pm_brand_active_likes_desc on product_metrics (brand_id, delete
 -- event_handled — 컨슈머 멱등 저장소. (consumer_group, event_id) 복합 PK 로 group 별 1회 처리 보장.
 -- JPA 엔티티가 아니라(commerce-streamer 가 JdbcTemplate 로 write) 직접 생성한다. (운영: docs/week7/migration_event_handled.sql)
 create table if not exists event_handled (consumer_group varchar(100) not null, event_id bigint not null, handled_at timestamp(3) not null, primary key (consumer_group, event_id));
+
+-- =============================================================================
+-- week9 실시간 랭킹
+-- =============================================================================
+-- ranking_daily_snapshot 의 페이지 조회 인덱스. 테이블 자체는 RankingSnapshotEntity 로 ddl-auto:create 가 만들고
+-- (PK = ranking_date, product_id), 여기서 "일자 + 순위순" 조회용 인덱스만 얹는다.
+-- PK 는 (ranking_date, product_id) 라 순위 정렬을 못 타므로 별도 인덱스가 필요하다. (운영: docs/week9/migration_ranking_snapshot.sql)
+create index idx_rds_date_rank on ranking_daily_snapshot (ranking_date, rank_no);

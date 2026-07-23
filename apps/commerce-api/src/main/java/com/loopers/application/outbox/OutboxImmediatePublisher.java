@@ -23,9 +23,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p><b>왜 AFTER_COMMIT + REQUIRES_NEW인가</b>: 커밋된 사실만 발행해야 유령 메시지가 없다(그래서
  * BEFORE_COMMIT에서 직접 send 하지 않는다 — 옛 at-most-once 방식을 되살리지 않는다). 커밋은 이미 끝났으므로
- * {@code markSent}는 신규 트랜잭션(REQUIRES_NEW)으로 남긴다. 즉시 발행과 릴레이가 같은 행을 동시에 보내도
- * 브로커 멱등(enable.idempotence)·소비자 멱등(event_handled)으로 중복이 흡수된다(낙관적 락 없음 → markSent는
- * last-write-wins라 충돌 없음).
+ * {@code markSent}는 신규 트랜잭션(REQUIRES_NEW)으로 남긴다(낙관적 락 없음 → markSent는 last-write-wins라
+ * 충돌 없음).
+ *
+ * <p><b>중복 발행은 실제로 일어난다</b>: 아래 PENDING 확인과 릴레이의 조회는 같은 행을 잠그지 않는 read-then-act
+ * 라, 커밋 직후 릴레이 폴링 주기가 겹치면 둘 다 PENDING을 보고 각자 발행한다. week9 E2E에서 13건 중 1건이 이렇게
+ * 두 번 실렸다(같은 eventId 레코드 2개). 흡수는 <b>오직 소비자 멱등(event_handled)</b>이 한다 — 카프카의
+ * {@code enable.idempotence}는 <b>한 프로듀서 세션 내 재시도</b>만 중복 제거하므로(PID+시퀀스 기준), 서로 다른
+ * 트랜잭션에서 나간 별개의 send() 두 번은 서로 다른 레코드로 그대로 적재된다. 따라서 이 토픽을 구독하는 컨슈머는
+ * 반드시 event_handled 로 멱등을 보장해야 한다(중복을 감수하겠다면 그 근거를 브로커 멱등에서 찾으면 안 된다).
  *
  * <p><b>왜 TransactionTemplate인가</b>: afterCommit 콜백에서 {@code @Transactional} 메서드를 자기호출하면
  * 프록시를 우회해 신규 트랜잭션이 생기지 않는다. 프로그래매틱 트랜잭션으로 이 함정을 피한다.
