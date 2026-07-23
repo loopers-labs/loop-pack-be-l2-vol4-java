@@ -35,6 +35,11 @@ public enum RankingPeriod {
         }
     };
 
+    /**
+     * MV 에 담는 개수. 과제 요구는 상위 100이지만 배치 이후 상품이 빠질 수 있어 여유분 50을 더 둔다.
+     */
+    public static final int RANK_LIMIT = 150;
+
     private final String tableName;
 
     RankingPeriod(String tableName) {
