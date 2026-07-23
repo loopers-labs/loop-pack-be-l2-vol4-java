@@ -162,9 +162,18 @@ WHERE period_key = '2026-W30' ORDER BY score DESC, product_id ASC LIMIT 20 OFFSE
 | WEEKLY | `<week-based-year>-'W'<ww>` | `2026-W30` | ISO 8601, 월요일 시작 |
 | MONTHLY | `yyyy-MM` | `2026-07` | KST 월 |
 
-**주 형식을 `DateTimeFormatter`의 `yyyy`로 만들면 안 된다.** `yyyy`는 달력 연도라 ISO 주 경계와 어긋난다 — 2025-12-29는 ISO로 `2026-W01`인데 `yyyy`는 `2025`를 준다. 연도는 `WeekFields.ISO.weekBasedYear()`, 주차는 `WeekFields.ISO.weekOfWeekBasedYear()`로 각각 뽑아 조립한다(`getYear()`/`getMonthValue()` 금지). 그 주의 날짜 범위(월~일) 계산도 같은 기준으로 한다.
+**주 형식을 `DateTimeFormatter`의 `yyyy`로 만들면 안 된다.** `yyyy`는 달력 연도라 ISO 주 경계와 어긋나는데, 어긋나는 방향이 **양쪽 다** 있다.
 
-경계 테스트로 고정한다 — 12월/1월을 걸치는 주, 두 달을 걸치는 주, 윤년 2월, 월의 1일/말일.
+| 날짜 | 올바른 키 | `getYear()` 사용 시 |
+| --- | --- | --- |
+| 2025-12-29 (월) | `2026-W01` | `2025-W01` — 해를 넘겨 **다음** 해 키여야 하는데 이전 해가 됨 |
+| 2027-01-03 (일) | `2026-W53` | `2027-W53` — 해를 넘겨 **이전** 해 키여야 하는데 다음 해가 됨 |
+
+연도는 `WeekFields.ISO.weekBasedYear()`, 주차는 `WeekFields.ISO.weekOfWeekBasedYear()`로 각각 뽑아 조립한다. 그 주의 날짜 범위(월~일)는 `with(DayOfWeek.MONDAY)`가 같은 ISO 주의 월요일을 주므로 거기서 6일을 더한다.
+
+월간은 사정이 다르다. `yyyy-MM`은 달력 연·월 그대로라 `YearMonth`를 쓰면 되고, 말일도 `atEndOfMonth()`가 윤년을 알아서 처리한다.
+
+경계는 테스트(`RankingPeriodTest`)로 고정했다 — 해를 걸치는 주 양방향, 두 달을 걸치는 주, 윤년/평년 2월 말일, 월의 1일과 말일, 주차·월 두 자리 채움.
 
 ### 확정된 지난 기간을 보여준다
 
