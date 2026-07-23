@@ -1,6 +1,7 @@
 package com.loopers.interfaces.consumer;
 
 import com.loopers.infrastructure.idempotency.EventHandledJpaRepository;
+import com.loopers.infrastructure.metrics.DailyProductMetricsJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +27,7 @@ class OrderEventsConsumerIntegrationTest {
 
     private final OrderEventsConsumer orderEventsConsumer;
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
+    private final DailyProductMetricsJpaRepository dailyProductMetricsJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
@@ -33,12 +36,14 @@ class OrderEventsConsumerIntegrationTest {
     OrderEventsConsumerIntegrationTest(
         OrderEventsConsumer orderEventsConsumer,
         ProductMetricsJpaRepository productMetricsJpaRepository,
+        DailyProductMetricsJpaRepository dailyProductMetricsJpaRepository,
         EventHandledJpaRepository eventHandledJpaRepository,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp
     ) {
         this.orderEventsConsumer = orderEventsConsumer;
         this.productMetricsJpaRepository = productMetricsJpaRepository;
+        this.dailyProductMetricsJpaRepository = dailyProductMetricsJpaRepository;
         this.eventHandledJpaRepository = eventHandledJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
@@ -78,6 +83,41 @@ class OrderEventsConsumerIntegrationTest {
             () -> assertThat(loadSalesCount(1L)).isEqualTo(3L),
             () -> assertThat(eventHandledJpaRepository.count()).isEqualTo(1L)
         );
+    }
+
+    @DisplayName("주문 이벤트를 받으면 daily_product_metrics 의 오늘 날짜 행에 상품별 수량만큼 sales_count 가 누적된다.")
+    @Test
+    void increasesDailySalesCountPerProduct_whenOrderConsumed() {
+        // given
+        LocalDate today = LocalDate.now();
+
+        // when
+        orderEventsConsumer.consume(List.of(orderRecord("evt-1", 100L, "1:3", "2:2")), NO_OP_ACK);
+
+        // then
+        assertAll(
+            () -> assertThat(loadDailySalesCount(1L, today)).isEqualTo(3L),
+            () -> assertThat(loadDailySalesCount(2L, today)).isEqualTo(2L)
+        );
+    }
+
+    @DisplayName("같은 주문 이벤트를 두 번 받아도 daily 판매량은 한 번만 반영된다 — 멱등.")
+    @Test
+    void appliesDailyOnce_whenSameOrderEventConsumedTwice() {
+        // given
+        LocalDate today = LocalDate.now();
+
+        // when : 같은 eventId 가 재전송되어 두 번 소비된다
+        orderEventsConsumer.consume(List.of(orderRecord("evt-1", 100L, "1:3")), NO_OP_ACK);
+        orderEventsConsumer.consume(List.of(orderRecord("evt-1", 100L, "1:3")), NO_OP_ACK);
+
+        // then
+        assertThat(loadDailySalesCount(1L, today)).isEqualTo(3L);
+    }
+
+    private long loadDailySalesCount(long productId, LocalDate metricDate) {
+        return dailyProductMetricsJpaRepository.findByProductIdAndMetricDate(productId, metricDate)
+            .orElseThrow().getSalesCount();
     }
 
     private long loadSalesCount(long productId) {

@@ -32,16 +32,17 @@ public class OrderEventFacade {
      */
     @Transactional
     public void handle(List<OrderEventMessage> messages) {
+        LocalDate today = LocalDate.now();
         Map<Long, Double> scoreDeltas = new HashMap<>();
         for (OrderEventMessage message : messages) {
             if (eventHandledRepository.markIfFirst(message.eventId())) {
-                applySales(message, scoreDeltas);
+                applySales(message, scoreDeltas, today);
             }
         }
-        rankingScoreReflector.reflectAfterCommit(RankingKey.of(LocalDate.now()), scoreDeltas);
+        rankingScoreReflector.reflectAfterCommit(RankingKey.of(today), scoreDeltas);
     }
 
-    private void applySales(OrderEventMessage message, Map<Long, Double> scoreDeltas) {
+    private void applySales(OrderEventMessage message, Map<Long, Double> scoreDeltas, LocalDate today) {
         JsonNode lines = message.data().get("lines");
         if (lines == null) {
             return;
@@ -49,7 +50,7 @@ public class OrderEventFacade {
         for (JsonNode line : lines) {
             long productId = line.get("productId").asLong();
             long quantity = line.get("quantity").asLong();
-            productMetricsRepository.applySalesDelta(productId, quantity);
+            productMetricsRepository.applySalesDelta(productId, today, quantity);
             long lineAmount = line.path("lineAmount").asLong(0L);
             scoreDeltas.merge(productId, rankingScorePolicy.scoreFor(RankingSignal.ORDER, lineAmount), Double::sum);
         }
