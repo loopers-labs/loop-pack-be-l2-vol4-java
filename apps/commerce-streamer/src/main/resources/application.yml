@@ -29,11 +29,38 @@ demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
 
+ranking:
+  weight:
+    view: 0.1
+    like: 0.2
+    order-count: 0.7
+    order-qty: 0.0
+  ttl-days: 2
+  compose:
+    enabled: true
+    interval-ms: 60000
+  carry-over:
+    enabled: true
+    weight: 0.1
+
 ---
 spring:
   config:
     activate:
       on-profile: local, test
+
+---
+# test: 스케줄러(합성·carry-over)는 빈 미등록 — 통합 테스트가 백그라운드 잡에 흔들리지 않게 (R8 queue.enabled 선례)
+spring:
+  config:
+    activate:
+      on-profile: test
+
+ranking:
+  compose:
+    enabled: false
+  carry-over:
+    enabled: false
 
 ---
 spring:

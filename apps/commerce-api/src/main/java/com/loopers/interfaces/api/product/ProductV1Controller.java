@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductCriteria;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.ranking.RankingApplicationService;
 import com.loopers.domain.common.PageResult;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductV1Controller implements ProductV1ApiSpec {
 
     private final ProductApplicationService productApplicationService;
+    private final RankingApplicationService rankingApplicationService;
 
     @GetMapping
     @Override
@@ -38,6 +40,9 @@ public class ProductV1Controller implements ProductV1ApiSpec {
             @PathVariable("productId") Long productId
     ) {
         ProductInfo.Detail info = productApplicationService.getProduct(productId);
-        return ApiResponse.success(ProductV1Dto.DetailResponse.from(info));
+        // 순위는 캐시된 상세 밖에서 매 요청 조회 — 실패해도 상세는 살아야 하므로 null 흡수 경로를 쓴다.
+        Long rank = rankingApplicationService.getTodayRankOrNull(productId);
+        return ApiResponse.success(ProductV1Dto.DetailResponse.from(info, rank));
     }
+
 }
