@@ -3,6 +3,7 @@ package com.loopers.interfaces.api.product;
 import com.loopers.application.like.ProductLikeFacade;
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductDetailInfo;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.auth.AuthenticatedUser;
 import com.loopers.interfaces.auth.LoginUser;
@@ -23,7 +24,7 @@ public class ProductV1Controller {
     public ApiResponse<ProductDto.Get.V1.Response> getProduct(
         @PathVariable(value = "productId") Long productId
     ) {
-        ProductInfo info = productFacade.getProduct(productId);
+        ProductDetailInfo info = productFacade.getProductDetail(productId);
         ProductDto.Get.V1.Response response = ProductDto.Get.V1.Response.from(info);
         return ApiResponse.success(response);
     }

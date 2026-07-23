@@ -1,6 +1,7 @@
 package com.loopers.application.product;
 
 import com.loopers.application.event.ProductViewedEvent;
+import com.loopers.application.ranking.RankingRepository;
 import com.loopers.domain.brand.Brand;
 import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.Product;
@@ -8,11 +9,16 @@ import com.loopers.domain.product.ProductBrandProcessService;
 import com.loopers.domain.product.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.time.Clock;
+import java.time.LocalDate;
 
+@Slf4j
 @Component
 public class ProductFacade {
     private final ProductService productService;
@@ -21,6 +27,8 @@ public class ProductFacade {
     private final ProductCacheRepository productCacheRepository;
     private final ProductLikeCountRepository productLikeCountRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final RankingRepository rankingRepository;
+    private final Clock clock;
 
     @Autowired
     public ProductFacade(
@@ -29,7 +37,9 @@ public class ProductFacade {
         ProductBrandProcessService productBrandProcessService,
         ProductCacheRepository productCacheRepository,
         ProductLikeCountRepository productLikeCountRepository,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        RankingRepository rankingRepository,
+        Clock clock
     ) {
         this.productService = productService;
         this.brandService = brandService;
@@ -37,6 +47,8 @@ public class ProductFacade {
         this.productCacheRepository = productCacheRepository;
         this.productLikeCountRepository = productLikeCountRepository;
         this.eventPublisher = eventPublisher;
+        this.rankingRepository = rankingRepository;
+        this.clock = clock;
     }
 
     public ProductFacade(
@@ -53,7 +65,9 @@ public class ProductFacade {
             productCacheRepository,
             productLikeCountRepository,
             event -> {
-            }
+            },
+            null,
+            Clock.systemDefaultZone()
         );
     }
 
@@ -73,6 +87,22 @@ public class ProductFacade {
             .orElseGet(() -> getProductFromDb(id));
         eventPublisher.publishEvent(ProductViewedEvent.viewed(id, null));
         return productInfo;
+    }
+
+    @Transactional
+    public ProductDetailInfo getProductDetail(Long id) {
+        ProductInfo productInfo = getProduct(id);
+        Long rank = null;
+        if (rankingRepository != null) {
+            try {
+                var foundRank = rankingRepository.findRank(LocalDate.now(clock), id);
+                rank = foundRank.isPresent() ? foundRank.getAsLong() : null;
+            } catch (DataAccessException e) {
+                // 랭킹은 유실 가능한 read model이므로 상품 상세 가용성을 우선한다.
+                log.warn("상품 상세 랭킹 조회에 실패했습니다. productId={}", id, e);
+            }
+        }
+        return new ProductDetailInfo(productInfo, rank);
     }
 
     private ProductInfo getProductFromDb(Long id) {

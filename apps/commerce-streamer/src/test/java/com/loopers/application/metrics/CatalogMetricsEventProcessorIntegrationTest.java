@@ -2,6 +2,7 @@ package com.loopers.application.metrics;
 
 import com.loopers.infrastructure.metrics.EventHandledJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
+import com.loopers.infrastructure.metrics.ProductMetricHourlyJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,7 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.ZonedDateTime;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -24,6 +28,7 @@ class CatalogMetricsEventProcessorIntegrationTest {
     private final CatalogMetricsEventProcessor processor;
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
+    private final ProductMetricHourlyJpaRepository productMetricHourlyJpaRepository;
     private final DatabaseCleanUp databaseCleanUp;
 
     @Autowired
@@ -31,11 +36,13 @@ class CatalogMetricsEventProcessorIntegrationTest {
         CatalogMetricsEventProcessor processor,
         ProductMetricsJpaRepository productMetricsJpaRepository,
         EventHandledJpaRepository eventHandledJpaRepository,
+        ProductMetricHourlyJpaRepository productMetricHourlyJpaRepository,
         DatabaseCleanUp databaseCleanUp
     ) {
         this.processor = processor;
         this.productMetricsJpaRepository = productMetricsJpaRepository;
         this.eventHandledJpaRepository = eventHandledJpaRepository;
+        this.productMetricHourlyJpaRepository = productMetricHourlyJpaRepository;
         this.databaseCleanUp = databaseCleanUp;
     }
 
@@ -56,11 +63,50 @@ class CatalogMetricsEventProcessorIntegrationTest {
 
         // assert
         var metrics = productMetricsJpaRepository.findByProductId(1L).orElseThrow();
+        var occurredAt = event.occurredAt().withZoneSameInstant(com.loopers.ranking.DailyRankingKey.ZONE_ID);
+        var hourly = productMetricHourlyJpaRepository.findByMetricDateAndMetricHourAndProductId(
+            occurredAt.toLocalDate(), occurredAt.getHour(), 1L
+        ).orElseThrow();
         assertAll(
             () -> assertThat(firstProcessed).isTrue(),
             () -> assertThat(secondProcessed).isFalse(),
             () -> assertThat(metrics.getLikeCount()).isEqualTo(1),
+            () -> assertThat(hourly.getLikeCount()).isEqualTo(1),
             () -> assertThat(eventHandledJpaRepository.existsById("event-1")).isTrue()
+        );
+    }
+
+    @DisplayName("서로 다른 이벤트가 같은 시간과 상품에 동시에 반영되어도 delta를 잃지 않는다.")
+    @Test
+    void atomicallyIncrementsHourlyMetricsConcurrently() throws Exception {
+        // arrange
+        LocalDate date = LocalDate.of(2026, 7, 17);
+        int increments = 50;
+        var executor = Executors.newFixedThreadPool(8);
+        var futures = new ArrayList<java.util.concurrent.Future<Integer>>();
+
+        // act
+        try {
+            for (int index = 0; index < increments; index++) {
+                futures.add(executor.submit(() -> productMetricHourlyJpaRepository.increment(
+                    date, 10, 1L, 1, 1, 1
+                )));
+            }
+            for (var future : futures) {
+                future.get();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        // assert
+        var hourly = productMetricHourlyJpaRepository
+            .findByMetricDateAndMetricHourAndProductId(date, 10, 1L)
+            .orElseThrow();
+        assertAll(
+            () -> assertThat(hourly.getLikeCount()).isEqualTo(increments),
+            () -> assertThat(hourly.getViewCount()).isEqualTo(increments),
+            () -> assertThat(hourly.getSalesCount()).isEqualTo(increments)
         );
     }
 

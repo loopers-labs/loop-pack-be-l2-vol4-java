@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductDetailInfo;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -24,7 +25,8 @@ public final class ProductDto {
                 String description,
                 Long price,
                 Integer stock,
-                Integer likeCount
+                Integer likeCount,
+                Long rank
             ) {
                 public static Response from(ProductInfo info) {
                     return new Response(
@@ -34,7 +36,16 @@ public final class ProductDto {
                         info.description(),
                         info.price(),
                         info.stock(),
-                        info.likeCount()
+                        info.likeCount(),
+                        null
+                    );
+                }
+
+                public static Response from(ProductDetailInfo detail) {
+                    ProductInfo info = detail.product();
+                    return new Response(
+                        info.id(), BrandResponse.from(info.brand()), info.name(), info.description(),
+                        info.price(), info.stock(), info.likeCount(), detail.rank()
                     );
                 }
             }

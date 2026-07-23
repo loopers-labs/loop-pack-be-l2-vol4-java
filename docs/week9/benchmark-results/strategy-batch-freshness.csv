@@ -1,0 +1,4 @@
+label,interval_seconds,basis_cardinality,basis_chunk_size,runtime_p50_ms,runtime_p95_ms,runtime_max_ms,derived_freshness_p50_ms,derived_freshness_p95_ms,derived_freshness_max_ms
+local-20260717-batch-v3,1,100000,100,377.9648,470.1852,470.1852,1377.9648,1470.1852,1470.1852
+local-20260717-batch-v3,10,100000,100,377.9648,470.1852,470.1852,10377.9648,10470.1852,10470.1852
+local-20260717-batch-v3,60,100000,100,377.9648,470.1852,470.1852,60377.9648,60470.1852,60470.1852

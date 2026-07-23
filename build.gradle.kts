@@ -113,3 +113,33 @@ subprojects {
 project("apps") { tasks.configureEach { enabled = false } }
 project("modules") { tasks.configureEach { enabled = false } }
 project("supports") { tasks.configureEach { enabled = false } }
+
+val rankingE2eJavaExecutable = providers.environmentVariable("E2E_JAVA").orElse(
+    providers.provider {
+        val candidates = listOf(
+            "/opt/homebrew/opt/openjdk@21/bin/java",
+            "/usr/local/opt/openjdk@21/bin/java",
+            "${System.getProperty("java.home")}/bin/java",
+        )
+        candidates.firstOrNull { file(it).canExecute() }
+            ?: error("Java executable not found. Set E2E_JAVA to a Java 21 executable.")
+    },
+)
+val commerceApiBootJar = project(":apps:commerce-api").tasks.named<BootJar>("bootJar")
+val commerceStreamerBootJar = project(":apps:commerce-streamer").tasks.named<BootJar>("bootJar")
+
+tasks.register<Exec>("rankingKafkaE2E") {
+    group = "verification"
+    description = "Runs the separate-process Outbox -> Kafka -> Redis -> Ranking API system E2E."
+
+    dependsOn(commerceApiBootJar, commerceStreamerBootJar)
+    commandLine("bash", layout.projectDirectory.file("scripts/e2e/ranking-kafka-e2e.sh").asFile.absolutePath)
+
+    doFirst {
+        environment("E2E_JAVA", rankingE2eJavaExecutable.get())
+        environment("E2E_API_JAR", commerceApiBootJar.get().archiveFile.get().asFile.absolutePath)
+        environment("E2E_STREAMER_JAR", commerceStreamerBootJar.get().archiveFile.get().asFile.absolutePath)
+    }
+
+    outputs.upToDateWhen { false }
+}

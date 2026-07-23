@@ -3,6 +3,7 @@ package com.loopers.application.metrics;
 import com.loopers.infrastructure.metrics.EventHandledJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaEntity;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
+import com.loopers.infrastructure.metrics.ProductMetricHourlyJpaRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,11 +27,13 @@ class CatalogMetricsEventProcessorTest {
         // arrange
         EventHandledJpaRepository eventHandledJpaRepository = mock(EventHandledJpaRepository.class);
         ProductMetricsJpaRepository productMetricsJpaRepository = mock(ProductMetricsJpaRepository.class);
+        ProductMetricHourlyJpaRepository productMetricHourlyJpaRepository = mock(ProductMetricHourlyJpaRepository.class);
         when(eventHandledJpaRepository.existsById("event-1")).thenReturn(false);
         when(productMetricsJpaRepository.findByProductId(1L)).thenReturn(Optional.empty());
         CatalogMetricsEventProcessor processor = new CatalogMetricsEventProcessor(
             eventHandledJpaRepository,
             productMetricsJpaRepository,
+            productMetricHourlyJpaRepository,
             new SimpleMeterRegistry()
         );
 
@@ -40,6 +43,7 @@ class CatalogMetricsEventProcessorTest {
         // assert
         assertThat(processed).isTrue();
         verify(productMetricsJpaRepository).save(any(ProductMetricsJpaEntity.class));
+        verify(productMetricHourlyJpaRepository).increment(any(), any(Integer.class), any(), any(Integer.class), any(Integer.class), any(Integer.class));
         verify(eventHandledJpaRepository).save(any());
     }
 
@@ -49,10 +53,12 @@ class CatalogMetricsEventProcessorTest {
         // arrange
         EventHandledJpaRepository eventHandledJpaRepository = mock(EventHandledJpaRepository.class);
         ProductMetricsJpaRepository productMetricsJpaRepository = mock(ProductMetricsJpaRepository.class);
+        ProductMetricHourlyJpaRepository productMetricHourlyJpaRepository = mock(ProductMetricHourlyJpaRepository.class);
         when(eventHandledJpaRepository.existsById("event-1")).thenReturn(true);
         CatalogMetricsEventProcessor processor = new CatalogMetricsEventProcessor(
             eventHandledJpaRepository,
             productMetricsJpaRepository,
+            productMetricHourlyJpaRepository,
             new SimpleMeterRegistry()
         );
 
@@ -62,6 +68,7 @@ class CatalogMetricsEventProcessorTest {
         // assert
         assertThat(processed).isFalse();
         verify(productMetricsJpaRepository, never()).save(any());
+        verify(productMetricHourlyJpaRepository, never()).increment(any(), any(Integer.class), any(), any(Integer.class), any(Integer.class), any(Integer.class));
         verify(eventHandledJpaRepository, never()).save(any());
     }
 
