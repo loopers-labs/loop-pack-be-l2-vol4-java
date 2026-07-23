@@ -29,8 +29,8 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     }
 
     @Override
-    public void increaseSalesCount(Long productId, Long quantity) {
-        productMetricsJpaRepository.increaseSalesCount(productId, quantity);
+    public void increaseOrderCount(Long productId, Long quantity) {
+        productMetricsJpaRepository.increaseOrderCount(productId, quantity);
     }
 
     @Override

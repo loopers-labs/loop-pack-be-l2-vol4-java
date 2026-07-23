@@ -109,9 +109,9 @@ class ProductMetricsConsumerIntegrationTest {
     @Nested
     class ListenOrder {
 
-        @DisplayName("주문 아이템 여러 개가 각 상품의 sales_count에 정확히 반영된다.")
+        @DisplayName("주문 아이템 여러 개가 각 상품의 order_count에 정확히 반영된다.")
         @Test
-        void increasesSalesCountPerItem_whenOrderCreatedPublished() throws Exception {
+        void increasesOrderCountPerItem_whenOrderCreatedPublished() throws Exception {
             // given
             Long productIdA = 200L;
             Long productIdB = 201L;
@@ -127,11 +127,11 @@ class ProductMetricsConsumerIntegrationTest {
             // then
             ProductMetricsModel metricsA = awaitMetrics(productIdA);
             ProductMetricsModel metricsB = awaitMetrics(productIdB);
-            assertThat(metricsA.getSalesCount()).isEqualTo(2L);
-            assertThat(metricsB.getSalesCount()).isEqualTo(3L);
+            assertThat(metricsA.getOrderCount()).isEqualTo(2L);
+            assertThat(metricsB.getOrderCount()).isEqualTo(3L);
         }
 
-        @DisplayName("같은 eventId(주문) 메시지를 재발행해도 sales_count는 한 번만 반영된다(멱등성).")
+        @DisplayName("같은 eventId(주문) 메시지를 재발행해도 order_count는 한 번만 반영된다(멱등성).")
         @Test
         void isIdempotent_whenSameOrderEventRepublished() throws Exception {
             // given
@@ -147,7 +147,7 @@ class ProductMetricsConsumerIntegrationTest {
 
             // then
             ProductMetricsModel metrics = productMetricsRepository.findByProductId(productId).orElseThrow();
-            assertThat(metrics.getSalesCount()).isEqualTo(5L);
+            assertThat(metrics.getOrderCount()).isEqualTo(5L);
         }
     }
 

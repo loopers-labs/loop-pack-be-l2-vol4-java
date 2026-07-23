@@ -31,13 +31,13 @@ public class ProductMetricsConsumer {
         try {
             KafkaEventEnvelope envelope = objectMapper.readValue(record.value(), KafkaEventEnvelope.class);
             if (SUPPORTED_ORDER_EVENT_TYPE.equals(envelope.eventType())) {
-                List<MetricsFacade.SalesItem> items = objectMapper.convertValue(
+                List<MetricsFacade.OrderItem> items = objectMapper.convertValue(
                         envelope.payload().get("items"), new TypeReference<List<OrderItemPayload>>() {
                         }
                 ).stream()
-                        .map(item -> new MetricsFacade.SalesItem(item.productId(), item.quantity()))
+                        .map(item -> new MetricsFacade.OrderItem(item.productId(), item.quantity()))
                         .toList();
-                metricsFacade.applySales(envelope.eventId(), items);
+                metricsFacade.applyOrder(envelope.eventId(), items);
             } else {
                 log.warn("처리할 수 없는 이벤트 타입입니다. eventType={}", envelope.eventType());
             }

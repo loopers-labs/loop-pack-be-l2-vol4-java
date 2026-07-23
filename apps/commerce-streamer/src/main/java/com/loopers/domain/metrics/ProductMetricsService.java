@@ -22,8 +22,8 @@ public class ProductMetricsService {
     }
 
     @Transactional
-    public void increaseSalesCount(Long productId, Long quantity) {
-        productMetricsRepository.increaseSalesCount(productId, quantity);
+    public void increaseOrderCount(Long productId, Long quantity) {
+        productMetricsRepository.increaseOrderCount(productId, quantity);
     }
 
     @Transactional

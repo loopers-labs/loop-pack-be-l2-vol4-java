@@ -23,7 +23,7 @@ public class MetricsFacade {
     private final ProductMetricsService productMetricsService;
     private final ProductMetricsDailyService productMetricsDailyService;
 
-    public record SalesItem(Long productId, Long quantity) {
+    public record OrderItem(Long productId, Long quantity) {
     }
 
     @Transactional
@@ -55,13 +55,13 @@ public class MetricsFacade {
 
     // 주문 하나에 아이템이 여럿이어도 이벤트(주문) 단위로 한 번만 markHandled를 호출한 뒤 아이템별로 반영한다.
     @Transactional
-    public void applySales(String eventId, List<SalesItem> items) {
+    public void applyOrder(String eventId, List<OrderItem> items) {
         if (!eventHandledService.markHandled(eventId)) {
             return;
         }
         LocalDate metricDate = LocalDate.now();
         items.forEach(item -> {
-            productMetricsService.increaseSalesCount(item.productId(), item.quantity());
+            productMetricsService.increaseOrderCount(item.productId(), item.quantity());
             productMetricsDailyService.increaseOrderCount(item.productId(), metricDate, item.quantity());
         });
     }

@@ -24,8 +24,8 @@ public class ProductMetricsModel extends BaseEntity {
     @Column(name = "like_count", nullable = false)
     private Long likeCount;
 
-    @Column(name = "sales_count", nullable = false)
-    private Long salesCount;
+    @Column(name = "order_count", nullable = false)
+    private Long orderCount;
 
     @Column(name = "view_count", nullable = false)
     private Long viewCount;
@@ -36,7 +36,7 @@ public class ProductMetricsModel extends BaseEntity {
     public ProductMetricsModel(Long productId) {
         this.productId = productId;
         this.likeCount = 0L;
-        this.salesCount = 0L;
+        this.orderCount = 0L;
         this.viewCount = 0L;
     }
 }
