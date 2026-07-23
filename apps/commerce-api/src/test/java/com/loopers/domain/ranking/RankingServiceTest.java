@@ -16,11 +16,13 @@ class RankingServiceTest {
 
     private RankingService rankingService;
     private RankingRepository rankingRepository;
+    private ProductRankMvRepository productRankMvRepository;
 
     @BeforeEach
     void setUp() {
         rankingRepository = mock(RankingRepository.class);
-        rankingService = new RankingService(rankingRepository);
+        productRankMvRepository = mock(ProductRankMvRepository.class);
+        rankingService = new RankingService(rankingRepository, productRankMvRepository);
     }
 
     @DisplayName("랭킹 페이지를 조회할 때,")
@@ -40,6 +42,44 @@ class RankingServiceTest {
 
             // then
             assertThat(result).isEqualTo(entries);
+        }
+    }
+
+    @DisplayName("주간/월간(MV) 랭킹을 조회할 때,")
+    @Nested
+    class GetMvRankings {
+
+        @DisplayName("조건의 period/집계대표일/page/size를 그대로 MV repository에 전달하고, 조회된 결과를 그대로 반환한다.")
+        @Test
+        void delegatesToMvRepository_withCondition() {
+            // given
+            RankingMvQueryCondition condition =
+                    new RankingMvQueryCondition(RankingPeriod.WEEKLY, LocalDate.of(2024, 1, 3), 2, 20);
+            List<RankingEntry> entries = List.of(new RankingEntry(1L, 21L, 60.0));
+            when(productRankMvRepository.findRankings(
+                    condition.period(), condition.aggregateDate(), condition.page(), condition.size()))
+                    .thenReturn(entries);
+
+            // when
+            List<RankingEntry> result = rankingService.getMvRankings(condition);
+
+            // then
+            assertThat(result).isEqualTo(entries);
+        }
+
+        @DisplayName("MV 총 개수를 그대로 반환한다.")
+        @Test
+        void returnsMvCount() {
+            // given
+            RankingMvQueryCondition condition =
+                    new RankingMvQueryCondition(RankingPeriod.MONTHLY, LocalDate.of(2024, 1, 15), 1, 20);
+            when(productRankMvRepository.count(condition.period(), condition.aggregateDate())).thenReturn(42L);
+
+            // when
+            long result = rankingService.countMvRankings(condition);
+
+            // then
+            assertThat(result).isEqualTo(42L);
         }
     }
 

@@ -6,8 +6,12 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.ranking.MvProductRankMonthlyModel;
+import com.loopers.domain.ranking.MvProductRankWeeklyModel;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
+import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository;
+import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
 import com.loopers.utils.DatabaseCleanUp;
@@ -54,6 +58,12 @@ class RankingV1ApiE2ETest {
 
     @Autowired
     private ProductStatsRepository productStatsRepository;
+
+    @Autowired
+    private MvProductRankWeeklyJpaRepository mvProductRankWeeklyJpaRepository;
+
+    @Autowired
+    private MvProductRankMonthlyJpaRepository mvProductRankMonthlyJpaRepository;
 
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
@@ -145,6 +155,109 @@ class RankingV1ApiE2ETest {
 
             // then
             assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings?period=WEEKLY")
+    @Nested
+    class GetWeeklyRankings {
+
+        @DisplayName("period=WEEKLY 로 조회하면 해당 주 MV 랭킹 페이지를 반환한다.")
+        @Test
+        void returnsWeeklyRankingPage_whenPeriodIsWeekly() {
+            // given - 2024-01-03(수)이 속한 주의 월요일은 2024-01-01
+            LocalDate weekStart = LocalDate.of(2024, 1, 1);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel first = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel second = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(weekStart, first.getId(), 100L, 1));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(weekStart, second.getId(), 60L, 2));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(
+                            BASE_URL + "?date=20240103&period=WEEKLY&page=1&size=20", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
+                    () -> assertThat(response.getBody().data().content()).hasSize(2),
+                    () -> assertThat(response.getBody().data().content().get(0).rank()).isEqualTo(1L),
+                    () -> assertThat(response.getBody().data().content().get(0).productId()).isEqualTo(first.getId()),
+                    () -> assertThat(response.getBody().data().content().get(0).brandName()).isEqualTo("Nike")
+            );
+        }
+
+        @DisplayName("지원하지 않는 period 로 조회하면 400 Bad Request 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPeriodIsInvalid() {
+            // when
+            ResponseEntity<Void> response =
+                    testRestTemplate.exchange(BASE_URL + "?date=20240103&period=yearly", HttpMethod.GET, null, Void.class);
+
+            // then
+            assertThat(response.getStatusCode().value()).isEqualTo(400);
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings?period=MONTHLY")
+    @Nested
+    class GetMonthlyRankings {
+
+        @DisplayName("period=MONTHLY 로 조회하면 해당 월 MV 랭킹 페이지를 반환한다.")
+        @Test
+        void returnsMonthlyRankingPage_whenPeriodIsMonthly() {
+            // given - 2024-01-15 가 속한 달의 1일은 2024-01-01
+            LocalDate monthStart = LocalDate.of(2024, 1, 1);
+            BrandModel brand = brandRepository.save(new BrandModel("Adidas"));
+            ProductModel first = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel second = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            mvProductRankMonthlyJpaRepository.save(new MvProductRankMonthlyModel(monthStart, first.getId(), 500L, 1));
+            mvProductRankMonthlyJpaRepository.save(new MvProductRankMonthlyModel(monthStart, second.getId(), 300L, 2));
+
+            // when
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(
+                            BASE_URL + "?date=20240115&period=MONTHLY&page=1&size=20", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(2),
+                    () -> assertThat(response.getBody().data().content()).hasSize(2),
+                    () -> assertThat(response.getBody().data().content().get(0).rank()).isEqualTo(1L),
+                    () -> assertThat(response.getBody().data().content().get(0).productId()).isEqualTo(first.getId()),
+                    () -> assertThat(response.getBody().data().content().get(0).brandName()).isEqualTo("Adidas")
+            );
+        }
+
+        @DisplayName("주간 MV 만 있고 월간 MV 가 없으면 빈 페이지를 반환한다(주/월 소스가 섞이지 않는다).")
+        @Test
+        void returnsEmpty_whenOnlyWeeklyMvExists() {
+            // given - 같은 기준일이라도 주간 MV 만 적재
+            LocalDate weekStart = LocalDate.of(2024, 1, 1);
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel product = saveProduct(brand.getId(), "주간전용", BigDecimal.valueOf(10000));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(weekStart, product.getId(), 100L, 1));
+
+            // when - 월간으로 조회
+            ParameterizedTypeReference<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> responseType =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(
+                            BASE_URL + "?date=20240115&period=MONTHLY", HttpMethod.GET, null, responseType);
+
+            // then
+            assertAll(
+                    () -> assertTrue(response.getStatusCode().is2xxSuccessful()),
+                    () -> assertThat(response.getBody().data().content()).isEmpty(),
+                    () -> assertThat(response.getBody().data().totalElements()).isEqualTo(0)
+            );
         }
     }
 
