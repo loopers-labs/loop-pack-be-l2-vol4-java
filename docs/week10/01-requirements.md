@@ -226,6 +226,29 @@ LIMIT 150
 
 가중치는 SQL에 박지 않고 바인딩 파라미터로 주입한다. 값은 「점수 정책 공유」에서 설정으로 관리한다.
 
+### 집계 쿼리는 버티나 — 실측
+
+PK가 `(stat_date, product_id)`라 `GROUP BY product_id`가 정렬을 유발한다. 디스크 temp table로 떨어지면 배치가 몇 분씩 걸릴 수 있어 구현 전에 쟀다.
+
+측정 조건 — MySQL 8.0.46, 상품 50,000 × 30일 = **150만 행(97MB)**, 기본 설정(`tmp_table_size` 16MB, `innodb_buffer_pool_size` 128MB).
+
+| 기간 | 읽은 행 | 그룹 수 | 소요 |
+| --- | --- | --- | --- |
+| 주간 7일 | 350,000 | 50,000 | **455ms** |
+| 월간 30일 | 1,500,000 | 50,000 | **1,218ms** |
+
+```
+Created_tmp_disk_tables  0     ← 디스크로 떨어지지 않음
+Sort_merge_passes        0     ← filesort 도 메모리 안에서
+Sort_rows                150   ← LIMIT 인지 정렬이라 5만 건이 아니라 150건만 정렬
+```
+
+**대응이 필요 없다.** 세 가지가 맞물린 결과다. `stat_date`가 PK 선행이라 기간이 연속 범위 스캔이 되고, 집계 결과가 5만 행뿐이라 temp table이 메모리에 들어가며, `LIMIT 150` 덕에 정렬 대상이 150건으로 줄어든다. `EXPLAIN`의 `Using temporary; Using filesort`는 뜨지만 둘 다 메모리에서 끝난다.
+
+커버링 인덱스 `(product_id, stat_date, view_count, like_count, sales_count)`도 붙여 봤는데 **옵티마이저가 쓰지 않았다.** `stat_date` 범위가 PK 선행이라 연속 스캔이 되는 쪽이 더 싸고, 저 인덱스는 전체를 훑어야 하기 때문이다. 쓰지 않으므로 두지 않는다.
+
+다만 이 결론은 **상품 5만 개 기준**이다. 카탈로그가 한 자릿수 배 커지면 그룹 수가 늘어 temp table이 16MB를 넘고 디스크로 떨어질 수 있다. 그때 다시 잰다.
+
 ### Reader — 커서를 기본으로, 페이징도 구현
 
 `JdbcCursorItemReader`를 기본으로 쓴다. 이유는 위 쿼리의 `LIMIT 150` 한 줄이다.
@@ -399,7 +422,6 @@ POST /admin/metrics/seed
 
 ## 미결
 
-- [ ] 집계 쿼리 성능 — PK가 `(stat_date, product_id)`라 `GROUP BY product_id`가 정렬을 유발한다. 대량 데이터로 `EXPLAIN`을 떠서 디스크 temp table로 떨어지는지 확인하고, 필요하면 커버링 인덱스를 추가한다. 구현 전에 잰다
 - [ ] `ranking.yml`을 둘 모듈 — "공유 위치"만 정하고 어디인지는 안 정했다. `modules` 아래 신설할지, 기존 위치에 얹을지
 - [ ] score 수식 중복 — 가중치 값은 `ranking.yml`로 공유하지만 "가중합"이라는 형태는 streamer Java와 batch SQL 두 곳에 있다. 한쪽만 바뀌어도 감지되지 않는다
 - [ ] 소비 지연 watermark — 월요일 새벽 실행 시점에 일요일 이벤트가 모두 반영됐다는 보장이 없다. Kafka lag가 남아 있으면 첫 확정본부터 낡는다. 실행 전 lag 확인, 실행 시각 늦추기, 재집계로 흡수 중 하나를 정한다
