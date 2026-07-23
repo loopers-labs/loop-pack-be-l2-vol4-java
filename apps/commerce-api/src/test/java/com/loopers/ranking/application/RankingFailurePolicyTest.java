@@ -11,6 +11,7 @@ import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductFacade;
 import com.loopers.product.application.ProductRankingFacade;
 import com.loopers.product.application.RankedProductDetailInfo;
+import com.loopers.ranking.domain.MaterializedRankingRepository;
 import com.loopers.ranking.domain.RankingRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -25,10 +26,14 @@ class RankingFailurePolicyTest {
     @Test
     void throwsServiceUnavailableWhenRankingRedisFails() {
         RankingRepository rankingRepository = mock(RankingRepository.class);
+        MaterializedRankingRepository materializedRankingRepository =
+                mock(MaterializedRankingRepository.class);
         ProductFacade productFacade = mock(ProductFacade.class);
         when(rankingRepository.findPage(any(LocalDate.class), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("redis down"));
-        RankingFacade rankingFacade = new RankingFacade(rankingRepository, productFacade);
+        RankingFacade rankingFacade =
+                new RankingFacade(
+                        rankingRepository, materializedRankingRepository, productFacade);
 
         assertThatThrownBy(() -> rankingFacade.getRankings("20260716", 1, 20))
                 .isInstanceOfSatisfying(
@@ -42,10 +47,14 @@ class RankingFailurePolicyTest {
     @Test
     void throwsServiceUnavailableWhenHourlyRankingRedisFails() {
         RankingRepository rankingRepository = mock(RankingRepository.class);
+        MaterializedRankingRepository materializedRankingRepository =
+                mock(MaterializedRankingRepository.class);
         ProductFacade productFacade = mock(ProductFacade.class);
         when(rankingRepository.findHourlyPage(any(LocalDateTime.class), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("redis down"));
-        RankingFacade rankingFacade = new RankingFacade(rankingRepository, productFacade);
+        RankingFacade rankingFacade =
+                new RankingFacade(
+                        rankingRepository, materializedRankingRepository, productFacade);
 
         assertThatThrownBy(() -> rankingFacade.getHourlyRankings("2026071623", 1, 20))
                 .isInstanceOfSatisfying(

@@ -2,8 +2,10 @@ package com.loopers.ranking.application;
 
 import com.loopers.product.application.ProductDetailInfo;
 import com.loopers.product.application.ProductFacade;
+import com.loopers.ranking.domain.MaterializedRankingRepository;
 import com.loopers.ranking.domain.RankingEntry;
 import com.loopers.ranking.domain.RankingPage;
+import com.loopers.ranking.domain.RankingPeriod;
 import com.loopers.ranking.domain.RankingRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -40,36 +42,49 @@ public class RankingFacade {
                     .withResolverStyle(ResolverStyle.STRICT);
 
     private final RankingRepository rankingRepository;
+    private final MaterializedRankingRepository materializedRankingRepository;
     private final ProductFacade productFacade;
 
-    public RankingPageInfo getRankings(String date, int page, int size) {
+    public RankingPageInfo getRankings(
+            String period, String date, int page, int size) {
         validatePaging(page, size);
-        LocalDate rankingDate = parseDate(date);
+        RankingPeriod rankingPeriod = RankingPeriod.from(period);
+        LocalDate rankingDate = parseDate(date, rankingPeriod);
 
-        RankingPage rankingPage;
         try {
-            rankingPage = rankingRepository.findPage(rankingDate, page, size);
-        } catch (RuntimeException e) {
+            RankingPage rankingPage =
+                    rankingPeriod == RankingPeriod.DAILY
+                            ? rankingRepository.findPage(rankingDate, page, size)
+                            : materializedRankingRepository.findPage(
+                                    rankingPeriod, rankingDate, page, size);
+            return aggregateProducts(rankingPage, page, size);
+        } catch (RuntimeException exception) {
             throw new CoreException(
-                    ErrorType.SERVICE_UNAVAILABLE, "랭킹 정보를 조회할 수 없습니다.");
+                    ErrorType.SERVICE_UNAVAILABLE,
+                    "랭킹 정보를 조회할 수 없습니다.",
+                    exception);
         }
+    }
 
-        return aggregateProducts(rankingPage, page, size);
+    /** 기존 애플리케이션 호출자의 일간 랭킹 계약을 유지한다. */
+    public RankingPageInfo getRankings(String date, int page, int size) {
+        return getRankings(null, date, page, size);
     }
 
     public RankingPageInfo getHourlyRankings(String dateTime, int page, int size) {
         validatePaging(page, size);
         LocalDateTime rankingDateTime = parseDateTime(dateTime);
 
-        RankingPage rankingPage;
         try {
-            rankingPage = rankingRepository.findHourlyPage(rankingDateTime, page, size);
-        } catch (RuntimeException e) {
+            RankingPage rankingPage =
+                    rankingRepository.findHourlyPage(rankingDateTime, page, size);
+            return aggregateProducts(rankingPage, page, size);
+        } catch (RuntimeException exception) {
             throw new CoreException(
-                    ErrorType.SERVICE_UNAVAILABLE, "시간 랭킹 정보를 조회할 수 없습니다.");
+                    ErrorType.SERVICE_UNAVAILABLE,
+                    "시간 랭킹 정보를 조회할 수 없습니다.",
+                    exception);
         }
-
-        return aggregateProducts(rankingPage, page, size);
     }
 
     private RankingPageInfo aggregateProducts(RankingPage rankingPage, int page, int size) {
@@ -100,9 +115,10 @@ public class RankingFacade {
         return new RankingPageInfo(items, page, size, rankingPage.totalCount(), totalPages);
     }
 
-    private LocalDate parseDate(String date) {
+    private LocalDate parseDate(String date, RankingPeriod period) {
         if (date == null || date.isBlank()) {
-            return LocalDate.now(SEOUL_ZONE);
+            LocalDate today = LocalDate.now(SEOUL_ZONE);
+            return period == RankingPeriod.DAILY ? today : today.minusDays(1);
         }
         try {
             return LocalDate.parse(date, REQUEST_DATE_FORMATTER);

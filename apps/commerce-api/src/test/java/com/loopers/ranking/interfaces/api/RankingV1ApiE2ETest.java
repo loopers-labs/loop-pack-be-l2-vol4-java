@@ -17,10 +17,13 @@ import com.loopers.product.interfaces.api.RankedProductDetailResponse;
 import com.loopers.ranking.infrastructure.RankingRedisRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,13 +37,17 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RankingV1ApiE2ETest {
 
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate MATERIALIZED_RANKING_DATE =
+            LocalDate.of(2026, 7, 22);
 
     private final TestRestTemplate testRestTemplate;
+    private final JdbcTemplate jdbcTemplate;
     private final BrandJpaRepository brandJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final InventoryJpaRepository inventoryJpaRepository;
@@ -52,6 +59,7 @@ class RankingV1ApiE2ETest {
     @Autowired
     RankingV1ApiE2ETest(
             TestRestTemplate testRestTemplate,
+            JdbcTemplate jdbcTemplate,
             BrandJpaRepository brandJpaRepository,
             ProductJpaRepository productJpaRepository,
             InventoryJpaRepository inventoryJpaRepository,
@@ -61,6 +69,7 @@ class RankingV1ApiE2ETest {
             DatabaseCleanUp databaseCleanUp,
             RedisCleanUp redisCleanUp) {
         this.testRestTemplate = testRestTemplate;
+        this.jdbcTemplate = jdbcTemplate;
         this.brandJpaRepository = brandJpaRepository;
         this.productJpaRepository = productJpaRepository;
         this.inventoryJpaRepository = inventoryJpaRepository;
@@ -70,10 +79,16 @@ class RankingV1ApiE2ETest {
         this.redisCleanUp = redisCleanUp;
     }
 
+    @BeforeEach
+    void setUpSnapshotTables() {
+        recreateSnapshotTables();
+    }
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
         redisCleanUp.truncateAll();
+        dropSnapshotTables();
     }
 
     @DisplayName("GET /api/v1/rankings")
@@ -123,6 +138,78 @@ class RankingV1ApiE2ETest {
                     () -> assertThat(data.totalPages()).isEqualTo(2));
         }
 
+        @DisplayName("주간·월간은 정확한 기준일의 서로 다른 MV와 페이지를 조회한다.")
+        @Test
+        void routesWeeklyAndMonthlyRankingsToMaterializedViews() {
+            Product first = createProduct("주간 1위", 3000L, 7, 2);
+            Product second = createProduct("주간 2위", 2000L, 5, 1);
+            insertSnapshot(
+                    "mv_product_rank_weekly",
+                    1,
+                    first.getId(),
+                    new BigDecimal("30.0"));
+            insertSnapshot(
+                    "mv_product_rank_weekly",
+                    2,
+                    second.getId(),
+                    new BigDecimal("20.0"));
+            insertSnapshot(
+                    "mv_product_rank_monthly",
+                    1,
+                    second.getId(),
+                    new BigDecimal("40.0"));
+
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>>
+                    weeklyResponse =
+                            getRankings(
+                                    "?period=weekly&date=20260722&page=2&size=1");
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>>
+                    monthlyResponse =
+                            getRankings("?period=monthly&date=20260722");
+
+            RankingV1Dto.RankingPageResponse weekly =
+                    weeklyResponse.getBody().data();
+            RankingV1Dto.RankingPageResponse monthly =
+                    monthlyResponse.getBody().data();
+            assertAll(
+                    () ->
+                            assertThat(weeklyResponse.getStatusCode())
+                                    .isEqualTo(HttpStatus.OK),
+                    () -> assertThat(weekly.items().getFirst().rank()).isEqualTo(2L),
+                    () ->
+                            assertThat(weekly.items().getFirst().product().id())
+                                    .isEqualTo(second.getId()),
+                    () -> assertThat(weekly.page()).isEqualTo(2),
+                    () -> assertThat(weekly.size()).isEqualTo(1),
+                    () -> assertThat(weekly.totalCount()).isEqualTo(2),
+                    () -> assertThat(weekly.totalPages()).isEqualTo(2),
+                    () ->
+                            assertThat(monthlyResponse.getStatusCode())
+                                    .isEqualTo(HttpStatus.OK),
+                    () -> assertThat(monthly.items().getFirst().rank()).isEqualTo(1L),
+                    () ->
+                            assertThat(monthly.items().getFirst().score())
+                                    .isEqualTo(40.0D),
+                    () ->
+                            assertThat(monthly.items().getFirst().product().id())
+                                    .isEqualTo(second.getId()),
+                    () -> assertThat(monthly.totalCount()).isEqualTo(1));
+        }
+
+        @DisplayName("생성되지 않은 주간 스냅샷은 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPageForMissingSnapshot() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                    getRankings("?period=weekly&date=20260723");
+
+            RankingV1Dto.RankingPageResponse data = response.getBody().data();
+            assertAll(
+                    () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                    () -> assertThat(data.items()).isEmpty(),
+                    () -> assertThat(data.totalCount()).isZero(),
+                    () -> assertThat(data.totalPages()).isZero());
+        }
+
         @DisplayName("ZSET에만 남은 삭제 상품은 제외하되 나머지 상품의 원래 순위는 유지한다.")
         @Test
         void excludesDeletedProductAndPreservesZSetRank() {
@@ -150,6 +237,9 @@ class RankingV1ApiE2ETest {
         @DisplayName("유효하지 않은 날짜와 페이지 요청은 400을 반환한다.")
         @Test
         void returnsBadRequestForInvalidQuery() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>>
+                    invalidPeriod =
+                            getRankings("?period=yearly&date=20260716");
             ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> invalidDate =
                     getRankings("?date=20260230");
             ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> invalidPage =
@@ -158,6 +248,9 @@ class RankingV1ApiE2ETest {
                     getRankings("?size=101");
 
             assertAll(
+                    () ->
+                            assertThat(invalidPeriod.getStatusCode())
+                                    .isEqualTo(HttpStatus.BAD_REQUEST),
                     () ->
                             assertThat(invalidDate.getStatusCode())
                                     .isEqualTo(HttpStatus.BAD_REQUEST),
@@ -318,6 +411,51 @@ class RankingV1ApiE2ETest {
         masterRedisTemplate
                 .opsForZSet()
                 .add(RankingRedisRepository.hourlyKey(dateTime), productId.toString(), score);
+    }
+
+    private void insertSnapshot(
+            String table, int rank, long productId, BigDecimal score) {
+        jdbcTemplate.update(
+                "INSERT INTO "
+                        + table
+                        + " (aggregation_date, period_start_date, period_end_date,"
+                        + " rank_position, product_id, score, generated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))",
+                Date.valueOf(MATERIALIZED_RANKING_DATE),
+                Date.valueOf(MATERIALIZED_RANKING_DATE.withDayOfMonth(1)),
+                Date.valueOf(MATERIALIZED_RANKING_DATE),
+                rank,
+                productId,
+                score);
+    }
+
+    private void recreateSnapshotTables() {
+        dropSnapshotTables();
+        createSnapshotTable("mv_product_rank_weekly");
+        createSnapshotTable("mv_product_rank_monthly");
+    }
+
+    private void dropSnapshotTables() {
+        jdbcTemplate.execute("DROP TABLE IF EXISTS mv_product_rank_monthly");
+        jdbcTemplate.execute("DROP TABLE IF EXISTS mv_product_rank_weekly");
+    }
+
+    private void createSnapshotTable(String table) {
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE %s (
+                    aggregation_date DATE NOT NULL,
+                    period_start_date DATE NOT NULL,
+                    period_end_date DATE NOT NULL,
+                    rank_position SMALLINT UNSIGNED NOT NULL,
+                    product_id BIGINT NOT NULL,
+                    score DECIMAL(30, 1) NOT NULL,
+                    generated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (aggregation_date, rank_position),
+                    UNIQUE (aggregation_date, product_id)
+                ) ENGINE=InnoDB
+                """
+                        .formatted(table));
     }
 
     private ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> getRankings(
