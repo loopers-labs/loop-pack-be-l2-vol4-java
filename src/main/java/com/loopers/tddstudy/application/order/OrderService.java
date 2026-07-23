@@ -12,11 +12,14 @@ import com.loopers.tddstudy.domain.product.Product;
 import com.loopers.tddstudy.domain.product.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.loopers.tddstudy.domain.order.event.OrderCompletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.loopers.tddstudy.application.log.UserActionEvent;
 
 @Service
 @Transactional
@@ -29,16 +32,20 @@ public class OrderService {
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
 
+    private final ApplicationEventPublisher eventPublisher;
+
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
                         PaymentGateway paymentGateway,
                         CouponRepository couponRepository,
-                        UserCouponRepository userCouponRepository) {
+                        UserCouponRepository userCouponRepository,
+                        ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.paymentGateway = paymentGateway;
         this.couponRepository = couponRepository;
         this.userCouponRepository = userCouponRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public Order createOrder(Long userId, List<OrderItemRequest> items,Long couponId) {
@@ -127,10 +134,24 @@ public class OrderService {
         String paymentResult = paymentGateway.requestPayment(order.getId(), order.getTotalAmount());
 
         // 6. 결제 결과 처리
-        if ("SUCCESS".equals(paymentResult)) {
+        if ("CIRCUIT_OPEN".equals(paymentResult)) {
+            // 회로 OPEN: 시도조차 못함 → 트랜잭션 롤백(재고 복구) 후 재시도 안내
+            throw new PaymentUnavailableException("서비스 이상으로 잠시 후 다시 시도해주세요.");
+        } else if ("PENDING".equals(paymentResult)) {
+            // 비동기 처리중 - PENDING 유지 (콜백/스케줄러가 확정)
+        } else if ("SUCCESS".equals(paymentResult)) {
             order.markPaid();
+
+            // 부가 로직(로깅/알림)은 이벤트로 분리 — 주문 커밋 후 처리
+            List<OrderCompletedEvent.Line> lines = items.stream()
+                    .map(i -> new OrderCompletedEvent.Line(i.productId(), i.quantity()))
+                    .toList();
+            eventPublisher.publishEvent(new OrderCompletedEvent(
+                    order.getId(), userId, order.getTotalAmount(), lines));
+            eventPublisher.publishEvent(new UserActionEvent(userId, "ORDER", order.getId()));
+
         } else {
-            // 보상 트랜잭션: 재고 복구
+            // 일반 실패(거절/타임아웃): 재고 복구 + FAILED
             for (OrderItemRequest item : items) {
                 Product product = productMap.get(item.productId());
                 product.restoreStock(item.quantity());

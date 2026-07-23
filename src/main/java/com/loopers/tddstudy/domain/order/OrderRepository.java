@@ -12,4 +12,6 @@ public interface OrderRepository {
     List<Order> findAllByUserId(Long userId);
 
     List<Order> findAll();
+
+    List<Order> findAllByStatus(String status);
 }
