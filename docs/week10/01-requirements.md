@@ -129,12 +129,14 @@ CREATE TABLE mv_product_rank_weekly (
   like_count   BIGINT      NOT NULL,
   sales_count  BIGINT      NOT NULL,
   created_at   DATETIME    NOT NULL,
-  PRIMARY KEY (period_key, product_id),
+  PRIMARY KEY (product_id, period_key),
   KEY idx_period_score (period_key, score DESC, product_id ASC)
 );
 ```
 
-`mv_product_rank_monthly`도 같은 형태이며 `period_key`만 다르다. MySQL 8.0은 내림차순 인덱스를 실제로 지원하므로 `score DESC`가 무시되지 않는다.
+`mv_product_rank_monthly`도 같은 형태이며 `period_key`만 다르다. MySQL 8.0은 내림차순 인덱스를 실제로 지원하므로 `score DESC`가 무시되지 않는다 — 스키마 테스트가 `information_schema`에서 `COLLATION='D'`를 확인한다.
+
+**PK 컬럼 순서는 `(product_id, period_key)`다.** 처음엔 한 기간의 행이 클러스터드 인덱스에서 연속으로 모이도록 `(period_key, product_id)`로 잡으려 했는데, Hibernate가 PK 컬럼을 테이블 컬럼 목록 순서대로 배치하고 `@MappedSuperclass`·`@EmbeddedId` 필드는 그 목록 뒤로 밀려서 뜻대로 되지 않았다. 필드 중복 선언으로 강제할 수는 있으나 그러지 않았다 — 조회도 `DELETE`도 `idx_period_score`가 받고, 기간당 150행이라 52주를 보관해도 7,800행이라 클러스터드 지역성이 성능에 드러나지 않기 때문이다. 두 엔티티를 계속 동기화하는 비용이 더 크다고 봤다.
 
 **왜 150인가.** 과제 요구는 상위 100이지만 순위 근처 상품이 삭제되거나 노출에서 빠지면 화면에 채울 100이 모자랄 수 있다. 여유분 50을 더 저장한다. 개수는 상수(`RANK_LIMIT = 150`) 하나로 둔다.
 
