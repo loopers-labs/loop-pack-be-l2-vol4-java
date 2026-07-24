@@ -6,6 +6,14 @@ Accept: application/json
 GET http://localhost:8080/api/v1/rankings?date=20260717&page=1&size=20
 Accept: application/json
 
+### 주간 상품 랭킹 (date가 속한 월요일~일요일)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&date=20260709&page=1&size=20
+Accept: application/json
+
+### 월간 상품 랭킹 (date가 속한 달의 1일~말일)
+GET http://localhost:8080/api/v1/rankings?period=MONTHLY&date=20260620&page=1&size=20
+Accept: application/json
+
 ### 상품 상세와 오늘 순위
 GET http://localhost:8080/api/v1/products/1
 Accept: application/json

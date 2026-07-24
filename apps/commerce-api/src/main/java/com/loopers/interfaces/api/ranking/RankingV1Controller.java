@@ -4,6 +4,7 @@ import com.loopers.application.ranking.RankingFacade;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
+import com.loopers.ranking.RankingPeriod;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +25,7 @@ public class RankingV1Controller {
 
     @GetMapping
     public ApiResponse<List<RankingDto.Response>> getRankings(
+        @RequestParam(defaultValue = "DAILY") RankingPeriod period,
         @RequestParam(required = false) @DateTimeFormat(pattern = "yyyyMMdd") LocalDate date,
         @RequestParam(defaultValue = "1") Integer page,
         @RequestParam(defaultValue = "20") Integer size
@@ -32,8 +34,12 @@ public class RankingV1Controller {
             throw new CoreException(ErrorType.BAD_REQUEST, "page는 1 이상, size는 1 이상 100 이하여야 합니다.");
         }
         LocalDate targetDate = date == null ? LocalDate.now(clock) : date;
+        if (period != RankingPeriod.DAILY
+            && !period.isCompleted(targetDate, LocalDate.now(clock))) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "주간·월간 랭킹은 종료된 기간만 조회할 수 있습니다.");
+        }
         return ApiResponse.success(
-            rankingFacade.getRankings(targetDate, page, size).stream()
+            rankingFacade.getRankings(period, targetDate, page, size).stream()
                 .map(RankingDto.Response::from)
                 .toList()
         );
