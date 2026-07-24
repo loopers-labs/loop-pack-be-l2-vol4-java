@@ -22,6 +22,11 @@ management:
     defaults:
       enabled: false
 
+batch:
+  ranking:
+    lock-lease-seconds: ${BATCH_RANKING_LOCK_LEASE_SECONDS:7200}
+    staging-retention-days: ${BATCH_RANKING_STAGING_RETENTION_DAYS:7}
+
 ---
 spring:
   config:

@@ -6,6 +6,7 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductBrandProcessService;
 import com.loopers.domain.product.ProductService;
+import com.loopers.ranking.RankingPeriod;
 import lombok.RequiredArgsConstructor;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
@@ -29,9 +30,14 @@ public class RankingFacade {
 
     @Transactional(readOnly = true)
     public List<RankingInfo> getRankings(LocalDate date, int page, int size) {
+        return getRankings(RankingPeriod.DAILY, date, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankingInfo> getRankings(RankingPeriod period, LocalDate date, int page, int size) {
         long startedAt = System.nanoTime();
         try {
-            List<RankedProduct> rankedProducts = rankingRepository.findRankedProducts(date, page, size);
+            List<RankedProduct> rankedProducts = rankingRepository.findRankedProducts(period, date, page, size);
             if (rankedProducts.isEmpty()) {
                 meterRegistry.counter("ranking_query_total", "result", "miss").increment();
                 return List.of();
