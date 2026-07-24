@@ -1,11 +1,26 @@
-### 오늘 랭킹 1페이지 (기본 size=20)
+### 오늘 일간 랭킹 1페이지 (기본 period=DAILY, size=20)
 GET http://localhost:8080/api/v1/rankings
 
-### 특정 일자 랭킹
+### 특정 일자 일간 랭킹
 GET http://localhost:8080/api/v1/rankings?date=20260715&size=20&page=1
 
-### 어제 랭킹 (TTL 2일 이내)
+### 어제 일간 랭킹 (TTL 2일 이내)
 GET http://localhost:8080/api/v1/rankings?date=20260714
+
+### 주간 랭킹 — 기준일이 속한 ISO 주(월~일)의 MV 를 조회
+# 사전에 배치 실행 필요:
+#   ./gradlew :apps:commerce-batch:bootRun --args='--job.name=productRankAggregationJob baseDate=20260722 period=WEEKLY'
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&date=20260722&size=20&page=1
+
+### 월간 랭킹 — 기준일이 속한 달(1일~말일)의 MV 를 조회
+#   ./gradlew :apps:commerce-batch:bootRun --args='--job.name=productRankAggregationJob baseDate=20260722 period=MONTHLY'
+GET http://localhost:8080/api/v1/rankings?period=MONTHLY&date=20260722
+
+### 아직 배치가 돌지 않은 기간 → 빈 목록 (예외 아님)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&date=20200101
 
 ### 잘못된 date 형식 → 400
 GET http://localhost:8080/api/v1/rankings?date=2026-07-15
+
+### 알 수 없는 period → 400
+GET http://localhost:8080/api/v1/rankings?period=YEARLY

@@ -18,11 +18,12 @@ public class RankingV1Controller implements RankingV1ApiSpec {
     @GetMapping
     @Override
     public ApiResponse<RankingV1Dto.RankingPageResponse> getRankings(
+        @RequestParam(value = "period", required = false, defaultValue = "DAILY") String period,
         @RequestParam(value = "date", required = false) String date,
         @RequestParam(value = "page", required = false, defaultValue = "1") int page,
         @RequestParam(value = "size", required = false, defaultValue = "20") int size
     ) {
         return ApiResponse.success(RankingV1Dto.RankingPageResponse.from(
-            rankingFacade.getRankings(date, page, size)));
+            rankingFacade.getRankings(period, date, page, size)));
     }
 }

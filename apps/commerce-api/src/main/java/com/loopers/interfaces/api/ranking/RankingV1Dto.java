@@ -22,7 +22,8 @@ public class RankingV1Dto {
     }
 
     public record RankingPageResponse(
-        String date,
+        String period,
+        String periodKey,
         int page,
         int size,
         long totalCount,
@@ -30,7 +31,7 @@ public class RankingV1Dto {
     ) {
         public static RankingPageResponse from(RankingPageInfo info) {
             return new RankingPageResponse(
-                info.date(), info.page(), info.size(), info.totalCount(),
+                info.period(), info.periodKey(), info.page(), info.size(), info.totalCount(),
                 info.items().stream().map(RankingItemResponse::from).toList());
         }
     }

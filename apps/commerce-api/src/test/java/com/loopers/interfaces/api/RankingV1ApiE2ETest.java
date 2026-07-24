@@ -17,6 +17,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.time.LocalDate;
 
@@ -24,11 +26,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Sql(scripts = "/mv-product-rank-schema.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class RankingV1ApiE2ETest {
 
     private final TestRestTemplate testRestTemplate;
     private final ProductJpaRepository productJpaRepository;
     private final RedisTemplate<String, String> redisTemplate;
+    private final JdbcTemplate jdbcTemplate;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
 
@@ -37,18 +41,23 @@ class RankingV1ApiE2ETest {
         TestRestTemplate testRestTemplate,
         ProductJpaRepository productJpaRepository,
         RedisTemplate<String, String> redisTemplate,
+        JdbcTemplate jdbcTemplate,
         DatabaseCleanUp databaseCleanUp,
         RedisCleanUp redisCleanUp
     ) {
         this.testRestTemplate = testRestTemplate;
         this.productJpaRepository = productJpaRepository;
         this.redisTemplate = redisTemplate;
+        this.jdbcTemplate = jdbcTemplate;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
     }
 
     @AfterEach
     void tearDown() {
+        // MV 는 엔티티가 없어 DatabaseCleanUp 대상이 아니므로 직접 비운다
+        jdbcTemplate.update("DELETE FROM mv_product_rank_weekly");
+        jdbcTemplate.update("DELETE FROM mv_product_rank_monthly");
         databaseCleanUp.truncateAllTables();
         redisCleanUp.truncateAll();
     }
@@ -94,6 +103,49 @@ class RankingV1ApiE2ETest {
             .extracting(RankingV1Dto.RankingItemResponse::productId).containsExactly(p1.getId());
     }
 
+    @DisplayName("period=WEEKLY 는 배치가 적재한 주간 MV 를 확정 순위대로 반환한다.")
+    @Test
+    void weeklyRankingReturnsMaterializedView() {
+        Product p1 = productJpaRepository.save(new Product(1L, "주간일등", "d", 5000L, 10));
+        Product p2 = productJpaRepository.save(new Product(1L, "주간이등", "d", 3000L, 10));
+        insertWeekly("2026-W29", p1.getId(), 1, 30.0);
+        insertWeekly("2026-W29", p2.getId(), 2, 12.0);
+
+        ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response = testRestTemplate.exchange(
+            "/api/v1/rankings?period=WEEKLY&date=20260715&size=20&page=1", HttpMethod.GET, null, responseType);
+
+        assertAll(
+            () -> assertThat(response.getStatusCode().is2xxSuccessful()).isTrue(),
+            () -> assertThat(response.getBody().data().period()).isEqualTo("WEEKLY"),
+            () -> assertThat(response.getBody().data().periodKey()).isEqualTo("2026-W29"),
+            () -> assertThat(response.getBody().data().items())
+                .extracting(RankingV1Dto.RankingItemResponse::productId)
+                .containsExactly(p1.getId(), p2.getId()),
+            () -> assertThat(response.getBody().data().items().get(0).name()).isEqualTo("주간일등"),
+            () -> assertThat(response.getBody().data().totalCount()).isEqualTo(2L)
+        );
+    }
+
+    @DisplayName("period=MONTHLY 는 월간 MV 를 반환한다.")
+    @Test
+    void monthlyRankingReturnsMonthlyView() {
+        Product p1 = productJpaRepository.save(new Product(1L, "월간일등", "d", 1000L, 10));
+        jdbcTemplate.update("""
+            INSERT INTO mv_product_rank_monthly
+              (period_key, product_id, rank_no, score, like_count, order_count, view_count, created_at, updated_at)
+            VALUES ('2026-07', ?, 1, 88.0, 0, 0, 0, NOW(), NOW())
+            """, p1.getId());
+
+        ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response = testRestTemplate.exchange(
+            "/api/v1/rankings?period=MONTHLY&date=20260715", HttpMethod.GET, null, responseType);
+
+        assertAll(
+            () -> assertThat(response.getBody().data().periodKey()).isEqualTo("2026-07"),
+            () -> assertThat(response.getBody().data().items())
+                .extracting(RankingV1Dto.RankingItemResponse::productId).containsExactly(p1.getId())
+        );
+    }
+
     @DisplayName("잘못된 date 형식은 400 이다.")
     @Test
     void invalidDateRejected() {
@@ -102,5 +154,23 @@ class RankingV1ApiE2ETest {
             new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @DisplayName("알 수 없는 period 는 400 이다.")
+    @Test
+    void invalidPeriodRejected() {
+        ResponseEntity<ApiResponse<Object>> response = testRestTemplate.exchange(
+            "/api/v1/rankings?period=YEARLY", HttpMethod.GET, null,
+            new ParameterizedTypeReference<>() {});
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    private void insertWeekly(String periodKey, Long productId, int rankNo, double score) {
+        jdbcTemplate.update("""
+            INSERT INTO mv_product_rank_weekly
+              (period_key, product_id, rank_no, score, like_count, order_count, view_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 0, 0, 0, NOW(), NOW())
+            """, periodKey, productId, rankNo, score);
     }
 }
