@@ -22,6 +22,17 @@ management:
     defaults:
       enabled: false
 
+ranking:
+  # 일간 랭킹 스냅샷(week9) — ZSET 상위 N 을 ranking_daily_snapshot 으로 내린다.
+  snapshot:
+    top-n: 100
+  # 기간 랭킹(week10) — product_metrics_daily 를 구간 집계해 MV 로 내린다.
+  period:
+    # MV 에 남길 상위 N. 과제 요구사항은 TOP 100.
+    top-n: 100
+    # 청크 커밋 단위이자 Writer 의 batch 크기. 행이 (id, score) 수준으로 가벼워 500 으로 둔다.
+    chunk-size: 500
+
 ---
 spring:
   config:

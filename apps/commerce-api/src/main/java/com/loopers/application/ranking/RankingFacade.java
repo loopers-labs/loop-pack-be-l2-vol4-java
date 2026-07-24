@@ -5,7 +5,9 @@ import com.loopers.domain.brand.BrandService;
 import com.loopers.domain.product.ProductMetricsService;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
+import com.loopers.domain.ranking.PeriodRankingRepository;
 import com.loopers.domain.ranking.RankedProduct;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -30,13 +32,38 @@ import java.util.stream.Collectors;
 public class RankingFacade {
 
     private final RankingRepository rankingRepository;
+    private final PeriodRankingRepository periodRankingRepository;
     private final ProductService productService;
     private final ProductMetricsService productMetricsService;
     private final BrandService brandService;
 
+    /** 일간 랭킹(기존 시그니처 유지 — 호출부 하위 호환). */
     public RankingPageInfo getRanking(LocalDate date, int page, int size) {
-        List<RankedProduct> ranked = rankingRepository.findPage(date, page, size);
-        long totalCount = rankingRepository.size(date);
+        return getRanking(RankingPeriod.DAILY, date, page, size);
+    }
+
+    /**
+     * 기간별 랭킹. {@code date} 는 <b>조회 기준일</b>이며 그 날짜가 속한 기간으로 환산해 찾는다(week10).
+     *
+     * <p>소스가 갈린다: 일간은 실시간 ZSET(+스냅샷 폴백), 주간/월간은 배치가 확정한 MV.
+     * 상품 상세를 조합하는 뒷부분은 세 단위가 완전히 같으므로 {@link #assemble} 로 공유한다.
+     */
+    public RankingPageInfo getRanking(RankingPeriod period, LocalDate date, int page, int size) {
+        List<RankedProduct> ranked;
+        long totalCount;
+        if (period.isDaily()) {
+            ranked = rankingRepository.findPage(date, page, size);
+            totalCount = rankingRepository.size(date);
+        } else {
+            LocalDate periodStart = period.resolveStart(date);
+            ranked = periodRankingRepository.findPage(period, periodStart, page, size);
+            totalCount = periodRankingRepository.size(period, periodStart);
+        }
+        return assemble(ranked, totalCount, page, size);
+    }
+
+    /** 순위 목록에 상품/브랜드/좋아요수를 조합한다. 랭킹 소스와 무관하게 동일하다. */
+    private RankingPageInfo assemble(List<RankedProduct> ranked, long totalCount, int page, int size) {
         if (ranked.isEmpty()) {
             return new RankingPageInfo(List.of(), totalCount, page, size);
         }

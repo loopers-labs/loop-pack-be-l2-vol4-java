@@ -31,3 +31,22 @@ create table if not exists event_handled (consumer_group varchar(100) not null, 
 -- (PK = ranking_date, product_id), 여기서 "일자 + 순위순" 조회용 인덱스만 얹는다.
 -- PK 는 (ranking_date, product_id) 라 순위 정렬을 못 타므로 별도 인덱스가 필요하다. (운영: docs/week9/migration_ranking_snapshot.sql)
 create index idx_rds_date_rank on ranking_daily_snapshot (ranking_date, rank_no);
+
+-- =============================================================================
+-- week10 Spring Batch 기간 랭킹(주간/월간 MV)
+-- =============================================================================
+-- product_metrics_daily(ProductMetricsDailyEntity)는 PK 가 (metric_date, product_id) 라 선두 컬럼이 날짜다.
+-- 배치의 구간 조회 `WHERE metric_date BETWEEN ? AND ? GROUP BY product_id` 는 PK 레인지 스캔으로 커버되므로
+-- 별도 인덱스를 만들지 않는다.
+
+-- 주간/월간 MV 의 "기간 + 순위순" 페이지 조회 인덱스. 테이블 자체는 엔티티로 ddl-auto:create 가 만들고
+-- (PK = period_start, product_id), PK 로는 순위 정렬을 못 타므로 별도 인덱스가 필요하다.
+-- (운영: docs/week10/migration_period_ranking.sql)
+create index idx_mvw_period_rank on mv_product_rank_weekly (period_start, rank_no);
+create index idx_mvm_period_rank on mv_product_rank_monthly (period_start, rank_no);
+
+-- product_rank_staging — 배치 Step1(청크)이 구간 스코어를 임시 적재하는 스테이징 테이블.
+-- 랭킹은 전역 정렬이 필요한데 청크는 스트리밍이라 한 Step 으로 순위를 못 매긴다. Step1 이 전 상품 스코어를
+-- 여기 쌓고, Step2 가 ROW_NUMBER() 로 상위 N 의 순위를 확정해 MV 로 옮긴다.
+-- JPA 엔티티가 아니라(commerce-batch 가 JdbcTemplate 로 write) 직접 생성한다.
+create table if not exists product_rank_staging (period_type varchar(10) not null, period_start date not null, product_id bigint not null, score double not null, primary key (period_type, period_start, product_id));
