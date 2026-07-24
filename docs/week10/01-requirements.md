@@ -443,4 +443,4 @@ POST /admin/metrics/seed
 - [x] ~~`ranking.yml` 공유 위치~~ — 만들지 않기로 결론. 가중치는 거의 고정인 값 하나라 공유 모듈을 신설할 값어치가 없다. 양쪽 상수 + 계약 테스트로 간다(「점수 정책 공유」). 자주 바뀌는 값이 되면 그때 재검토
 - [ ] 소비 지연 watermark — 월요일 새벽 실행 시점에 일요일 이벤트가 모두 반영됐다는 보장이 없다. Kafka lag가 남아 있으면 첫 확정본부터 낡는다. 실행 전 lag 확인, 실행 시각 늦추기, 재집계로 흡수 중 하나를 정한다
 - [ ] MV 보존 기간 — 지난 기간 `period_key`가 계속 쌓인다. 언젠가 정리 배치가 필요하나 당장은 아니다
-- [ ] 배치 실패 알림 — `JobListener.afterJob`에 `getStatus() == FAILED` 분기 추가 (Slack appender는 이미 붙어 있음)
+- [x] ~~배치 실패 알림~~ — `JobListener.afterJob`이 `FAILED`면 실패 사유를 `log.error`로 남긴다. logback Slack appender가 붙어 있어 그대로 채널로 나간다. 완료 가드 예외는 `JobExecution` 생성 전에 던져져 여기 안 오므로 실제 실행 실패만 걸린다
