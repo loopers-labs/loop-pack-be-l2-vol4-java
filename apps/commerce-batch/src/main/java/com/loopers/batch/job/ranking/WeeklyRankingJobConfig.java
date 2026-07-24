@@ -103,9 +103,11 @@ public class WeeklyRankingJobConfig {
 
     @StepScope
     @Bean(READER)
-    public ItemStreamReader<RankingRow> weeklyRankingReader(@Value("#{jobParameters['targetDate']}") String targetDate) {
+    public ItemStreamReader<RankingRow> weeklyRankingReader(
+            @Value("#{jobParameters['targetDate']}") String targetDate,
+            @Value("${ranking.reader.type:CURSOR}") RankingItemReaderFactory.Type readerType) {
         RankingPeriod.Range range = PERIOD.resolve(TargetDateValidator.parse(targetDate));
-        return RankingItemReaderFactory.cursor(dataSource, range, weights);
+        return RankingItemReaderFactory.create(readerType, dataSource, range, weights);
     }
 
     @StepScope

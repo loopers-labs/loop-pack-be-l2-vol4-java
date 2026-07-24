@@ -284,9 +284,14 @@ Sort_rows                150   ← LIMIT 인지 정렬이라 5만 건이 아니�
 
 행 단위로 진짜 스트리밍하려면 `fetchSize = Integer.MIN_VALUE`를, 서버 커서를 쓰려면 `useCursorFetch=true` + 양의 fetch size를 준다. 둘은 다른 기능이고 우리는 어느 쪽도 필요 없다.
 
-**둘 다 구현하는 이유는 이 판단을 실측으로 확인하려는 것이다.** `RankingItemReaderFactory`에 `cursor`/`paging`을 두고 설정으로 전환한다. 페이징 `pageSize`는 청크와 같은 100으로 둔다 — 150이면 1페이지에 끝나 커서와 구분이 안 되고, 100이면 2페이지가 생겨 서브쿼리 재집계 비용이 드러난다. 재는 것은 쿼리 수, Step 시간, 커넥션 점유 시간, 두 리더의 결과 동일성.
+**둘 다 구현하는 이유는 이 판단을 확인하려는 것이다.** `RankingItemReaderFactory`에 `cursor`/`paging`을 두고 `ranking.reader.type` 설정으로 전환한다(기본 `CURSOR`). 페이징 `pageSize`는 청크와 같은 100으로 둔다 — 150이면 1페이지에 끝나 커서와 구분이 안 되고, 100이면 2페이지가 생겨 서브쿼리 재집계가 드러난다.
 
-`chunkSize`는 100이다. Reader/Processor/Writer는 `@StepScope`로 둔다 — 그래야 `targetDate`가 실행 시점에 늦게 바인딩된다.
+두 가지를 테스트로 고정했다(`RankingItemReaderFactoryTest`).
+
+- **결과 동일성** — 200개를 넣고 커서·페이징을 각각 흘려 두 리스트가 같은 150개를 같은 순서로 내는지 단언한다. 페이지 경계(100↔101)에서 순서가 어긋나지 않는다.
+- **페이징이 실제로 만드는 SQL** — `MySqlPagingQueryProvider`가 낸 2페이지 쿼리가 `... GROUP BY m.product_id) AS MAIN_QRY WHERE (score < ?) OR (...) ... LIMIT 100`임을 확인한다. 서브쿼리 안에 `LIMIT`이 없어 페이지마다 기간 전체를 다시 집계한다는 문서의 주장이 생성 SQL로 확정된다.
+
+`chunkSize`는 100이다. Reader/Processor/Writer는 `@StepScope`로 둔다 — 그래야 `targetDate`가 실행 시점에 늦게 바인딩된다. 페이징 리더는 `ItemReader`가 아니라 `ItemStreamReader` 타입으로 노출해야 한다. `ItemReader`로 두면 `@StepScope` JDK 프록시가 `ItemStream`을 가려 Step이 커서를 `open()`하지 않는다.
 
 ### Job은 둘, 구현은 공유
 
