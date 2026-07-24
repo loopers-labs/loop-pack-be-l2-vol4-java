@@ -34,7 +34,7 @@ val rankingBatchBenchmarkLabel = providers.gradleProperty("rankingBatchBenchmark
 
 tasks.named<Test>("test") {
     useJUnitPlatform {
-        excludeTags("benchmark")
+        excludeTags("benchmark", "period-ranking-benchmark")
     }
 }
 
@@ -47,6 +47,9 @@ tasks.register<Test>("rankingBatchBenchmark") {
     maxParallelForks = 1
     useJUnitPlatform {
         includeTags("benchmark")
+    }
+    filter {
+        includeTestsMatching("com.loopers.benchmark.ranking.RankingBatchBenchmarkTest")
     }
 
     systemProperty("rankingBatchBenchmarkCardinalities", rankingBatchBenchmarkCardinalities.get())
@@ -61,6 +64,57 @@ tasks.register<Test>("rankingBatchBenchmark") {
     systemProperty("api.version", System.getProperty("api.version") ?: "1.40")
     systemProperty("spring.jpa.show-sql", "false")
     systemProperty("spring.batch.job.enabled", "false")
+    systemProperty("user.timezone", "Asia/Seoul")
+    jvmArgs("-Xshare:off")
+
+    shouldRunAfter(tasks.named("test"))
+    outputs.upToDateWhen { false }
+}
+
+val periodRankingBenchmarkCardinalities = providers.gradleProperty("periodRankingBenchmarkCardinalities").orElse("1000,5000")
+val periodRankingBenchmarkPeriodDays = providers.gradleProperty("periodRankingBenchmarkPeriodDays").orElse("7")
+val periodRankingBenchmarkActiveHours = providers.gradleProperty("periodRankingBenchmarkActiveHours").orElse("1")
+val periodRankingBenchmarkPageSize = providers.gradleProperty("periodRankingBenchmarkPageSize").orElse("100")
+val periodRankingBenchmarkChunkSizes = providers.gradleProperty("periodRankingBenchmarkChunkSizes").orElse("100,500,1000")
+val periodRankingBenchmarkRuns = providers.gradleProperty("periodRankingBenchmarkRuns").orElse("3")
+val periodRankingBenchmarkWarmup = providers.gradleProperty("periodRankingBenchmarkWarmup").orElse("1")
+val periodRankingBenchmarkContentionRuns = providers.gradleProperty("periodRankingBenchmarkContentionRuns").orElse("3")
+val periodRankingBenchmarkHoldMs = providers.gradleProperty("periodRankingBenchmarkHoldMs").orElse("400")
+val periodRankingBenchmarkOutputDir = providers.gradleProperty("periodRankingBenchmarkOutputDir").orElse(
+    layout.buildDirectory.dir("reports/period-ranking").map { it.asFile.absolutePath },
+)
+val periodRankingBenchmarkLabel = providers.gradleProperty("periodRankingBenchmarkLabel").orElse("local")
+
+tasks.register<Test>("periodRankingBenchmark") {
+    group = "verification"
+    description = "Runs period ranking aggregation, chunk-size, and isolation-level benchmarks."
+
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform {
+        includeTags("period-ranking-benchmark")
+    }
+    filter {
+        includeTestsMatching("com.loopers.benchmark.ranking.period.PeriodRankingBenchmarkTest")
+    }
+
+    systemProperty("periodRankingBenchmarkCardinalities", periodRankingBenchmarkCardinalities.get())
+    systemProperty("periodRankingBenchmarkPeriodDays", periodRankingBenchmarkPeriodDays.get())
+    systemProperty("periodRankingBenchmarkActiveHours", periodRankingBenchmarkActiveHours.get())
+    systemProperty("periodRankingBenchmarkPageSize", periodRankingBenchmarkPageSize.get())
+    systemProperty("periodRankingBenchmarkChunkSizes", periodRankingBenchmarkChunkSizes.get())
+    systemProperty("periodRankingBenchmarkRuns", periodRankingBenchmarkRuns.get())
+    systemProperty("periodRankingBenchmarkWarmup", periodRankingBenchmarkWarmup.get())
+    systemProperty("periodRankingBenchmarkContentionRuns", periodRankingBenchmarkContentionRuns.get())
+    systemProperty("periodRankingBenchmarkHoldMs", periodRankingBenchmarkHoldMs.get())
+    systemProperty("periodRankingBenchmarkOutputDir", periodRankingBenchmarkOutputDir.get())
+    systemProperty("periodRankingBenchmarkLabel", periodRankingBenchmarkLabel.get())
+    systemProperty("spring.profiles.active", "test")
+    systemProperty("api.version", System.getProperty("api.version") ?: "1.40")
+    systemProperty("spring.jpa.show-sql", "false")
+    systemProperty("spring.batch.job.enabled", "false")
+    systemProperty("spring.batch.job.name", "none")
     systemProperty("user.timezone", "Asia/Seoul")
     jvmArgs("-Xshare:off")
 
