@@ -1,0 +1,11 @@
+label,run,isolation,hold_ms,snapshot_insert_ms,source_update_latency_ms,updated_rows
+week10-local-20260724-transactional,1,REPEATABLE_READ,400,588.2736,420.0935,1
+week10-local-20260724-transactional,1,READ_COMMITTED,400,527.6442,5.0322,1
+week10-local-20260724-transactional,2,READ_COMMITTED,400,127.6773,2.7395,1
+week10-local-20260724-transactional,2,REPEATABLE_READ,400,196.4421,425.8960,1
+week10-local-20260724-transactional,3,REPEATABLE_READ,400,246.6640,412.5262,1
+week10-local-20260724-transactional,3,READ_COMMITTED,400,115.6440,103.2317,1
+week10-local-20260724-transactional,4,READ_COMMITTED,400,201.9055,4.5340,1
+week10-local-20260724-transactional,4,REPEATABLE_READ,400,144.0996,422.5543,1
+week10-local-20260724-transactional,5,REPEATABLE_READ,400,249.4748,421.3318,1
+week10-local-20260724-transactional,5,READ_COMMITTED,400,508.4644,2.7277,1
