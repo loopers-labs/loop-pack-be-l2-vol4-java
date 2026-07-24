@@ -4,12 +4,14 @@ import com.loopers.application.ranking.RankingContribution;
 import com.loopers.confg.kafka.message.EventEnvelope;
 import com.loopers.domain.metrics.EventHandled;
 import com.loopers.infrastructure.metrics.EventHandledJpaRepository;
+import com.loopers.infrastructure.metrics.ProductMetricsDailyJpaRepository;
 import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,6 +39,7 @@ import java.util.Set;
 public class MetricsBatchEventHandler {
 
     private final ProductMetricsJpaRepository productMetricsJpaRepository;
+    private final ProductMetricsDailyJpaRepository productMetricsDailyJpaRepository;
     private final EventHandledJpaRepository eventHandledJpaRepository;
 
     /**
@@ -80,8 +83,13 @@ public class MetricsBatchEventHandler {
             }
         }
 
-        acc.forEach((productId, a) -> productMetricsJpaRepository.upsertMetrics(
-            productId, a.likeDelta, a.saleQty, a.viewCount));
+        LocalDate metricDate = LocalDate.now();
+        acc.forEach((productId, a) -> {
+            productMetricsJpaRepository.upsertMetrics(
+                productId, a.likeDelta, a.saleQty, a.viewCount, a.orderScore);
+            productMetricsDailyJpaRepository.upsertDailyMetrics(
+                metricDate, productId, a.likeDelta, a.saleQty, a.viewCount, a.orderScore);
+        });
         eventHandledJpaRepository.saveAll(toRecord);
 
         Map<Long, RankingContribution> contributions = new LinkedHashMap<>();

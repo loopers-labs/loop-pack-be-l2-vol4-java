@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.ranking;
 
 import com.loopers.application.ranking.RankingApplicationService;
 import com.loopers.application.ranking.RankingInfo;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -33,11 +34,13 @@ public class RankingV1Controller {
     @GetMapping
     public ApiResponse<List<RankingV1Dto.RankingResponse>> getRankings(
         @RequestParam(required = false) String date,
+        @RequestParam(required = false) String period,
         @RequestParam(required = false, defaultValue = "20") int size,
         @RequestParam(required = false, defaultValue = "1") int page
     ) {
         LocalDate target = parseDate(date);
-        List<RankingV1Dto.RankingResponse> responses = rankingApplicationService.getRanking(target, page, size).stream()
+        RankingPeriod rankingPeriod = RankingPeriod.from(period);
+        List<RankingV1Dto.RankingResponse> responses = rankingApplicationService.getRanking(target, rankingPeriod, page, size).stream()
             .map(RankingV1Dto.RankingResponse::from)
             .toList();
         return ApiResponse.success(responses);

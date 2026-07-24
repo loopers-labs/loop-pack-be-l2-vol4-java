@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,6 +40,7 @@ class RankingBatchIntegrationTest {
     @Autowired private CommerceEventConsumer consumer;
     @Autowired private RankingRedisStore rankingRedisStore;
     @Autowired private ProductMetricsJpaRepository productMetricsJpaRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private RedisTemplate<String, String> redisTemplate;
     @Autowired private DatabaseCleanUp databaseCleanUp;
     @Autowired private RedisCleanUp redisCleanUp;
@@ -105,6 +107,15 @@ class RankingBatchIntegrationTest {
         assertThat(metrics.getViewCount()).isEqualTo(3);
         assertThat(metrics.getLikeCount()).isEqualTo(2);
         assertThat(metrics.getSaleCount()).isEqualTo(2);
+
+        Map<String, Object> daily = jdbcTemplate.queryForMap(
+            "SELECT view_count, like_count, sale_count, order_score FROM product_metrics_daily "
+                + "WHERE metric_date = CURRENT_DATE AND product_id = ?",
+            productId);
+        assertThat(((Number) daily.get("view_count")).longValue()).isEqualTo(3);
+        assertThat(((Number) daily.get("like_count")).longValue()).isEqualTo(2);
+        assertThat(((Number) daily.get("sale_count")).longValue()).isEqualTo(2);
+        assertThat(((Number) daily.get("order_score")).doubleValue()).isCloseTo(orderScore, within(1e-9));
 
         // TTL 이 설정되어 있어야 한다(일간 48h, 시간별 3h).
         assertThat(redisTemplate.getExpire(allKey())).isGreaterThan(0);

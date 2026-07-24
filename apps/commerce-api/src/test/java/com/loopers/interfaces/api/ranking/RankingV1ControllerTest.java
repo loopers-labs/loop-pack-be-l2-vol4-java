@@ -18,7 +18,16 @@ class RankingV1ControllerTest {
     @DisplayName("잘못된 date 형식은 BAD_REQUEST CoreException 을 던진다")
     @Test
     void invalidDateThrowsBadRequest() {
-        assertThatThrownBy(() -> controller.getRankings("2026-07-15", 20, 1))
+        assertThatThrownBy(() -> controller.getRankings("2026-07-15", null, 20, 1))
+            .isInstanceOf(CoreException.class)
+            .extracting(e -> ((CoreException) e).getErrorType())
+            .isEqualTo(ErrorType.BAD_REQUEST);
+    }
+
+    @DisplayName("잘못된 period 는 BAD_REQUEST CoreException 을 던진다")
+    @Test
+    void invalidPeriodThrowsBadRequest() {
+        assertThatThrownBy(() -> controller.getRankings("20260715", "yearly", 20, 1))
             .isInstanceOf(CoreException.class)
             .extracting(e -> ((CoreException) e).getErrorType())
             .isEqualTo(ErrorType.BAD_REQUEST);

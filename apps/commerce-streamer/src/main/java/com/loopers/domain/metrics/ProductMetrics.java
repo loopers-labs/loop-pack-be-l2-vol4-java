@@ -32,6 +32,9 @@ public class ProductMetrics {
     @Column(name = "view_count", nullable = false)
     private long viewCount;
 
+    @Column(name = "order_score", nullable = false)
+    private double orderScore;
+
     /** 마지막 이벤트 반영 시각 — 집계 최신성 판단 기준. */
     @Column(name = "updated_at", nullable = false)
     private ZonedDateTime updatedAt;
@@ -52,6 +55,10 @@ public class ProductMetrics {
 
     public long getViewCount() {
         return viewCount;
+    }
+
+    public double getOrderScore() {
+        return orderScore;
     }
 
     public ZonedDateTime getUpdatedAt() {

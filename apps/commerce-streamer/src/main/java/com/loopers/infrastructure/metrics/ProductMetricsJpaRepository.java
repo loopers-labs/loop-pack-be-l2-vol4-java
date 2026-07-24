@@ -22,16 +22,18 @@ public interface ProductMetricsJpaRepository extends JpaRepository<ProductMetric
      * 1회로 줄인다. 증감 의미(원자 증가, like_count 음수 방지)는 기존과 동일하다.
      */
     @Modifying
-    @Query(value = "INSERT INTO product_metrics (product_id, like_count, sale_count, view_count, updated_at) "
-        + "VALUES (:productId, GREATEST(:likeDelta, 0), :saleDelta, :viewDelta, NOW(6)) "
+    @Query(value = "INSERT INTO product_metrics (product_id, like_count, sale_count, view_count, order_score, updated_at) "
+        + "VALUES (:productId, GREATEST(:likeDelta, 0), :saleDelta, :viewDelta, :orderScoreDelta, NOW(6)) "
         + "ON DUPLICATE KEY UPDATE "
         + "like_count = GREATEST(like_count + :likeDelta, 0), "
         + "sale_count = sale_count + :saleDelta, "
         + "view_count = view_count + :viewDelta, "
+        + "order_score = order_score + :orderScoreDelta, "
         + "updated_at = NOW(6)",
         nativeQuery = true)
     int upsertMetrics(@Param("productId") Long productId,
                       @Param("likeDelta") long likeDelta,
                       @Param("saleDelta") long saleDelta,
-                      @Param("viewDelta") long viewDelta);
+                      @Param("viewDelta") long viewDelta,
+                      @Param("orderScoreDelta") double orderScoreDelta);
 }
