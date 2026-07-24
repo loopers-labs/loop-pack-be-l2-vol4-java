@@ -1,6 +1,6 @@
 package com.loopers.infrastructure.order;
 
-import com.loopers.domain.order.OrderCreatedEvent;
+import com.loopers.domain.order.OrderEvent;
 import com.loopers.domain.order.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,7 +13,7 @@ public class OrderCoreEventPublisher implements OrderEventPublisher {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
-    public void publish(OrderCreatedEvent event) {
+    public void publish(OrderEvent.OrderCreated event) {
         applicationEventPublisher.publishEvent(event);
     }
 }

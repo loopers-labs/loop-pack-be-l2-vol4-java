@@ -9,6 +9,8 @@ import com.loopers.domain.product.ProductService;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsService;
 import com.loopers.domain.product.ProductViewedEvent;
+import com.loopers.domain.ranking.ProductRank;
+import com.loopers.domain.ranking.RankingService;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockService;
 import com.loopers.infrastructure.product.ProductCacheStore;
@@ -22,6 +24,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,6 +42,14 @@ public class ProductFacade {
     private final ProductInfoAssembler productInfoAssembler;
     private final ProductCacheStore productCacheStore;
     private final ProductEventPublisher productEventPublisher;
+    private final RankingService rankingService;
+
+    // 상품 정보는 캐시(TTL 5분)를 거치지만, 랭킹 순위는 실시간성이 중요하므로 캐시를 우회해 매 요청 새로 조회한다.
+    public ProductDetailInfo getProductDetail(Long id) {
+        ProductInfo info = getProduct(id);
+        ProductRank rank = rankingService.getRank(LocalDate.now(), id);
+        return ProductDetailInfo.of(info, rank == null ? null : rank.position());
+    }
 
     public ProductInfo getProduct(Long id) {
         productEventPublisher.publish(ProductViewedEvent.of(id));
