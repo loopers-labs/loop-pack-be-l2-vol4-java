@@ -1,0 +1,20 @@
+### [R10] product_metrics 일별 시드 — 배치 검증용 더미 (local 프로파일 전용)
+# 주간 배치는 최소 7일, 월간은 30일치 과거가 필요하다. 상품마다 인기 편차가 있어야 순위가 의미를 갖는다.
+POST {{commerce-streamer}}/api/v1/admin/metrics/seed
+Content-Type: application/json
+
+{
+  "from": "20260701",
+  "to": "20260731",
+  "productIds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+}
+
+### [R10] 주간 검증용 — 지난 주(월~일) 한 주치만
+POST {{commerce-streamer}}/api/v1/admin/metrics/seed
+Content-Type: application/json
+
+{
+  "from": "20260720",
+  "to": "20260726",
+  "productIds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+}
