@@ -21,8 +21,26 @@ spring:
     import:
       - jpa.yml
       - redis.yml
+      - kafka.yml
       - logging.yml
       - monitoring.yml
+
+# outbox 폴러를 기본 활성화
+outbox:
+  relay:
+    enabled: true
+    interval-ms: 1000 # 1초마다 발행
+
+# 대기열 입장 토큰 & 스케줄러
+queue:
+  entry-token:
+    ttl-seconds: 300 # 입장 토큰 수명 5분
+  scheduler:
+    enabled: true
+    interval-ms: 100 # Thundering Herd 평탄화: 100ms마다 잘게 입장
+    # 배치 크기 근거: DB 커넥션 풀 40 / 주문 처리 200ms(가정) = 200 TPS
+    # → 안전마진 70% = 140 TPS → 100ms tick당 14명. (200ms는 실측 전 가정치)
+    batch-size: 14
 
 springdoc:
   use-fqn: true
@@ -34,6 +52,23 @@ spring:
   config:
     activate:
       on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 테스트에서는 outbox 폴러를 기본 비활성화(브로커 미가동 시 발행 타임아웃으로 느려짐 방지).
+# Kafka 파이프라인 e2e 테스트는 @TestPropertySource로 true + Kafka testcontainer를 함께 켠다.
+outbox:
+  relay:
+    enabled: false
+
+# 테스트에서는 대기열 스케줄러도 비활성화(타이밍 의존 제거). tick()을 직접 호출해 검증한다.
+queue:
+  scheduler:
+    enabled: false
 
 ---
 spring:

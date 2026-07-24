@@ -14,6 +14,21 @@ public class CouponService {
 
     private final CouponRepository couponRepository;
     private final UserCouponRepository userCouponRepository;
+    private final CouponIssueRequestRepository couponIssueRequestRepository;
+
+    /** 선착순 발급 요청을 PENDING 상태로 기록한다(발행 이벤트와 같은 트랜잭션에서 호출). */
+    @Transactional
+    public void recordPending(String requestId, Long userId, Long couponId) {
+        couponIssueRequestRepository.save(new CouponIssueRequestModel(requestId, userId, couponId));
+    }
+
+    /** 발급 요청의 현재 상태(PENDING/ISSUED/SOLD_OUT)를 조회한다. */
+    @Transactional(readOnly = true)
+    public String getIssueStatus(String requestId) {
+        return couponIssueRequestRepository.findByRequestId(requestId)
+            .map(CouponIssueRequestModel::getStatus)
+            .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "존재하지 않는 발급 요청입니다."));
+    }
 
     @Transactional(readOnly = true)
     public CouponModel getCoupon(Long couponId) {

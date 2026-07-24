@@ -74,15 +74,20 @@ public class ProductService {
         }
     }
 
+    /**
+     * 비정규화된 like_count를 원자적 UPDATE로 증가. 좋아요 커밋 후 @Async AFTER_COMMIT 리스너에서 호출된다.
+     * 리스너가 별도 스레드(활성 트랜잭션 없음)에서 실행되므로, 기본 전파(REQUIRED)가 자연히 새 트랜잭션을 열어 커밋한다.
+     */
     @Transactional
     public void increaseLikeCount(Long id) {
-        // 비정규화된 like_count를 원자적 UPDATE로 증가. 좋아요 insert가 실제로 일어난 경우에만 호출된다.
         productRepository.increaseLikeCount(id);
     }
 
+    /**
+     * 비정규화된 like_count를 원자적 UPDATE로 감소(0 미만 가드 포함). @Async AFTER_COMMIT 리스너에서 호출된다.
+     */
     @Transactional
     public void decreaseLikeCount(Long id) {
-        // like_count > 0 가드가 쿼리에 포함돼 음수로 내려가지 않는다. 좋아요 delete가 실제로 일어난 경우에만 호출된다.
         productRepository.decreaseLikeCount(id);
     }
 

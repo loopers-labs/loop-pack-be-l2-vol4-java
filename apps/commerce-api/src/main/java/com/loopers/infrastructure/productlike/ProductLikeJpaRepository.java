@@ -13,6 +13,18 @@ public interface ProductLikeJpaRepository extends JpaRepository<ProductLikeModel
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
     /**
+     * (userId, productId) 좋아요를 멱등하게 insert한다. unique 제약(uk_product_like_user_product)에 걸리면
+     * MySQL이 예외 없이 무시하고 0행을 반환한다. created_at/updated_at은 NOT NULL이고 DB 기본값이 없어
+     * NOW()로 채운다(네이티브 insert는 @PrePersist를 타지 않으므로).
+     *
+     * @return 새로 insert되면 1, 이미 존재하면 0
+     */
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO product_like (user_id, product_id, created_at, updated_at) "
+        + "VALUES (:userId, :productId, NOW(), NOW())", nativeQuery = true)
+    int insertIgnore(@Param("userId") Long userId, @Param("productId") Long productId);
+
+    /**
      * (userId, productId) 좋아요를 삭제하고 영향받은 행 수를 반환한다.
      * 멱등 취소 판단(실제로 삭제가 일어났는지)에 사용한다.
      *
