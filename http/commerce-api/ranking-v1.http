@@ -10,5 +10,23 @@ GET http://localhost:8080/api/v1/rankings?date=20260713&page=2&size=10
 ### 랭킹 조회 - 잘못된 날짜 형식 (400)
 GET http://localhost:8080/api/v1/rankings?date=2026-07-13
 
+### 주간 랭킹 조회 - periodKey(yyyyWww)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&periodKey=2026W29
+
+### 월간 랭킹 조회 - periodKey(yyyyMM)
+GET http://localhost:8080/api/v1/rankings?period=MONTHLY&periodKey=202607
+
+### 주간 랭킹 조회 - 페이징 (1-based)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&periodKey=2026W29&page=2&size=10
+
+### 랭킹 조회 - date와 period 동시 사용 (400, 상호 배타)
+GET http://localhost:8080/api/v1/rankings?date=20260719&period=WEEKLY&periodKey=2026W29
+
+### 랭킹 조회 - period만 있고 periodKey 없음 (400)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY
+
+### 랭킹 조회 - periodKey 형식 오류 (400)
+GET http://localhost:8080/api/v1/rankings?period=WEEKLY&periodKey=2026-29
+
 ### 상품 상세 조회 - 오늘 랭킹 순위(rank) 포함 (순위권 밖이면 null)
 GET http://localhost:8080/api/v1/products/1

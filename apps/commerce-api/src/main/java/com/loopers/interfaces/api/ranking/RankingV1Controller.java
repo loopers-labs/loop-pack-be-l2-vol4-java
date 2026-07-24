@@ -2,6 +2,8 @@ package com.loopers.interfaces.api.ranking;
 
 import com.loopers.application.ranking.RankingFacade;
 import com.loopers.application.ranking.RankingInfo;
+import com.loopers.domain.ranking.RankingMvPeriod;
+import com.loopers.domain.ranking.RankingMvRequestValidator;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
@@ -27,6 +29,8 @@ public class RankingV1Controller {
     @GetMapping
     public ApiResponse<RankingV1Dto.RankingPageResponse> getRankings(
         @RequestParam(required = false) String date,
+        @RequestParam(required = false) String period,
+        @RequestParam(required = false) String periodKey,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -36,7 +40,11 @@ public class RankingV1Controller {
         if (size < 1 || size > 100) {
             throw new CoreException(ErrorType.BAD_REQUEST, "size는 1 이상 100 이하만 허용됩니다.");
         }
-        RankingInfo info = rankingFacade.getRankings(parseDate(date), page - 1, size);
+        RankingMvRequestValidator.validate(date, period, periodKey);
+
+        RankingInfo info = period != null
+            ? rankingFacade.getRankings(RankingMvPeriod.from(period), periodKey, page - 1, size)
+            : rankingFacade.getRankings(parseDate(date), page - 1, size);
         return ApiResponse.success(RankingV1Dto.RankingPageResponse.from(info));
     }
 

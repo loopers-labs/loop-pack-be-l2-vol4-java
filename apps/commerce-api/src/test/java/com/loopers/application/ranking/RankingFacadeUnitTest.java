@@ -3,6 +3,8 @@ package com.loopers.application.ranking;
 import com.loopers.application.product.ProductService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.ranking.RankingItem;
+import com.loopers.domain.ranking.RankingMvPeriod;
+import com.loopers.domain.ranking.RankingMvReadRepository;
 import com.loopers.domain.ranking.RankingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,9 @@ class RankingFacadeUnitTest {
     private RankingRepository rankingRepository;
 
     @Mock
+    private RankingMvReadRepository rankingMvReadRepository;
+
+    @Mock
     private ProductService productService;
 
     private RankingFacade rankingFacade;
@@ -43,7 +48,7 @@ class RankingFacadeUnitTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(TODAY.atStartOfDay(ZONE).toInstant(), ZONE);
-        rankingFacade = new RankingFacade(rankingRepository, productService, clock);
+        rankingFacade = new RankingFacade(rankingRepository, rankingMvReadRepository, productService, clock);
     }
 
     private Product product(Long id) {
@@ -132,6 +137,55 @@ class RankingFacadeUnitTest {
 
             assertThat(info.date()).isEqualTo(TODAY);
             assertThat(info.items()).isEmpty();
+        }
+    }
+
+    @DisplayName("주간/월간(MV) 랭킹을 조회할 때,")
+    @Nested
+    class GetRankingsByPeriod {
+
+        @DisplayName("period/periodKey로 MV 리포지토리를 조회해 상품정보와 함께 반환한다.")
+        @Test
+        void returnsMvRanking_withProductInfo() {
+            int size = 2;
+            given(rankingMvReadRepository.countTotal(RankingMvPeriod.WEEKLY, "2026W29")).willReturn(2L);
+            given(rankingMvReadRepository.findPage(RankingMvPeriod.WEEKLY, "2026W29", 0, size)).willReturn(List.of(
+                new RankingItem(1L, 100.0),
+                new RankingItem(2L, 90.0)
+            ));
+            given(productService.getProductsByIds(List.of(1L, 2L)))
+                .willReturn(List.of(product(1L), product(2L)));
+
+            RankingInfo info = rankingFacade.getRankings(RankingMvPeriod.WEEKLY, "2026W29", 0, size);
+
+            assertThat(info.period()).isEqualTo(RankingMvPeriod.WEEKLY);
+            assertThat(info.periodKey()).isEqualTo("2026W29");
+            assertThat(info.date()).isNull();
+            assertThat(info.totalCount()).isEqualTo(2L);
+            assertThat(info.items()).extracting(RankingInfo.RankingProductInfo::productId).containsExactly(1L, 2L);
+        }
+
+        @DisplayName("순위권 상품이 삭제되어 빠지면, 다음 페이지를 추가로 조회해 요청한 size만큼 채운다.")
+        @Test
+        void backfillsFromNextPage_whenSomeRankedProductsAreDeleted() {
+            int size = 2;
+            given(rankingMvReadRepository.countTotal(RankingMvPeriod.WEEKLY, "2026W29")).willReturn(10L);
+            given(rankingMvReadRepository.findPage(RankingMvPeriod.WEEKLY, "2026W29", 0, size)).willReturn(List.of(
+                new RankingItem(1L, 100.0),
+                new RankingItem(2L, 90.0)
+            ));
+            given(productService.getProductsByIds(List.of(1L, 2L))).willReturn(List.of(product(1L)));
+            given(rankingMvReadRepository.findPage(RankingMvPeriod.WEEKLY, "2026W29", 1, size)).willReturn(List.of(
+                new RankingItem(3L, 80.0)
+            ));
+            given(productService.getProductsByIds(List.of(3L))).willReturn(List.of(product(3L)));
+
+            RankingInfo info = rankingFacade.getRankings(RankingMvPeriod.WEEKLY, "2026W29", 0, size);
+
+            assertThat(info.items()).hasSize(size);
+            assertThat(info.items()).extracting(RankingInfo.RankingProductInfo::rank).containsExactly(1L, 3L);
+            then(rankingMvReadRepository).should(Mockito.times(2))
+                .findPage(eq(RankingMvPeriod.WEEKLY), eq("2026W29"), anyInt(), eq(size));
         }
     }
 }

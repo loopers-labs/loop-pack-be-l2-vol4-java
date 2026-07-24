@@ -12,12 +12,16 @@ public class RankingV1Dto {
 
     public record RankingPageResponse(
         String date,
+        String period,
+        String periodKey,
         long totalCount,
         List<RankingItemResponse> items
     ) {
         public static RankingPageResponse from(RankingInfo info) {
             return new RankingPageResponse(
-                info.date().format(DATE_FORMATTER),
+                info.date() != null ? info.date().format(DATE_FORMATTER) : null,
+                info.period() != null ? info.period().name() : null,
+                info.periodKey(),
                 info.totalCount(),
                 info.items().stream().map(RankingItemResponse::from).toList()
             );

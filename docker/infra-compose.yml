@@ -125,11 +125,26 @@ services:
       OFFSET_STORAGE_REPLICATION_FACTOR: 1
       STATUS_STORAGE_REPLICATION_FACTOR: 1
 
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    container_name: jenkins
+    user: root # 로컬 검증용: 마운트한 리포 파일에 대한 권한 이슈를 피하기 위함
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false # 로컬 1회성 검증용: 셋업 위저드/보안 설정 생략
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - gradle_cache:/root/.gradle
+      - ../:/workspace/loopers # 배치 잡을 로컬 검증하기 위해 리포를 그대로 마운트 (git 불필요)
+
 volumes:
   mysql-8-data:
   redis_master_data:
   redis_readonly_data:
   kafka-data:
+  jenkins_home:
+  gradle_cache:
 
 networks:
   default:

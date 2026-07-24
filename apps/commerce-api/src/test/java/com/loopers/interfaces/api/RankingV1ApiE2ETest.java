@@ -23,6 +23,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -61,6 +62,9 @@ class RankingV1ApiE2ETest {
     @Autowired
     private RedisCleanUp redisCleanUp;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @AfterEach
     void tearDown() {
         databaseCleanUp.truncateAllTables();
@@ -73,6 +77,26 @@ class RankingV1ApiE2ETest {
 
     private void addScore(LocalDate date, Long productId, double score) {
         redisTemplate.opsForZSet().add(RankingKeys.daily(date), productId.toString(), score);
+    }
+
+    private void insertWeeklyMvRow(String periodKey, Long productId, int rank, double score) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO mv_product_rank_weekly (period_key, product_id, rank_position, score, updated_at)
+                VALUES (?, ?, ?, ?, NOW())
+                """,
+            periodKey, productId, rank, score
+        );
+    }
+
+    private void insertMonthlyMvRow(String periodKey, Long productId, int rank, double score) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO mv_product_rank_monthly (period_key, product_id, rank_position, score, updated_at)
+                VALUES (?, ?, ?, ?, NOW())
+                """,
+            periodKey, productId, rank, score
+        );
     }
 
     private ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> get(String url) {
@@ -244,6 +268,132 @@ class RankingV1ApiE2ETest {
         void returnsBadRequest_whenSizeExceedsLimit() {
             ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
                 get(BASE_URL + "?size=101");
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @DisplayName("GET /api/v1/rankings?period=WEEKLY|MONTHLY")
+    @Nested
+    class GetRankingsByPeriod {
+
+        @DisplayName("period=WEEKLY&periodKey를 주면, MV 랭킹을 순위 오름차순으로 상품정보와 함께 반환한다.")
+        @Test
+        void returnsWeeklyMvRanking_withProductInfo() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity first = saveProduct(brand.getId(), "상품A", BigDecimal.valueOf(12000));
+            ProductEntity second = saveProduct(brand.getId(), "상품B", BigDecimal.valueOf(25000));
+            insertWeeklyMvRow("2026W29", first.getId(), 1, 87.3);
+            insertWeeklyMvRow("2026W29", second.getId(), 2, 55.0);
+
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=WEEKLY&periodKey=2026W29");
+
+            RankingV1Dto.RankingPageResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.date()).isNull(),
+                () -> assertThat(data.period()).isEqualTo("WEEKLY"),
+                () -> assertThat(data.periodKey()).isEqualTo("2026W29"),
+                () -> assertThat(data.totalCount()).isEqualTo(2L),
+                () -> assertThat(data.items()).hasSize(2),
+                () -> assertThat(data.items().get(0).rank()).isEqualTo(1L),
+                () -> assertThat(data.items().get(0).productId()).isEqualTo(first.getId()),
+                () -> assertThat(data.items().get(0).name()).isEqualTo("상품A"),
+                () -> assertThat(data.items().get(1).rank()).isEqualTo(2L),
+                () -> assertThat(data.items().get(1).productId()).isEqualTo(second.getId())
+            );
+        }
+
+        @DisplayName("period=MONTHLY&periodKey를 주면, MV 랭킹을 반환한다.")
+        @Test
+        void returnsMonthlyMvRanking() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity product = saveProduct(brand.getId(), "월간상품", BigDecimal.valueOf(9900));
+            insertMonthlyMvRow("202607", product.getId(), 1, 42.0);
+
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=MONTHLY&periodKey=202607");
+
+            RankingV1Dto.RankingPageResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.period()).isEqualTo("MONTHLY"),
+                () -> assertThat(data.periodKey()).isEqualTo("202607"),
+                () -> assertThat(data.items()).hasSize(1),
+                () -> assertThat(data.items().get(0).productId()).isEqualTo(product.getId())
+            );
+        }
+
+        @DisplayName("삭제된 상품은 MV 랭킹 항목에서도 제외된다.")
+        @Test
+        void excludesDeletedProduct_fromMvItems() {
+            BrandEntity brand = brandJpaRepository.save(new BrandEntity("브랜드", "설명"));
+            ProductEntity alive = saveProduct(brand.getId(), "판매중", BigDecimal.valueOf(10000));
+            ProductEntity deleted = saveProduct(brand.getId(), "삭제됨", BigDecimal.valueOf(20000));
+            deleted.delete();
+            productJpaRepository.save(deleted);
+            insertWeeklyMvRow("2026W29", deleted.getId(), 1, 99.0);
+            insertWeeklyMvRow("2026W29", alive.getId(), 2, 50.0);
+
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=WEEKLY&periodKey=2026W29");
+
+            RankingV1Dto.RankingPageResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.items()).hasSize(1),
+                () -> assertThat(data.items().get(0).productId()).isEqualTo(alive.getId()),
+                () -> assertThat(data.items().get(0).rank()).isEqualTo(2L)
+            );
+        }
+
+        @DisplayName("해당 periodKey에 랭킹 데이터가 없으면, 빈 페이지를 반환한다.")
+        @Test
+        void returnsEmptyPage_whenPeriodKeyHasNoRanking() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=WEEKLY&periodKey=2026W01");
+
+            RankingV1Dto.RankingPageResponse data = response.getBody().data();
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(data.totalCount()).isEqualTo(0L),
+                () -> assertThat(data.items()).isEmpty()
+            );
+        }
+
+        @DisplayName("date와 period를 함께 주면, 400 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenDateAndPeriodBothGiven() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?date=20260719&period=WEEKLY&periodKey=2026W29");
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("period만 있고 periodKey가 없으면, 400 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPeriodWithoutPeriodKey() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=WEEKLY");
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("periodKey 형식이 잘못되면, 400 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPeriodKeyFormatIsInvalid() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=WEEKLY&periodKey=2026-29");
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+
+        @DisplayName("지원하지 않는 period 값이면, 400 응답을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPeriodIsUnsupported() {
+            ResponseEntity<ApiResponse<RankingV1Dto.RankingPageResponse>> response =
+                get(BASE_URL + "?period=DAILY&periodKey=2026W29");
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }

@@ -3,6 +3,7 @@ package com.loopers.application.catalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.infrastructure.catalog.EventHandledEntity;
 import com.loopers.infrastructure.catalog.EventHandledJpaRepository;
+import com.loopers.infrastructure.catalog.ProductDailyMetricsJpaRepository;
 import com.loopers.infrastructure.catalog.ProductMetricsJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,12 +31,15 @@ class CatalogMetricsProcessorTest {
     @Mock
     private ProductMetricsJpaRepository productMetricsJpaRepository;
 
+    @Mock
+    private ProductDailyMetricsJpaRepository productDailyMetricsJpaRepository;
+
     private CatalogMetricsProcessor processor;
 
     @BeforeEach
     void setUp() {
         processor = new CatalogMetricsProcessor(eventHandledJpaRepository, productMetricsJpaRepository,
-            new ObjectMapper());
+            productDailyMetricsJpaRepository, new ObjectMapper());
     }
 
     @DisplayName("process()를 실행할 때,")
@@ -51,10 +55,11 @@ class CatalogMetricsProcessorTest {
                 "{\"orderId\":1,\"productQtyMap\":{\"10\":2}}");
 
             then(productMetricsJpaRepository).should(never()).upsertOrderCount(anyLong(), anyInt());
+            then(productDailyMetricsJpaRepository).should(never()).upsertOrderCount(anyLong(), anyInt());
             then(eventHandledJpaRepository).should(never()).save(any());
         }
 
-        @DisplayName("OrderItemSoldEvent 처리 시 productQtyMap 기준으로 order_count를 upsert한다.")
+        @DisplayName("OrderItemSoldEvent 처리 시 productQtyMap 기준으로 product_metrics와 product_daily_metrics의 order_count를 함께 upsert한다.")
         @Test
         void upsertsOrderCount_whenOrderItemSoldEvent() throws Exception {
             given(eventHandledJpaRepository.existsByEventId("uuid-2")).willReturn(false);
@@ -64,9 +69,11 @@ class CatalogMetricsProcessorTest {
 
             then(productMetricsJpaRepository).should().upsertOrderCount(10L, 2);
             then(productMetricsJpaRepository).should().upsertOrderCount(20L, 3);
+            then(productDailyMetricsJpaRepository).should().upsertOrderCount(10L, 2);
+            then(productDailyMetricsJpaRepository).should().upsertOrderCount(20L, 3);
         }
 
-        @DisplayName("ProductLikedEvent 처리 시 like_count를 1 증가시킨다.")
+        @DisplayName("ProductLikedEvent 처리 시 product_metrics와 product_daily_metrics의 like_count를 함께 1 증가시킨다.")
         @Test
         void incrementsLikeCount_whenProductLikedEvent() throws Exception {
             given(eventHandledJpaRepository.existsByEventId("uuid-3")).willReturn(false);
@@ -75,9 +82,10 @@ class CatalogMetricsProcessorTest {
                 "{\"productId\":10}");
 
             then(productMetricsJpaRepository).should().upsertLikeCountIncrement(10L);
+            then(productDailyMetricsJpaRepository).should().upsertLikeCountIncrement(10L);
         }
 
-        @DisplayName("ProductUnlikedEvent 처리 시 like_count를 1 감소시킨다.")
+        @DisplayName("ProductUnlikedEvent 처리 시 product_metrics와 product_daily_metrics의 like_count를 함께 1 감소시킨다.")
         @Test
         void decrementsLikeCount_whenProductUnlikedEvent() throws Exception {
             given(eventHandledJpaRepository.existsByEventId("uuid-4")).willReturn(false);
@@ -86,6 +94,19 @@ class CatalogMetricsProcessorTest {
                 "{\"productId\":10}");
 
             then(productMetricsJpaRepository).should().upsertLikeCountDecrement(10L);
+            then(productDailyMetricsJpaRepository).should().upsertLikeCountDecrement(10L);
+        }
+
+        @DisplayName("ProductViewedEvent 처리 시 product_metrics와 product_daily_metrics의 view_count를 함께 1 증가시킨다.")
+        @Test
+        void incrementsViewCount_whenProductViewedEvent() throws Exception {
+            given(eventHandledJpaRepository.existsByEventId("uuid-7")).willReturn(false);
+
+            processor.process("ProductViewedEvent", "uuid-7", "catalog-events-v1",
+                "{\"productId\":10}");
+
+            then(productMetricsJpaRepository).should().upsertViewCountIncrement(10L);
+            then(productDailyMetricsJpaRepository).should().upsertViewCountIncrement(10L);
         }
 
         @DisplayName("처리 완료 후 eventHandled를 저장한다.")
@@ -110,6 +131,7 @@ class CatalogMetricsProcessorTest {
             processor.process("UnknownEvent", "uuid-6", "catalog-events-v1", "{}");
 
             then(productMetricsJpaRepository).shouldHaveNoInteractions();
+            then(productDailyMetricsJpaRepository).shouldHaveNoInteractions();
             then(eventHandledJpaRepository).should().save(any());
         }
     }
