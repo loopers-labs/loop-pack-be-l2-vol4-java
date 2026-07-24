@@ -58,7 +58,7 @@ class DeadLetterTopicE2ETest {
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             publish("catalog-events", "901", valid);
-            assertThat(metricsRepository.find(901L)).isPresent()
+            assertThat(metricsRepository.find(901L, java.time.LocalDate.of(2026, 7, 2))).isPresent()
                 .get().extracting(m -> m.getViewCount()).isEqualTo(1L);
         });
 

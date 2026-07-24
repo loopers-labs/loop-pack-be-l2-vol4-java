@@ -29,6 +29,9 @@ class MetricsConsumerE2ETest {
         registry.add("spring.kafka.bootstrap-servers", KafkaTestContainersConfig::getBootstrapServers);
     }
 
+    // 페이로드의 occurredAt(2026-07-02T00:00:00Z) 을 KST 로 환산한 일자 — 집계 로우의 metric_date
+    private static final java.time.LocalDate KST_DATE = java.time.LocalDate.of(2026, 7, 2);
+
     @Autowired private ProductMetricsRepository metricsRepository;
     @Autowired private DatabaseCleanUp databaseCleanUp;
 
@@ -46,7 +49,7 @@ class MetricsConsumerE2ETest {
         // MetricsProcessor 의 event_handled 멱등 가드 덕분에 동일 eventId 재발행은 안전하다.
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             publish("catalog-events", "100", payload);
-            assertThat(metricsRepository.find(100L)).isPresent()
+            assertThat(metricsRepository.find(100L, KST_DATE)).isPresent()
                 .get().extracting(m -> m.getLikeCount()).isEqualTo(7L);
         });
     }
@@ -60,7 +63,7 @@ class MetricsConsumerE2ETest {
         // 같은 eventId 를 소비될 때까지 재발행 — event_handled 멱등 덕분에 view_count 는 1에 고정되어야 한다.
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
             publish("catalog-events", "200", payload);
-            assertThat(metricsRepository.find(200L)).isPresent()
+            assertThat(metricsRepository.find(200L, KST_DATE)).isPresent()
                 .get().extracting(m -> m.getViewCount()).isEqualTo(1L);
         });
     }
