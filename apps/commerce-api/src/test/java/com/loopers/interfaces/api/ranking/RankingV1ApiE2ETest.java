@@ -15,8 +15,10 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -34,6 +36,7 @@ class RankingV1ApiE2ETest {
     private final RedisTemplate<String, String> redisTemplate;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
+    private final JdbcTemplate jdbcTemplate;
 
     @Autowired
     RankingV1ApiE2ETest(
@@ -42,7 +45,8 @@ class RankingV1ApiE2ETest {
             ProductApplicationService productApplicationService,
             RedisTemplate<String, String> redisTemplate,
             DatabaseCleanUp databaseCleanUp,
-            RedisCleanUp redisCleanUp
+            RedisCleanUp redisCleanUp,
+            JdbcTemplate jdbcTemplate
     ) {
         this.testRestTemplate = testRestTemplate;
         this.brandApplicationService = brandApplicationService;
@@ -50,6 +54,7 @@ class RankingV1ApiE2ETest {
         this.redisTemplate = redisTemplate;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @AfterEach
@@ -60,6 +65,13 @@ class RankingV1ApiE2ETest {
 
     private void seedRanking(LocalDate date, String productId, double score) {
         redisTemplate.opsForZSet().add("ranking:all:" + date.format(DATE_FORMAT), productId, score);
+    }
+
+    private void seedWeeklyMv(LocalDate asOfDate, String productId, double score) {
+        jdbcTemplate.update("""
+                INSERT INTO mv_product_rank_weekly (as_of_date, product_id, score, view_sum, like_delta_sum, purchase_quantity_sum, created_at)
+                VALUES (?, ?, ?, 0, 0, 0, ?)
+                """, asOfDate, productId, score, ZonedDateTime.now());
     }
 
     @DisplayName("GET /api/v1/rankings")
@@ -243,6 +255,60 @@ class RankingV1ApiE2ETest {
 
             // assert
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("period=WEEKLY이면 RDB MV 스냅샷을 조회한다.")
+        @Test
+        void returnsRankedProducts_whenPeriodIsWeekly() {
+            // arrange
+            LocalDate asOfDate = LocalDate.of(2026, 7, 23);
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+            ProductInfo first = productApplicationService.createProduct(brand.id(), "에어맥스", "설명", 100_000L, 10);
+            ProductInfo second = productApplicationService.createProduct(brand.id(), "에어포스", "설명", 120_000L, 5);
+            seedWeeklyMv(asOfDate, first.id(), 30.0);
+            seedWeeklyMv(asOfDate, second.id(), 10.0);
+
+            // act
+            ParameterizedTypeReference<ApiResponse<PageResult<RankingV1Dto.RankingItemResponse>>> type =
+                    new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<PageResult<RankingV1Dto.RankingItemResponse>>> response =
+                    testRestTemplate.exchange(
+                            ENDPOINT + "?date=20260723&period=WEEKLY&page=0&size=20",
+                            HttpMethod.GET, HttpEntity.EMPTY, type
+                    );
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            List<RankingV1Dto.RankingItemResponse> content = response.getBody().data().content();
+            assertThat(content).hasSize(2);
+            assertThat(content.get(0).id()).isEqualTo(first.id());
+            assertThat(content.get(0).rank()).isEqualTo(1);
+            assertThat(content.get(1).id()).isEqualTo(second.id());
+            assertThat(content.get(1).rank()).isEqualTo(2);
+        }
+
+        @DisplayName("해당 as_of_date의 WEEKLY MV 스냅샷이 없으면 404를 반환한다.")
+        @Test
+        void returnsNotFound_whenWeeklyMvSnapshotDoesNotExist() {
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "?date=20260101&period=WEEKLY", HttpMethod.GET, HttpEntity.EMPTY, type);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+
+        @DisplayName("period 값이 열거형 밖이면 400을 반환한다.")
+        @Test
+        void returnsBadRequest_whenPeriodIsInvalid() {
+            // act
+            ParameterizedTypeReference<ApiResponse<Void>> type = new ParameterizedTypeReference<>() {};
+            ResponseEntity<ApiResponse<Void>> response =
+                    testRestTemplate.exchange(ENDPOINT + "?date=20260716&period=YEARLY", HttpMethod.GET, HttpEntity.EMPTY, type);
+
+            // assert
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         }
     }
 }

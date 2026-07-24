@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.ranking;
 
 import com.loopers.application.product.ProductApplicationService;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.support.error.CoreException;
@@ -30,14 +31,16 @@ public class RankingV1Controller implements RankingV1ApiSpec {
     @GetMapping
     public ApiResponse<PageResult<RankingV1Dto.RankingItemResponse>> getRankings(
             @RequestParam(required = false) String date,
+            @RequestParam(required = false, defaultValue = "DAILY") String period,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size
     ) {
         LocalDate targetDate = parseDate(date);
+        RankingPeriod targetPeriod = parsePeriod(period);
         validatePageRequest(page, size);
         return ApiResponse.success(
                 PageResult.from(
-                        productApplicationService.getRankedProducts(targetDate, PageRequest.of(page, size))
+                        productApplicationService.getRankedProducts(targetDate, targetPeriod, PageRequest.of(page, size))
                                 .map(RankingV1Dto.RankingItemResponse::from)
                 )
         );
@@ -51,6 +54,14 @@ public class RankingV1Controller implements RankingV1ApiSpec {
             return LocalDate.parse(date, DATE_FORMAT);
         } catch (DateTimeParseException e) {
             throw new CoreException(ErrorType.BAD_REQUEST, "date 형식이 올바르지 않습니다: " + date);
+        }
+    }
+
+    private RankingPeriod parsePeriod(String period) {
+        try {
+            return RankingPeriod.valueOf(period);
+        } catch (IllegalArgumentException e) {
+            throw new CoreException(ErrorType.BAD_REQUEST, "period 값이 올바르지 않습니다: " + period);
         }
     }
 

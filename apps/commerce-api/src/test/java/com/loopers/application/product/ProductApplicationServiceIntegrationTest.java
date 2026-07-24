@@ -6,6 +6,7 @@ import com.loopers.domain.inventory.InventoryEntity;
 import com.loopers.domain.inventory.InventoryRepository;
 import com.loopers.domain.like.LikeEntity;
 import com.loopers.domain.like.LikeRepository;
+import com.loopers.domain.metrics.ProductMetricSummaryRepository;
 import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.infrastructure.inventory.InventoryJpaRepository;
 import com.loopers.infrastructure.like.LikeJpaRepository;
@@ -58,6 +59,9 @@ class ProductApplicationServiceIntegrationTest {
 
     @Autowired
     private LikeJpaRepository likeJpaRepository;
+
+    @Autowired
+    private ProductMetricSummaryRepository productMetricSummaryRepository;
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
@@ -128,6 +132,27 @@ class ProductApplicationServiceIntegrationTest {
                     .isPresent()
                     .get()
                     .satisfies(inv -> assertEquals(10, inv.getQuantity()));
+        }
+
+        @DisplayName("[Error Guessing] 상품 등록 시 product_metric_summary가 0으로 초기화되어 함께 생성된다 (첫 이벤트를 기다리지 않는다).")
+        @Test
+        void createsProductMetricSummary_whenProductIsCreated() {
+            // arrange
+            BrandInfo brand = brandApplicationService.createBrand("나이키", "스포츠 브랜드");
+
+            // act
+            ProductInfo result = productApplicationService.createProduct(brand.id(), "에어맥스", "운동화 설명", 100_000L, 10);
+
+            // assert
+            assertThat(productMetricSummaryRepository.findByProductId(result.id()))
+                    .isPresent()
+                    .get()
+                    .satisfies(metric -> assertAll(
+                            () -> assertEquals(0L, metric.getViewCount()),
+                            () -> assertEquals(0L, metric.getLikeCount()),
+                            () -> assertEquals(0L, metric.getPurchaseCount()),
+                            () -> assertNotNull(metric.getCreatedAt())
+                    ));
         }
     }
 

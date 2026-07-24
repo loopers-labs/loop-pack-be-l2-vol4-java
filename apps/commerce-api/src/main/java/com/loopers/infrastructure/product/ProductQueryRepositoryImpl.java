@@ -4,7 +4,7 @@ import com.loopers.application.product.ProductInfo;
 import com.loopers.application.product.ProductQueryRepository;
 import com.loopers.infrastructure.brand.QBrandJpaEntity;
 import com.loopers.infrastructure.inventory.QInventoryJpaEntity;
-import com.loopers.infrastructure.metrics.QProductMetricsJpaEntity;
+import com.loopers.infrastructure.metrics.QProductMetricSummaryJpaEntity;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
@@ -28,7 +28,7 @@ public class ProductQueryRepositoryImpl implements ProductQueryRepository {
     private static final QProductJpaEntity product = QProductJpaEntity.productJpaEntity;
     private static final QBrandJpaEntity brand = QBrandJpaEntity.brandJpaEntity;
     private static final QInventoryJpaEntity inventory = QInventoryJpaEntity.inventoryJpaEntity;
-    private static final QProductMetricsJpaEntity metrics = QProductMetricsJpaEntity.productMetricsJpaEntity;
+    private static final QProductMetricSummaryJpaEntity metrics = QProductMetricSummaryJpaEntity.productMetricSummaryJpaEntity;
 
     @Override
     public Page<ProductInfo> findAllWithDetails(String brandId, Pageable pageable) {

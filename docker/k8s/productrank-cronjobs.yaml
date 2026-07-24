@@ -1,0 +1,155 @@
+# 주간/월간 랭킹 롤업 배치 (docs/domain/ranking_mv_batch/01-design.md #13, #23) 트리거.
+# 두 Job 모두 "완결된 어제까지" 롤링 윈도우를 매일 재계산하는 구조라(#5) 스케줄은 동일하게
+# 매일 새벽 2시(KST)로 둔다. requestDate는 실행 당일 날짜를 그대로 넘긴다(#6.1 참고).
+#
+# 주의: requestDate는 "--" 없이 key=value 형식으로 넘겨야 Job Parameter로 인식된다.
+# "--requestDate=..."로 쓰면 Spring Boot가 옵션으로 먼저 소비해버려 jobParameters에서
+# 빠지고 NPE로 실패한다 (01-design.md #6.3 참고). spring.batch.job.name처럼 Spring
+# 프로퍼티인 것만 "--"를 쓴다.
+#
+# 적용: kubectl apply -f docker/k8s/productrank-cronjobs.yaml -n loopers
+# 사전 준비:
+#   - Secret loopers-mysql-credentials (MYSQL_USER, MYSQL_PWD)
+#   - 이미지 loopers/commerce-batch:<tag> 를 레지스트리에 push
+#   - 아래 <REGISTRY>/<TAG>, MYSQL_HOST 등 플레이스홀더 치환
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loopers-commerce-batch-config
+  namespace: loopers
+data:
+  SPRING_PROFILES_ACTIVE: "prd"
+  MYSQL_HOST: "mysql.loopers.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  TZ: "Asia/Seoul"
+
+---
+# 실제 값은 별도로 관리(kubectl create secret / External Secrets 등)한다.
+# 여기 있는 값은 필드 이름을 보여주기 위한 자리표시자일 뿐이다.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: loopers-mysql-credentials
+  namespace: loopers
+type: Opaque
+stringData:
+  MYSQL_USER: "CHANGE_ME"
+  MYSQL_PWD: "CHANGE_ME"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: product-rank-weekly-job
+  namespace: loopers
+  labels:
+    app.kubernetes.io/name: commerce-batch
+    app.kubernetes.io/component: product-rank-weekly
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Asia/Seoul"
+  # 같은 requestDate로 두 인스턴스가 동시에 뜨면 cleanup(DELETE)과 재집계가 서로
+  # 경합할 수 있어(#23) 이전 실행이 끝나기 전엔 새 실행을 만들지 않는다.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      # k8s 레벨 재시도는 Spring Batch의 재시작 안전성(cleanup 재실행 + saveState(false), #23)과
+      # 궁합이 맞는다: 실패 후 새 Pod가 같은 requestDate로 다시 뜨면 cleanup부터 다시 돈다.
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 259200 # 3일 보관 후 자동 정리
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: commerce-batch
+            app.kubernetes.io/component: product-rank-weekly
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: commerce-batch
+              image: "<REGISTRY>/loopers-commerce-batch:<TAG>"
+              command: ["/bin/sh", "-c"]
+              args:
+                - >-
+                  exec java $JAVA_OPTS -jar app.jar
+                  requestDate=$(date +%F)
+              env:
+                - name: JOB_NAME
+                  value: "productRankWeeklyJob"
+              envFrom:
+                - configMapRef:
+                    name: loopers-commerce-batch-config
+                - secretRef:
+                    name: loopers-mysql-credentials
+              # --- CPU/메모리 산정 근거 ---
+              # Chunk-Oriented 단일 스텝(청크 500건)이라 애플리케이션 스레드 자체는 가볍다.
+              # 다만 modules/jpa의 HikariCP 풀 설정(maximum-pool-size: 40)이 API 트래픽 기준으로
+              # 잡혀 있어(공유 설정, 이번 변경 범위 밖) 배치 입장에서는 과할 수 있다는 점은 참고.
+              # request:limit = 1:2(CPU), 1:1.3(메모리) 정도로 두어 노드 스케줄링 여유는 주되
+              # OOMKill 여지는 최소화했다. JVM 힙은 Dockerfile의 -XX:MaxRAMPercentage=70.0이
+              # limit(memory) 기준으로 자동 계산되므로 limit을 바꾸면 힙도 같이 움직인다.
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "768Mi"
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: product-rank-monthly-job
+  namespace: loopers
+  labels:
+    app.kubernetes.io/name: commerce-batch
+    app.kubernetes.io/component: product-rank-monthly
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Asia/Seoul"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 259200
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: commerce-batch
+            app.kubernetes.io/component: product-rank-monthly
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: commerce-batch
+              image: "<REGISTRY>/loopers-commerce-batch:<TAG>"
+              command: ["/bin/sh", "-c"]
+              args:
+                - >-
+                  exec java $JAVA_OPTS -jar app.jar
+                  requestDate=$(date +%F)
+              env:
+                - name: JOB_NAME
+                  value: "productRankMonthlyJob"
+              envFrom:
+                - configMapRef:
+                    name: loopers-commerce-batch-config
+                - secretRef:
+                    name: loopers-mysql-credentials
+              # 월간은 30일치를 읽지만 여전히 청크 500건 단위 순차 처리라 리소스 프로필은
+              # weekly와 동일하게 둔다. 실측 후 필요하면 조정.
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "768Mi"
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"

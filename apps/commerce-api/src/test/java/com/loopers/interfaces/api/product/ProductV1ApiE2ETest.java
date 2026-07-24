@@ -6,8 +6,8 @@ import com.loopers.application.like.LikeApplicationService;
 import com.loopers.application.product.ProductApplicationService;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.application.user.UserApplicationService;
-import com.loopers.infrastructure.metrics.ProductMetricsJpaEntity;
-import com.loopers.infrastructure.metrics.ProductMetricsJpaRepository;
+import com.loopers.infrastructure.metrics.ProductMetricSummaryJpaEntity;
+import com.loopers.infrastructure.metrics.ProductMetricSummaryJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResult;
 import com.loopers.utils.DatabaseCleanUp;
@@ -40,7 +40,7 @@ class ProductV1ApiE2ETest {
     private final ProductApplicationService productApplicationService;
     private final LikeApplicationService likeApplicationService;
     private final UserApplicationService userApplicationService;
-    private final ProductMetricsJpaRepository productMetricsJpaRepository;
+    private final ProductMetricSummaryJpaRepository productMetricSummaryJpaRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final DatabaseCleanUp databaseCleanUp;
     private final RedisCleanUp redisCleanUp;
@@ -52,7 +52,7 @@ class ProductV1ApiE2ETest {
             ProductApplicationService productApplicationService,
             LikeApplicationService likeApplicationService,
             UserApplicationService userApplicationService,
-            ProductMetricsJpaRepository productMetricsJpaRepository,
+            ProductMetricSummaryJpaRepository productMetricSummaryJpaRepository,
             RedisTemplate<String, String> redisTemplate,
             DatabaseCleanUp databaseCleanUp,
             RedisCleanUp redisCleanUp
@@ -62,7 +62,7 @@ class ProductV1ApiE2ETest {
         this.productApplicationService = productApplicationService;
         this.likeApplicationService = likeApplicationService;
         this.userApplicationService = userApplicationService;
-        this.productMetricsJpaRepository = productMetricsJpaRepository;
+        this.productMetricSummaryJpaRepository = productMetricSummaryJpaRepository;
         this.redisTemplate = redisTemplate;
         this.databaseCleanUp = databaseCleanUp;
         this.redisCleanUp = redisCleanUp;
@@ -182,8 +182,11 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            // like_count는 streamer가 product_metrics에 반영하므로 직접 시드
-            productMetricsJpaRepository.save(new ProductMetricsJpaEntity(hasLike.id(), 0L, 1L, 0L));
+            // like_count는 streamer가 product_metrics에 반영하므로 직접 시드.
+            // createProduct()가 이미 0으로 초기화된 summary 행을 만들어두므로, 새로 insert되도록 먼저 지운다
+            // (기존 행에 save()하면 JPA merge가 UPDATE 경로를 타 createdAt이 null로 덮어써진다).
+            productMetricSummaryJpaRepository.deleteById(hasLike.id());
+            productMetricSummaryJpaRepository.save(new ProductMetricSummaryJpaEntity(hasLike.id(), 0L, 1L, 0L));
 
             // act
             ParameterizedTypeReference<ApiResponse<PageResult<ProductV1Dto.PlpResponse>>> type =
@@ -209,8 +212,11 @@ class ProductV1ApiE2ETest {
             ProductInfo noLike = createProduct(brand.id(), "에어맥스", 80_000L, 10);
             ProductInfo hasLike = createProduct(brand.id(), "에어포스", 150_000L, 5);
 
-            // like_count는 streamer가 product_metrics에 반영하므로 직접 시드
-            productMetricsJpaRepository.save(new ProductMetricsJpaEntity(hasLike.id(), 0L, 1L, 0L));
+            // like_count는 streamer가 product_metrics에 반영하므로 직접 시드.
+            // createProduct()가 이미 0으로 초기화된 summary 행을 만들어두므로, 새로 insert되도록 먼저 지운다
+            // (기존 행에 save()하면 JPA merge가 UPDATE 경로를 타 createdAt이 null로 덮어써진다).
+            productMetricSummaryJpaRepository.deleteById(hasLike.id());
+            productMetricSummaryJpaRepository.save(new ProductMetricSummaryJpaEntity(hasLike.id(), 0L, 1L, 0L));
 
             // act
             ParameterizedTypeReference<ApiResponse<PageResult<ProductV1Dto.PlpResponse>>> type =

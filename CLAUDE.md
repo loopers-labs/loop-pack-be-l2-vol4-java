@@ -160,6 +160,7 @@ com.loopers
 - **유일성**: 다중 인스턴스에서도 ULID(80bit 랜덤 + ms)로 사실상 보장 + **DB PK/복합 UNIQUE 제약**이 최종 보장. nodeId 세그먼트는 사용하지 않음
 - **FK 컬럼 네이밍**: 다른 테이블 PK 를 참조하는 FK 컬럼은 `ref_{xxx}_id` 로 명명 (예: `like.ref_user_id`, `like.ref_product_id`). `users.user_id` 는 로그인 ID 이므로 FK 가 아니며 제외
 - **동시성(비즈니스 중복)**: ID 포맷이 아니라 복합 UNIQUE 제약 + `DataIntegrityViolation` 처리로 방어 (예: `like(ref_user_id, ref_product_id)`). 단, `coupon` 은 동일 템플릿의 동일 유저 다중 발급을 허용하므로 복합 UNIQUE 를 두지 않음
+- **예외 — 이벤트에서 파생되는 집계/read-model 테이블**: `product_metric_summary`(자연키 `product_id`), `product_metric_daily`/`mv_product_rank_weekly`/`mv_product_rank_monthly`(복합 자연키) 는 `BaseJpaEntity` 를 상속하지 않고 ULID PK 를 쓰지 않는다. "생성/삭제되는 도메인 엔티티"가 아니라 이벤트로부터 원자적 upsert 로 파생되는 집계 데이터이기 때문이며, 대리키를 두면 upsert 대상 식별을 위해 별도 UNIQUE 인덱스가 추가로 필요해진다. 근거: `docs/domain/ranking_mv_batch/01-design.md` #16·#17·#18
 
 > follow-up: `docker/seed-data.sql` 은 숫자 PK 기반 성능 테스트 시드라 String PK 스킴 적용 시 갱신 필요.
 

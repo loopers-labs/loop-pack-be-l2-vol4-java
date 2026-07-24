@@ -3,31 +3,52 @@ package com.loopers.interfaces.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.confg.kafka.KafkaConfig;
 import com.loopers.domain.handled.EventHandledRepository;
-import com.loopers.domain.metrics.ProductMetricsEntity;
-import com.loopers.domain.metrics.ProductMetricsRepository;
-import com.loopers.domain.order.OrderSnapshot;
-import com.loopers.domain.order.OrderSnapshotItem;
-import com.loopers.domain.order.OrderSnapshotRepository;
-import lombok.RequiredArgsConstructor;
+import com.loopers.domain.metrics.ProductMetricsService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
-@RequiredArgsConstructor
 @Component
 public class OrderEventsConsumer {
 
     private static final String CONSUMER_GROUP = "order-metrics-consumer";
-    private final ProductMetricsRepository productMetricsRepository;
+    private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
+
+    private final ProductMetricsService productMetricsService;
     private final EventHandledRepository eventHandledRepository;
-    private final OrderSnapshotRepository orderSnapshotRepository;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
+
+    @Autowired
+    public OrderEventsConsumer(
+            ProductMetricsService productMetricsService,
+            EventHandledRepository eventHandledRepository,
+            ObjectMapper objectMapper
+    ) {
+        this(productMetricsService, eventHandledRepository, objectMapper, Clock.system(ZONE_SEOUL));
+    }
+
+    OrderEventsConsumer(
+            ProductMetricsService productMetricsService,
+            EventHandledRepository eventHandledRepository,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
+        this.productMetricsService = productMetricsService;
+        this.eventHandledRepository = eventHandledRepository;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
 
     @KafkaListener(
             topics = "${commerce-streamer.kafka.topics.order-events:order-events}",
@@ -65,19 +86,6 @@ public class OrderEventsConsumer {
             return;
         }
 
-        OrderSnapshot snapshot = orderSnapshotRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new IllegalStateException("주문 snapshot을 찾을 수 없습니다. orderId=" + orderId));
-
-        for (OrderSnapshotItem item : snapshot.items()) {
-            if (item.productId() == null || item.quantity() == null) {
-                log.warn("상품 정보가 없는 주문 snapshot item 무시 [eventId={}, orderId={}]", payload.eventId(), orderId);
-                continue;
-            }
-
-            ProductMetricsEntity metrics = productMetricsRepository.findByProductId(item.productId())
-                    .orElseGet(() -> ProductMetricsEntity.create(item.productId()));
-            metrics.incrementPurchaseCount(item.quantity());
-            productMetricsRepository.save(metrics);
-        }
+        productMetricsService.recordPurchase(payload.eventId(), orderId, LocalDate.now(clock));
     }
 }

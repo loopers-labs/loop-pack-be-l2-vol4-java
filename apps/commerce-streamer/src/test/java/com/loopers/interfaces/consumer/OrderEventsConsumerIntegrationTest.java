@@ -1,7 +1,8 @@
 package com.loopers.interfaces.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.loopers.domain.metrics.ProductMetricsRepository;
+import com.loopers.domain.metrics.ProductMetricDailyRepository;
+import com.loopers.domain.metrics.ProductMetricSummaryRepository;
 import com.loopers.infrastructure.EntityId;
 import com.loopers.testcontainers.MySqlTestContainersConfig;
 import com.loopers.testcontainers.RedisTestContainersConfig;
@@ -16,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,7 +47,10 @@ class OrderEventsConsumerIntegrationTest {
     private KafkaTemplate<Object, Object> kafkaTemplate;
 
     @Autowired
-    private ProductMetricsRepository productMetricsRepository;
+    private ProductMetricSummaryRepository productMetricSummaryRepository;
+
+    @Autowired
+    private ProductMetricDailyRepository productMetricDailyRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -77,9 +82,9 @@ class OrderEventsConsumerIntegrationTest {
 
         // assert
         await().atMost(10, SECONDS).untilAsserted(() -> {
-            long purchaseCount1 = productMetricsRepository.findByProductId(productId1)
+            long purchaseCount1 = productMetricSummaryRepository.findByProductId(productId1)
                     .map(m -> m.getPurchaseCount()).orElse(0L);
-            long purchaseCount2 = productMetricsRepository.findByProductId(productId2)
+            long purchaseCount2 = productMetricSummaryRepository.findByProductId(productId2)
                     .map(m -> m.getPurchaseCount()).orElse(0L);
             assertEquals(2L, purchaseCount1);
             assertEquals(3L, purchaseCount2);
@@ -103,7 +108,7 @@ class OrderEventsConsumerIntegrationTest {
 
         // assert — 멱등 처리로 purchase_count는 quantity만큼만 증가
         await().atMost(10, SECONDS).untilAsserted(() -> {
-            long purchaseCount = productMetricsRepository.findByProductId(productId)
+            long purchaseCount = productMetricSummaryRepository.findByProductId(productId)
                     .map(m -> m.getPurchaseCount()).orElse(0L);
             assertEquals(2L, purchaseCount);
         });
@@ -122,9 +127,30 @@ class OrderEventsConsumerIntegrationTest {
 
         // assert — 일정 시간 후에도 purchase_count = 0
         Thread.sleep(3000);
-        long purchaseCount = productMetricsRepository.findByProductId(orderId)
+        long purchaseCount = productMetricSummaryRepository.findByProductId(orderId)
                 .map(m -> m.getPurchaseCount()).orElse(0L);
         assertEquals(0L, purchaseCount);
+    }
+
+    @DisplayName("[ECP] PaymentCompleteEvent 수신 시 product_metric_daily의 오늘자 purchase_quantity가 수량만큼 증가한다.")
+    @Test
+    void incrementsDailyPurchaseQuantity_whenPaymentCompleteEventReceived() throws Exception {
+        // arrange
+        String orderId = EntityId.generate("ORD");
+        String productId = EntityId.generate("PRD");
+        insertOrder(orderId, productId, 4);
+        String payload = buildPayload(EntityId.generate("OBX"), "PaymentCompleteEvent",
+                Map.of("userId", "USR_01", "orderId", orderId));
+
+        // act
+        kafkaTemplate.send(ORDER_EVENTS_TOPIC, orderId, payload);
+
+        // assert
+        await().atMost(10, SECONDS).untilAsserted(() -> {
+            long purchaseQuantity = productMetricDailyRepository.findByProductIdAndMetricDate(productId, LocalDate.now())
+                    .map(m -> m.getPurchaseQuantity()).orElse(0L);
+            assertEquals(4L, purchaseQuantity);
+        });
     }
 
     private void insertOrder(String orderId, String productId, int quantity) throws Exception {

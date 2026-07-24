@@ -6,10 +6,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+import java.time.ZonedDateTime;
+
 @Entity
-@Table(name = "product_metrics")
+@Table(name = "product_metric_summary")
 @Getter
-public class ProductMetricsJpaEntity {
+public class ProductMetricSummaryJpaEntity {
 
     @Id
     @Column(name = "product_id", length = 60, nullable = false)
@@ -24,12 +26,11 @@ public class ProductMetricsJpaEntity {
     @Column(name = "purchase_count", nullable = false)
     private long purchaseCount;
 
-    protected ProductMetricsJpaEntity() {}
+    @Column(name = "created_at", nullable = false)
+    private ZonedDateTime createdAt;
 
-    public ProductMetricsJpaEntity(String productId, long viewCount, long likeCount, long purchaseCount) {
-        this.productId = productId;
-        this.viewCount = viewCount;
-        this.likeCount = likeCount;
-        this.purchaseCount = purchaseCount;
-    }
+    @Column(name = "updated_at", nullable = false)
+    private ZonedDateTime updatedAt;
+
+    protected ProductMetricSummaryJpaEntity() {}
 }
