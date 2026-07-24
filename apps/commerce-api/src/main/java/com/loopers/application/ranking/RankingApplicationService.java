@@ -3,9 +3,11 @@ package com.loopers.application.ranking;
 import com.loopers.application.product.ProductInfo;
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
 import com.loopers.infrastructure.product.ProductCacheStore;
+import com.loopers.infrastructure.ranking.ProductRankMvStore;
 import com.loopers.infrastructure.ranking.RankingRedisStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,12 +42,23 @@ public class RankingApplicationService {
     private static final int TOP_N = 100;
 
     private final RankingRedisStore rankingRedisStore;
+    private final ProductRankMvStore productRankMvStore;
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
     private final ProductCacheStore productCacheStore;
 
     @Transactional(readOnly = true)
     public List<RankingInfo> getRanking(LocalDate date, int page, int size) {
+        return getRanking(date, RankingPeriod.DAILY, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankingInfo> getRanking(LocalDate date, String period, int page, int size) {
+        return getRanking(date, RankingPeriod.from(period), page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RankingInfo> getRanking(LocalDate date, RankingPeriod period, int page, int size) {
         if (page < 1 || size < 1) {
             return List.of();   // 잘못된 페이지 요청 — ZREVRANGE 음수 인덱스로 새지 않도록 방어
         }
@@ -54,7 +67,11 @@ public class RankingApplicationService {
             return List.of();   // Top-100 밖 구간 — 에러 대신 빈 목록
         }
         long end = Math.min(start + size - 1, TOP_N - 1);
-        return assemble(rankingRedisStore.findProductIdsByRank(date, start, end), start);
+        List<Long> productIds = switch (period) {
+            case DAILY -> rankingRedisStore.findProductIdsByRank(date, start, end);
+            case WEEKLY, MONTHLY -> productRankMvStore.findProductIds(period, date, start, end);
+        };
+        return assemble(productIds, start);
     }
 
     /**
