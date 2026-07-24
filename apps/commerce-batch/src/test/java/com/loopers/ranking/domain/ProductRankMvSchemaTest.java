@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * MV 는 조회가 압도적인 지면을 받치므로 스키마 자체가 계약이다.
@@ -78,13 +80,17 @@ class ProductRankMvSchemaTest {
     }
 
     @Test
-    @DisplayName("같은 기간·상품은 한 행뿐이라 재적재가 PK 로 막힌다")
+    @DisplayName("같은 기간·상품을 다시 INSERT 하면 PK 가 막는다 — 재적재는 DELETE 후에만 가능하다")
     void givenSamePeriodAndProduct_whenInsertedTwice_thenRejectedByPrimaryKey() {
-        jdbcTemplate.update("""
+        String insert = """
                 INSERT INTO mv_product_rank_weekly
                     (period_key, product_id, score, view_count, like_count, sales_count, created_at)
                 VALUES ('2026-W30', 100, 12.5, 10, 5, 1, NOW())
-                """);
+                """;
+        jdbcTemplate.update(insert);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(insert))
+                .isInstanceOf(DuplicateKeyException.class);
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM mv_product_rank_weekly WHERE period_key = '2026-W30'", Integer.class))
