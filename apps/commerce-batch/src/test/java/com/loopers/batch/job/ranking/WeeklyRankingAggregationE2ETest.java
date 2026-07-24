@@ -205,4 +205,22 @@ class WeeklyRankingAggregationE2ETest {
         assertThat(rows.get(0)).containsEntry("product_id", 160L);
         assertThat(rows.get(149)).containsEntry("product_id", 11L);
     }
+
+    @Test
+    @DisplayName("세 시그널 혼합 점수는 streamer 정책과 같은 형태다 — view*0.1 + like*0.2 + sales*0.6")
+    void givenMixedSignals_whenAggregated_thenScoreMatchesSharedFormula() throws Exception {
+        // streamer 의 RankingScorePolicyTest.mixedSignals_sumToSameFormAsBatchAggregate 와 같은 조합·기대값.
+        // 한쪽 가중치가 바뀌면 그 앱 테스트가 깨진다. 완전한 크로스-앱 계약은 가중치 공유 위치가 정해져야 가능.
+        LocalDate w29Monday = LocalDate.of(2026, 7, 13);
+        product(100L, "ON_SALE", false);
+        metric(w29Monday, 100L, 10, 5, 2);
+
+        runAndGetExitCode("20260713");
+
+        Double score = jdbcTemplate.queryForObject(
+                "SELECT score FROM mv_product_rank_weekly WHERE period_key = '2026-W29' AND product_id = 100",
+                Double.class);
+        // 10*0.1 + 5*0.2 + 2*0.6 = 3.2
+        assertThat(score).isEqualTo(3.2);
+    }
 }
