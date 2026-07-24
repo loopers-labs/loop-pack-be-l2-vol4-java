@@ -23,6 +23,14 @@ management:
     defaults:
       enabled: false
 
+# 랭킹 집계 — 가중치는 commerce-streamer 의 실시간 랭킹과 동일해야 한다(일간/주간/월간 점수 해석 일치).
+ranking:
+  view-weight: 0.1
+  like-weight: 0.2
+  order-weight: 0.7
+  top-n: 100
+  chunk-size: 500
+
 ---
 spring:
   config:
@@ -31,6 +39,17 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  jpa:
+    hibernate:
+      # MV 테이블은 이 배치가 소유하지만, 기동할 때마다 drop 되면 적재 결과가 사라진다.
+      # 로컬에서는 없으면 만들고 있으면 두는 update 로 고정한다(jpa.yml 의 create 를 덮어씀).
+      ddl-auto: update
 
 ---
 spring:
