@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ranking Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d8dde6;
+      --text: #1d2430;
+      --muted: #687386;
+      --primary: #2457c5;
+      --primary-dark: #173f97;
+      --ok: #177245;
+      --warn: #a15c00;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .status {
+      min-width: 220px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .status.ok {
+      color: var(--ok);
+    }
+
+    .status.warn {
+      color: var(--warn);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.3fr) 140px 230px 100px 100px auto;
+      gap: 10px;
+      align-items: end;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 10px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .segments {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .segments button,
+    .actions button,
+    .pager button {
+      border: 0;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .segments button {
+      background: #fff;
+      color: var(--muted);
+      border-right: 1px solid var(--line);
+    }
+
+    .segments button:last-child {
+      border-right: 0;
+    }
+
+    .segments button.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .actions button,
+    .pager button {
+      height: 38px;
+      border-radius: 6px;
+      padding: 0 14px;
+      background: var(--primary);
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .actions button.secondary,
+    .pager button {
+      background: #eef1f6;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    .actions button:hover {
+      background: var(--primary-dark);
+    }
+
+    .actions button.secondary:hover,
+    .pager button:hover {
+      background: #e3e8f1;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 12px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .table-wrap {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      background: #f9fafc;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .rank {
+      width: 72px;
+      font-weight: 800;
+    }
+
+    .id {
+      width: 96px;
+    }
+
+    .brand {
+      width: 96px;
+    }
+
+    .price {
+      width: 120px;
+      text-align: right;
+    }
+
+    .stock {
+      width: 110px;
+      text-align: center;
+    }
+
+    .likes {
+      width: 110px;
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 64px;
+      height: 24px;
+      border-radius: 999px;
+      padding: 0 8px;
+      background: #eaf7ef;
+      color: var(--ok);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .badge.out {
+      background: #f5eef0;
+      color: #9a2e43;
+    }
+
+    .empty {
+      padding: 34px 16px;
+      color: var(--muted);
+      text-align: center;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .url {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    @media (max-width: 920px) {
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .actions {
+        grid-column: 1 / -1;
+      }
+
+      header,
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        display: grid;
+      }
+
+      .status {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 680px) {
+      main {
+        width: min(100% - 20px, 1180px);
+        padding-top: 18px;
+      }
+
+      .toolbar,
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 760px;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Ranking Dashboard</h1>
+      <div class="url" id="requestUrl">API 요청 전입니다.</div>
+    </div>
+    <div class="status" id="status">대기 중</div>
+  </header>
+
+  <section class="toolbar" aria-label="ranking query controls">
+    <label>
+      Base URL
+      <input id="baseUrl" type="text" placeholder="비우면 현재 commerce-api origin 사용">
+    </label>
+    <label>
+      Date
+      <input id="date" type="text" inputmode="numeric" maxlength="8" value="20260723">
+    </label>
+    <label>
+      Period
+      <span class="segments" id="periods">
+        <button type="button" data-period="daily">Daily</button>
+        <button type="button" data-period="weekly" class="active">Weekly</button>
+        <button type="button" data-period="monthly">Monthly</button>
+      </span>
+    </label>
+    <label>
+      Page
+      <input id="page" type="number" min="1" value="1">
+    </label>
+    <label>
+      Size
+      <input id="size" type="number" min="1" max="100" value="20">
+    </label>
+    <div class="actions">
+      <button type="button" id="load">조회</button>
+      <button type="button" id="sample" class="secondary">샘플</button>
+    </div>
+  </section>
+
+  <section class="summary" aria-label="ranking summary">
+    <div class="metric"><span>조회 기간</span><strong id="summaryPeriod">weekly</strong></div>
+    <div class="metric"><span>조회 일자</span><strong id="summaryDate">20260723</strong></div>
+    <div class="metric"><span>표시 건수</span><strong id="summaryCount">0</strong></div>
+    <div class="metric"><span>현재 페이지</span><strong id="summaryPage">1</strong></div>
+  </section>
+
+  <section class="table-wrap" aria-label="ranking results">
+    <table>
+      <thead>
+      <tr>
+        <th class="rank">Rank</th>
+        <th class="id">Product</th>
+        <th class="brand">Brand</th>
+        <th>Name</th>
+        <th class="price">Price</th>
+        <th class="stock">Stock</th>
+        <th class="likes">Likes</th>
+      </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty">조회 버튼을 눌러 랭킹 데이터를 확인하세요.</div>
+  </section>
+
+  <div class="pager">
+    <button type="button" id="prev">이전</button>
+    <button type="button" id="next">다음</button>
+  </div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const state = { period: "weekly" };
+
+  const sampleRows = [
+    { rank: 1, productId: 101, brandId: 7, name: "Loopers Signature Hoodie", price: 69000, inStock: true, remainingStock: 42, likeCount: 315 },
+    { rank: 2, productId: 104, brandId: 9, name: "Batch Worker Denim Jacket", price: 119000, inStock: true, remainingStock: 18, likeCount: 271 },
+    { rank: 3, productId: 108, brandId: 7, name: "Materialized View Sneakers", price: 89000, inStock: false, remainingStock: 0, likeCount: 204 }
+  ];
+
+  function periodText() {
+    return state.period;
+  }
+
+  function baseUrl() {
+    const value = $("baseUrl").value.trim();
+    return (value || window.location.origin).replace(/\/$/, "");
+  }
+
+  function buildUrl() {
+    const params = new URLSearchParams({
+      date: $("date").value.trim(),
+      period: state.period,
+      page: $("page").value,
+      size: $("size").value
+    });
+    return `${baseUrl()}/api/v1/rankings?${params.toString()}`;
+  }
+
+  function setStatus(text, kind) {
+    $("status").textContent = text;
+    $("status").className = `status ${kind || ""}`.trim();
+  }
+
+  function render(rows) {
+    $("rows").innerHTML = rows.map((row) => `
+      <tr>
+        <td class="rank">#${row.rank}</td>
+        <td class="id">${row.productId}</td>
+        <td class="brand">${row.brandId}</td>
+        <td title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</td>
+        <td class="price">${Number(row.price || 0).toLocaleString("ko-KR")}원</td>
+        <td class="stock">
+          <span class="badge ${row.inStock ? "" : "out"}">${row.inStock ? `${row.remainingStock ?? 0}개` : "품절"}</span>
+        </td>
+        <td class="likes">${Number(row.likeCount || 0).toLocaleString("ko-KR")}</td>
+      </tr>
+    `).join("");
+
+    $("empty").style.display = rows.length > 0 ? "none" : "block";
+    $("empty").textContent = "조회 결과가 없습니다. 배치 적재 또는 테스트 데이터를 먼저 확인하세요.";
+    $("summaryPeriod").textContent = periodText();
+    $("summaryDate").textContent = $("date").value.trim();
+    $("summaryCount").textContent = String(rows.length);
+    $("summaryPage").textContent = $("page").value;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  async function loadRanking() {
+    const url = buildUrl();
+    $("requestUrl").textContent = url;
+    setStatus("요청 중", "");
+
+    try {
+      const response = await fetch(url);
+      const body = await response.json();
+      if (!response.ok || body?.meta?.result === "FAIL") {
+        throw new Error(body?.meta?.message || `HTTP ${response.status}`);
+      }
+      const rows = Array.isArray(body.data) ? body.data : [];
+      render(rows);
+      setStatus(`SUCCESS · ${rows.length}건`, "ok");
+    } catch (error) {
+      render([]);
+      $("empty").textContent = error.message;
+      setStatus("요청 실패", "warn");
+    }
+  }
+
+  $("periods").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-period]");
+    if (!button) {
+      return;
+    }
+    state.period = button.dataset.period;
+    document.querySelectorAll("#periods button").forEach((item) => item.classList.toggle("active", item === button));
+    render([]);
+  });
+
+  $("load").addEventListener("click", loadRanking);
+  $("sample").addEventListener("click", () => {
+    $("requestUrl").textContent = "샘플 데이터 표시 중";
+    setStatus("SAMPLE", "ok");
+    render(sampleRows);
+  });
+  $("prev").addEventListener("click", () => {
+    $("page").value = Math.max(1, Number($("page").value || 1) - 1);
+    loadRanking();
+  });
+  $("next").addEventListener("click", () => {
+    $("page").value = Number($("page").value || 1) + 1;
+    loadRanking();
+  });
+
+  render([]);
+</script>
+</body>
+</html>
