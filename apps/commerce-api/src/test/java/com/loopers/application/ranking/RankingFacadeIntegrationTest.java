@@ -7,6 +7,7 @@ import com.loopers.domain.money.Money;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.Stock;
 import com.loopers.infrastructure.brand.BrandJpaRepository;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.infrastructure.ranking.RankingKeys;
 import com.loopers.utils.DatabaseCleanUp;
@@ -74,7 +75,7 @@ class RankingFacadeIntegrationTest {
             seedScore(date, second.getId(), 50.0);
 
             // act
-            PageResult<RankingInfo> result = rankingFacade.getRankings(date, 1, 20);
+            PageResult<RankingInfo> result = rankingFacade.getRankings(RankingPeriod.DAILY, date, 1, 20);
 
             // assert
             assertThat(result.items()).hasSize(2);
@@ -95,7 +96,7 @@ class RankingFacadeIntegrationTest {
             seedScore(date, 999_999L, 50.0); // DB에는 없는 상품 ID
 
             // act
-            PageResult<RankingInfo> result = rankingFacade.getRankings(date, 1, 20);
+            PageResult<RankingInfo> result = rankingFacade.getRankings(RankingPeriod.DAILY, date, 1, 20);
 
             // assert
             assertThat(result.items()).hasSize(1);

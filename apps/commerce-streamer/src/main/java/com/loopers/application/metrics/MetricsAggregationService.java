@@ -37,17 +37,17 @@ public class MetricsAggregationService {
         switch (eventType) {
             case "ProductLikedEvent" -> {
                 Long productId = payload.get("productId").asLong();
-                productMetricsRepository.increaseLikeCount(productId);
+                productMetricsRepository.increaseLikeCount(productId, today);
                 rankingRepository.incrementScore(today, productId, RankingScorePolicy.likeScore());
             }
             case "ProductUnlikedEvent" -> {
                 Long productId = payload.get("productId").asLong();
-                productMetricsRepository.decreaseLikeCount(productId);
+                productMetricsRepository.decreaseLikeCount(productId, today);
                 rankingRepository.incrementScore(today, productId, RankingScorePolicy.unlikeScore());
             }
             case "ProductViewedEvent" -> {
                 Long productId = payload.get("productId").asLong();
-                productMetricsRepository.increaseViewCount(productId);
+                productMetricsRepository.increaseViewCount(productId, today);
                 rankingRepository.incrementScore(today, productId, RankingScorePolicy.viewScore());
             }
             // 판매량은 주문 생성 기준으로 집계한다 (결제 실패 시 과대 집계 가능 — 파생 지표라 감수, 정밀화는 추후 과제).
@@ -55,8 +55,10 @@ public class MetricsAggregationService {
                 Long productId = item.get("productId").asLong();
                 int quantity = item.get("quantity").asInt();
                 double unitPrice = item.get("unitPrice").get("amount").asDouble();
-                productMetricsRepository.increaseSaleCount(productId, quantity);
-                rankingRepository.incrementScore(today, productId, RankingScorePolicy.orderScore(unitPrice, quantity));
+                // 정규화된 주문 점수는 한 번만 계산해 일별 집계(order_score)와 ZSET 에 같은 값을 넣는다 — 일간/주간 점수 기준을 일치시키기 위함.
+                double orderScore = RankingScorePolicy.orderScore(unitPrice, quantity);
+                productMetricsRepository.increaseSaleCount(productId, quantity, orderScore, today);
+                rankingRepository.incrementScore(today, productId, orderScore);
             });
             default -> {
                 // 집계 대상이 아닌 이벤트(결제 확정 등)도 장부에는 남긴다 — 재배달 시 다시 파싱하지 않도록.

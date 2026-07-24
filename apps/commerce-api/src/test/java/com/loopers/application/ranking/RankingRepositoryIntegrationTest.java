@@ -1,8 +1,8 @@
 package com.loopers.application.ranking;
 
 import com.loopers.config.redis.RedisConfig;
-import com.loopers.domain.ranking.RankingRepository;
 import com.loopers.infrastructure.ranking.RankingKeys;
+import com.loopers.infrastructure.ranking.RankingRedisRepository;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,8 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class RankingRepositoryIntegrationTest {
 
+    // 구현체가 여러 개(Daily/Weekly/Monthly)라 인터페이스로 주입하면 모호하다. 이 테스트는 일간(Redis) 동작을 검증하므로 구체 타입으로 받는다.
     @Autowired
-    private RankingRepository rankingRepository;
+    private RankingRedisRepository rankingRepository;
     @Autowired
     @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private RedisTemplate<String, String> redisTemplate;

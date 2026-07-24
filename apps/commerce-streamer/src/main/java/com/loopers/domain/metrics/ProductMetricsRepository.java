@@ -1,15 +1,16 @@
 package com.loopers.domain.metrics;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 public interface ProductMetricsRepository {
-    void increaseLikeCount(Long productId);
+    void increaseLikeCount(Long productId, LocalDate metricDate);
 
-    void decreaseLikeCount(Long productId);
+    void decreaseLikeCount(Long productId, LocalDate metricDate);
 
-    void increaseViewCount(Long productId);
+    void increaseViewCount(Long productId, LocalDate metricDate);
 
-    void increaseSaleCount(Long productId, int quantity);
+    void increaseSaleCount(Long productId, int quantity, double orderScore, LocalDate metricDate);
 
-    Optional<ProductMetrics> findByProductId(Long productId);
+    Optional<ProductMetrics> findByProductIdAndMetricDate(Long productId, LocalDate metricDate);
 }
