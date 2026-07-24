@@ -104,23 +104,23 @@ class ProductMetricsServiceIntegrationTest {
         }
     }
 
-    @DisplayName("판매량을 증가시킬 때,")
+    @DisplayName("주문 수를 증가시킬 때,")
     @Nested
-    class IncreaseSalesCount {
+    class IncreaseOrderCount {
 
-        @DisplayName("주문 수량만큼 sales_count가 누적된다.")
+        @DisplayName("주문 수량만큼 order_count가 누적된다.")
         @Test
-        void accumulatesByQuantity_whenSalesIncreased() {
+        void accumulatesByQuantity_whenOrderIncreased() {
             // given
             Long productId = 5L;
-            productMetricsService.increaseSalesCount(productId, 3L);
+            productMetricsService.increaseOrderCount(productId, 3L);
 
             // when
-            productMetricsService.increaseSalesCount(productId, 2L);
+            productMetricsService.increaseOrderCount(productId, 2L);
 
             // then
-            Long salesCount = productMetricsRepository.findByProductId(productId).orElseThrow().getSalesCount();
-            assertThat(salesCount).isEqualTo(5L);
+            Long orderCount = productMetricsRepository.findByProductId(productId).orElseThrow().getOrderCount();
+            assertThat(orderCount).isEqualTo(5L);
         }
     }
 

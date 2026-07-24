@@ -3,6 +3,8 @@ package com.loopers.interfaces.api.ranking;
 import com.loopers.application.ranking.RankingFacade;
 import com.loopers.application.ranking.RankingPageInfo;
 import com.loopers.domain.ranking.RankingHourlyQueryCondition;
+import com.loopers.domain.ranking.RankingMvQueryCondition;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingQueryCondition;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.PageResponse;
@@ -41,11 +43,16 @@ public class RankingV1Controller {
     @GetMapping
     public ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>> getRankings(
         @RequestParam(value = "date", required = false) String date,
+        @RequestParam(value = "period", required = false) String period,
         @RequestParam(value = "page", defaultValue = "1") int page,
         @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        RankingQueryCondition condition = new RankingQueryCondition(parseDate(date), page, size);
-        RankingPageInfo pageInfo = rankingFacade.getRankings(condition);
+        RankingPeriod rankingPeriod = RankingPeriod.from(period);
+        LocalDate parsedDate = parseDate(date);
+        // DAILY 는 실시간 Redis, WEEKLY/MONTHLY 는 배치가 만든 MV 를 조회한다.
+        RankingPageInfo pageInfo = (rankingPeriod == RankingPeriod.DAILY)
+                ? rankingFacade.getRankings(new RankingQueryCondition(parsedDate, page, size))
+                : rankingFacade.getMvRankings(new RankingMvQueryCondition(rankingPeriod, parsedDate, page, size));
         List<RankingV1Dto.RankingItemResponse> content =
                 pageInfo.items().stream().map(RankingV1Dto.RankingItemResponse::from).toList();
         return ApiResponse.success(PageResponse.of(content, pageInfo.totalElements(), page, size));

@@ -5,12 +5,17 @@ import com.loopers.domain.metrics.ProductMetricsModel;
 import com.loopers.domain.metrics.ProductMetricsRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.test.utils.ContainerTestUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductMetricsConsumerIntegrationTest {
 
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(10);
+    private static final String ORDER_TOPIC = "order-events";
+    private static final String CATALOG_TOPIC = "catalog-events";
 
     @Autowired
     private KafkaTemplate<String, String> stringKafkaTemplate;
@@ -38,6 +45,26 @@ class ProductMetricsConsumerIntegrationTest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired
+    private KafkaAdmin kafkaAdmin;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry endpointRegistry;
+
+    // auto.offset.reset=latest(프로덕션 설정) 하에서, 토픽 자동 생성 특성상 컨슈머가 파티션을 할당받기 전에
+    // 메시지를 발행하면 컨슈머가 로그 끝부터 읽어 첫 메시지(offset 0)를 건너뛴다.
+    // 그래서 발행 전에 토픽을 미리 만들고 metrics-consumer 두 리스너가 파티션을 할당받을 때까지 대기한다.
+    // 할당이 끝나면 컨슈머가 빈 토픽의 끝(offset 0)에 자리 잡으므로 이후 발행되는 메시지를 놓치지 않는다.
+    @BeforeEach
+    void waitForConsumerAssignment() {
+        kafkaAdmin.createOrModifyTopics(
+                TopicBuilder.name(ORDER_TOPIC).partitions(1).replicas(1).build(),
+                TopicBuilder.name(CATALOG_TOPIC).partitions(1).replicas(1).build()
+        );
+        ContainerTestUtils.waitForAssignment(endpointRegistry.getListenerContainer("productMetricsOrderConsumer"), 1);
+        ContainerTestUtils.waitForAssignment(endpointRegistry.getListenerContainer("productMetricsCatalogConsumer"), 1);
+    }
 
     @AfterEach
     void tearDown() {
@@ -82,9 +109,9 @@ class ProductMetricsConsumerIntegrationTest {
     @Nested
     class ListenOrder {
 
-        @DisplayName("주문 아이템 여러 개가 각 상품의 sales_count에 정확히 반영된다.")
+        @DisplayName("주문 아이템 여러 개가 각 상품의 order_count에 정확히 반영된다.")
         @Test
-        void increasesSalesCountPerItem_whenOrderCreatedPublished() throws Exception {
+        void increasesOrderCountPerItem_whenOrderCreatedPublished() throws Exception {
             // given
             Long productIdA = 200L;
             Long productIdB = 201L;
@@ -100,11 +127,11 @@ class ProductMetricsConsumerIntegrationTest {
             // then
             ProductMetricsModel metricsA = awaitMetrics(productIdA);
             ProductMetricsModel metricsB = awaitMetrics(productIdB);
-            assertThat(metricsA.getSalesCount()).isEqualTo(2L);
-            assertThat(metricsB.getSalesCount()).isEqualTo(3L);
+            assertThat(metricsA.getOrderCount()).isEqualTo(2L);
+            assertThat(metricsB.getOrderCount()).isEqualTo(3L);
         }
 
-        @DisplayName("같은 eventId(주문) 메시지를 재발행해도 sales_count는 한 번만 반영된다(멱등성).")
+        @DisplayName("같은 eventId(주문) 메시지를 재발행해도 order_count는 한 번만 반영된다(멱등성).")
         @Test
         void isIdempotent_whenSameOrderEventRepublished() throws Exception {
             // given
@@ -120,7 +147,7 @@ class ProductMetricsConsumerIntegrationTest {
 
             // then
             ProductMetricsModel metrics = productMetricsRepository.findByProductId(productId).orElseThrow();
-            assertThat(metrics.getSalesCount()).isEqualTo(5L);
+            assertThat(metrics.getOrderCount()).isEqualTo(5L);
         }
     }
 

@@ -10,7 +10,7 @@ public interface ProductMetricsRepository {
 
     void decreaseLikeCount(Long productId);
 
-    void increaseSalesCount(Long productId, Long quantity);
+    void increaseOrderCount(Long productId, Long quantity);
 
     void increaseViewCount(Long productId);
 }

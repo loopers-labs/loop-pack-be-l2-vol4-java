@@ -6,6 +6,7 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.ranking.RankingEntry;
 import com.loopers.domain.ranking.RankingHourlyQueryCondition;
+import com.loopers.domain.ranking.RankingMvQueryCondition;
 import com.loopers.domain.ranking.RankingQueryCondition;
 import com.loopers.domain.ranking.RankingService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,12 @@ public class RankingFacade {
     public RankingPageInfo getHourlyRankings(RankingHourlyQueryCondition condition) {
         List<RankingEntry> entries = rankingService.getHourlyRankings(condition);
         long totalElements = rankingService.countHourlyRankings(condition);
+        return toPageInfo(entries, totalElements);
+    }
+
+    public RankingPageInfo getMvRankings(RankingMvQueryCondition condition) {
+        List<RankingEntry> entries = rankingService.getMvRankings(condition);
+        long totalElements = rankingService.countMvRankings(condition);
         return toPageInfo(entries, totalElements);
     }
 

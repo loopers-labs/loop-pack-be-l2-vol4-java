@@ -6,10 +6,16 @@ import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
 import com.loopers.domain.product.ProductStatsModel;
 import com.loopers.domain.product.ProductStatsRepository;
+import com.loopers.domain.ranking.MvProductRankMonthlyModel;
+import com.loopers.domain.ranking.MvProductRankWeeklyModel;
 import com.loopers.domain.ranking.RankingHourlyQueryCondition;
+import com.loopers.domain.ranking.RankingMvQueryCondition;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingQueryCondition;
 import com.loopers.domain.stock.StockModel;
 import com.loopers.domain.stock.StockRepository;
+import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository;
+import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +54,12 @@ class RankingFacadeIntegrationTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private MvProductRankWeeklyJpaRepository mvProductRankWeeklyJpaRepository;
+
+    @Autowired
+    private MvProductRankMonthlyJpaRepository mvProductRankMonthlyJpaRepository;
 
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
@@ -201,6 +213,104 @@ class RankingFacadeIntegrationTest {
 
             // when
             RankingPageInfo result = rankingFacade.getHourlyRankings(new RankingHourlyQueryCondition(dateTime, 1, 20));
+
+            // then
+            assertThat(result.items()).isEmpty();
+        }
+    }
+
+    @DisplayName("주간(MV) 랭킹 페이지를 조회할 때,")
+    @Nested
+    class GetWeeklyRankings {
+
+        // 2024-01-03(수)이 속한 주의 월요일은 2024-01-01. MV 는 week_start_date 로 저장된다.
+        private static final LocalDate WEEK_START = LocalDate.of(2024, 1, 1);
+
+        @DisplayName("MV 의 ranking 오름차순으로 순위와 상품 정보가 조합되어 반환된다.")
+        @Test
+        void returnsWeeklyRankings_fromMv() {
+            // given
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel first = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel second = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(WEEK_START, first.getId(), 100L, 1));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(WEEK_START, second.getId(), 60L, 2));
+
+            // when - date 는 주 중간 날짜여도 해당 주(월요일)로 해석된다
+            RankingPageInfo result = rankingFacade.getMvRankings(
+                new RankingMvQueryCondition(RankingPeriod.WEEKLY, LocalDate.of(2024, 1, 3), 1, 20));
+
+            // then
+            assertAll(
+                () -> assertThat(result.totalElements()).isEqualTo(2),
+                () -> assertThat(result.items()).hasSize(2),
+                () -> assertThat(result.items().get(0).rank()).isEqualTo(1L),
+                () -> assertThat(result.items().get(0).score()).isEqualTo(100.0),
+                () -> assertThat(result.items().get(0).product().id()).isEqualTo(first.getId()),
+                () -> assertThat(result.items().get(1).rank()).isEqualTo(2L),
+                () -> assertThat(result.items().get(1).product().id()).isEqualTo(second.getId())
+            );
+        }
+
+        @DisplayName("해당 주에 MV 데이터가 없으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmpty_whenNoMvDataForWeek() {
+            // when
+            RankingPageInfo result = rankingFacade.getMvRankings(
+                new RankingMvQueryCondition(RankingPeriod.WEEKLY, LocalDate.of(2000, 1, 1), 1, 20));
+
+            // then
+            assertAll(
+                () -> assertThat(result.items()).isEmpty(),
+                () -> assertThat(result.totalElements()).isEqualTo(0)
+            );
+        }
+    }
+
+    @DisplayName("월간(MV) 랭킹 페이지를 조회할 때,")
+    @Nested
+    class GetMonthlyRankings {
+
+        // 2024-01-15 가 속한 달의 1일은 2024-01-01. MV 는 month_start_date 로 저장된다.
+        private static final LocalDate MONTH_START = LocalDate.of(2024, 1, 1);
+
+        @DisplayName("MV 의 ranking 오름차순으로 순위와 상품 정보가 조합되어 반환된다.")
+        @Test
+        void returnsMonthlyRankings_fromMv() {
+            // given
+            BrandModel brand = brandRepository.save(new BrandModel("Adidas"));
+            ProductModel first = saveProduct(brand.getId(), "1위상품", BigDecimal.valueOf(10000));
+            ProductModel second = saveProduct(brand.getId(), "2위상품", BigDecimal.valueOf(20000));
+            mvProductRankMonthlyJpaRepository.save(new MvProductRankMonthlyModel(MONTH_START, first.getId(), 500L, 1));
+            mvProductRankMonthlyJpaRepository.save(new MvProductRankMonthlyModel(MONTH_START, second.getId(), 300L, 2));
+
+            // when - date 는 달 중간 날짜여도 해당 달(1일)로 해석된다
+            RankingPageInfo result = rankingFacade.getMvRankings(
+                new RankingMvQueryCondition(RankingPeriod.MONTHLY, LocalDate.of(2024, 1, 15), 1, 20));
+
+            // then
+            assertAll(
+                () -> assertThat(result.totalElements()).isEqualTo(2),
+                () -> assertThat(result.items()).hasSize(2),
+                () -> assertThat(result.items().get(0).rank()).isEqualTo(1L),
+                () -> assertThat(result.items().get(0).score()).isEqualTo(500.0),
+                () -> assertThat(result.items().get(0).product().id()).isEqualTo(first.getId()),
+                () -> assertThat(result.items().get(1).rank()).isEqualTo(2L),
+                () -> assertThat(result.items().get(1).product().id()).isEqualTo(second.getId())
+            );
+        }
+
+        @DisplayName("같은 기준일이라도 주간 MV 는 월간 조회에 섞이지 않는다.")
+        @Test
+        void doesNotMixWithWeeklyMv() {
+            // given - 주간 MV 만 적재
+            BrandModel brand = brandRepository.save(new BrandModel("Nike"));
+            ProductModel weeklyOnly = saveProduct(brand.getId(), "주간전용", BigDecimal.valueOf(10000));
+            mvProductRankWeeklyJpaRepository.save(new MvProductRankWeeklyModel(MONTH_START, weeklyOnly.getId(), 100L, 1));
+
+            // when - 월간으로 조회
+            RankingPageInfo result = rankingFacade.getMvRankings(
+                new RankingMvQueryCondition(RankingPeriod.MONTHLY, LocalDate.of(2024, 1, 15), 1, 20));
 
             // then
             assertThat(result.items()).isEmpty();
