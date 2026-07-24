@@ -11,14 +11,18 @@ import com.loopers.domain.product.ProductSortType;
 import com.loopers.domain.product.event.ProductViewed;
 import com.loopers.domain.productrank.ProductRankRepository;
 import com.loopers.domain.productrank.RankedProduct;
+import com.loopers.domain.ranking.RankingKeys;
+import com.loopers.domain.ranking.RankingQueryRepository;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class ProductFacade {
@@ -36,6 +41,7 @@ public class ProductFacade {
     private final ProductRankRepository productRankRepository;
     private final ProductCache productCache;
     private final ApplicationEventPublisher eventPublisher;
+    private final RankingQueryRepository rankingQueryRepository;
 
     private static final int OVER_FETCH = 2; // 삭제/누락 보정용 여유분 배수
     private static final int BLOB_SIZE = 100; // 첫 페이지 hot 경로용 top-N 블롭 크기
@@ -58,16 +64,16 @@ public class ProductFacade {
         Optional<ProductDetailInfo> cached = productCache.getDetail(id);
         if (cached.isPresent()) {
             eventPublisher.publishEvent(new ProductViewed(id, null, ZonedDateTime.now()));
-            return cached.get(); // 캐시 히트
+            return cached.get().withRank(currentRank(id)); // 캐시 히트 — rank 는 실시간으로 덧씌운다
         }
         Product product = loadProduct(id);
         Brand brand = brandRepository.find(product.getBrandId())
             .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND,
                 "[id = " + product.getBrandId() + "] 브랜드를 찾을 수 없습니다."));
         ProductDetailInfo info = ProductDetailInfo.from(product, brand, likeCountOf(id));
-        productCache.putDetail(info, DETAIL_TTL); // read-through
+        productCache.putDetail(info, DETAIL_TTL); // read-through — rank=null 상태로 캐시
         eventPublisher.publishEvent(new ProductViewed(id, null, ZonedDateTime.now()));
-        return info;
+        return info.withRank(currentRank(id));
     }
 
     @Transactional(readOnly = true)
@@ -170,5 +176,17 @@ public class ProductFacade {
         return likeCountRepository.find(productId)
             .map(ProductLikeCount::getCount)
             .orElse(0L);
+    }
+
+    /** 오늘(KST) 랭킹 1-based 순위. 순위 밖/조회 실패 시 null — 상세 조회는 랭킹 없이도 살아야 한다(fail-open). */
+    private Integer currentRank(Long productId) {
+        try {
+            return rankingQueryRepository.findRank(LocalDate.now(RankingKeys.ZONE), productId)
+                .map(rank -> (int) (rank + 1))
+                .orElse(null);
+        } catch (Exception e) {
+            log.warn("랭킹 순위 조회 실패 — rank=null 응답 (productId={})", productId, e);
+            return null;
+        }
     }
 }

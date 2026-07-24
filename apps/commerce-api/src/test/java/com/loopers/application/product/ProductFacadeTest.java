@@ -32,7 +32,19 @@ class ProductFacadeTest {
     private final ProductRankRepository productRankRepository = mock(ProductRankRepository.class);
     private final ProductCache productCache = mock(ProductCache.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache, eventPublisher);
+    private final com.loopers.domain.ranking.RankingQueryRepository rankingQueryRepository =
+        new com.loopers.domain.ranking.RankingQueryRepository() {
+            @Override
+            public java.util.List<com.loopers.domain.ranking.RankedProductEntry> findPage(
+                java.time.LocalDate date, int offset, int size) { return java.util.List.of(); }
+            @Override
+            public java.util.Optional<Long> findRank(java.time.LocalDate date, Long productId) {
+                return java.util.Optional.empty(); // 랭킹 없음 → rank null 경로
+            }
+            @Override
+            public long countRanked(java.time.LocalDate date) { return 0L; }
+        };
+    private final ProductFacade productFacade = new ProductFacade(productRepository, brandRepository, likeCountRepository, productRankRepository, productCache, eventPublisher, rankingQueryRepository);
 
     @DisplayName("상품 상세를 조회할 때, ")
     @Nested
