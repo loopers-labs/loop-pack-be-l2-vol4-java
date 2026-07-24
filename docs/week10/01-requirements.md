@@ -400,7 +400,9 @@ GET /api/v1/rankings?period=DAILY&date=20260722&size=20&page=1
 
 port는 둘로 나눈다 — `RankingRepository`(Redis)와 `RankingMvRepository`(MySQL). 하나로 합치면 서빙 창 검증이나 폴백 같은 일간 전용 정책이 infrastructure로 숨고 시그니처가 둘의 최소공배수로 뭉뚱그려진다. 두 저장소는 성질이 다르다 — 하나는 휘발성이라 폴백이 필요하고, 하나는 영속이라 없으면 그냥 없는 것이다.
 
-어디를 읽을지 정하는 건 순수 규칙이므로(입력 `period`, 출력 `SPEED | BATCH`, I/O 없음) `RankingDatePolicy`와 같은 자리에 정책 객체로 둔다.
+어디를 읽을지 정하는 건 순수 규칙이므로(입력 `period`, 출력 `SPEED | BATCH`, I/O 없음) `RankingDatePolicy`와 같은 자리에 정책 객체로 둔다. `period_key` 계산·완결 판정은 commerce-api의 `RankingPeriod` enum이 맡는다(DAILY 제외 — 그건 ZSET 2일 창이라 `RankingDatePolicy`).
+
+**`period_key` 형식이 batch와 API 두 곳에 복제된다.** `apps`끼리 의존할 수 없어 ISO 주/KST 월 계산을 양쪽이 각자 구현한다. 형식이 어긋나면 batch가 저장한 키와 API 조회 키가 안 맞아 조용히 빈 결과가 된다. 가중치 이중화와 같은 범주의 문제이고, 같은 공유 위치가 생기면 함께 해소된다. 지금은 양쪽 경계 테스트(`RankingPeriodTest`)가 같은 기대값(`2026-W30`, 해 경계 `2026-W01`/`2026-W53`)을 붙잡아 부분 방어한다.
 
 ## 테스트 데이터 — 배치를 돌릴 게 없다
 

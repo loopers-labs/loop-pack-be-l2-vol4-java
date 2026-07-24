@@ -4,6 +4,7 @@ import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.ranking.application.RankingQueryService;
 import com.loopers.ranking.application.RankingResult;
 import com.loopers.ranking.domain.RankingErrorCode;
+import com.loopers.ranking.domain.RankingPeriod;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -24,25 +25,44 @@ public class RankingV1Controller implements RankingV1ApiSpec {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final String DAILY = "DAILY";
 
     private final RankingQueryService rankingQueryService;
 
     @GetMapping
     @Override
     public ApiResponse<RankingV1Response.Page> getRankings(
+            @RequestParam(name = "period", defaultValue = DAILY) String period,
             @RequestParam(name = "date", required = false) String date,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "20") int size
     ) {
-        LocalDate target = parseDate(date);
-        RankingResult.Page result = rankingQueryService.getRankingPage(target, page, size);
+        RankingResult.Page result = DAILY.equalsIgnoreCase(period)
+                ? rankingQueryService.getRankingPage(parseDateOrToday(date), page, size)
+                : rankingQueryService.getPeriodRankingPage(parsePeriod(period), parseDateOrNull(date), page, size);
         return ApiResponse.success(RankingV1Response.Page.from(result));
     }
 
-    private LocalDate parseDate(String date) {
-        if (date == null || date.isBlank()) {
-            return LocalDate.now(SEOUL);
+    /** DAILY 외의 period 를 배치 기간으로 변환한다. 알 수 없는 값은 400. */
+    private RankingPeriod parsePeriod(String period) {
+        try {
+            return RankingPeriod.valueOf(period.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CoreException(ErrorType.BAD_REQUEST, RankingErrorCode.RANKING_INVALID_PERIOD);
         }
+    }
+
+    /** 일간용 — 생략 시 오늘. */
+    private LocalDate parseDateOrToday(String date) {
+        return date == null || date.isBlank() ? LocalDate.now(SEOUL) : parse(date);
+    }
+
+    /** 주간·월간용 — 생략 시 null(가장 최근 확정본을 서비스가 고른다). */
+    private LocalDate parseDateOrNull(String date) {
+        return date == null || date.isBlank() ? null : parse(date);
+    }
+
+    private LocalDate parse(String date) {
         try {
             return LocalDate.parse(date, YYYYMMDD);
         } catch (DateTimeParseException e) {
