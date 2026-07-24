@@ -13,7 +13,8 @@ spring:
       - monitoring.yml
   batch:
     job:
-      name: ${job.name:NONE}
+      # 미지정 시 빈 값 — 'NONE' 을 쓰면 JobLauncherApplicationRunner 가 그 이름의 Job 을 찾다 기동에 실패한다.
+      name: ${job.name:}
     jdbc:
       initialize-schema: never
 
