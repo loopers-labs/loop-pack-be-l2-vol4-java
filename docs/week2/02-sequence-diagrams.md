@@ -507,6 +507,7 @@ sequenceDiagram
     participant Scheduler as OutboxRelayScheduler
     participant Kafka as Kafka Broker
     participant Consumer as MetricsKafkaConsumer
+    participant ScorePolicy as RankingScorePolicy
     participant CDB as Collector DB
 
     rect rgba(0, 128, 0, 0.1)
@@ -538,7 +539,9 @@ sequenceDiagram
             Note right of Consumer: 중복 이벤트 무시
             Consumer->>Kafka: 수동 Ack (커밋)
         else 새로운 이벤트
-            Consumer->>CDB: 2. product_metrics 집계 데이터 증감 (UPDATE/UPSERT)
+            Consumer->>ScorePolicy: 이벤트 발생 시각 기준 metricDate 및 scoreDelta 계산
+            ScorePolicy-->>Consumer: metricDate, productId, dailyRankingScoreDelta
+            Consumer->>CDB: 2. product_metrics 일자별 메트릭 증감 (UPDATE/UPSERT)
             Consumer->>CDB: 3. event_handled 이력 저장 (INSERT)
             CDB-->>Consumer: 트랜잭션 커밋
             Consumer->>Kafka: 4. 수동 Ack (커밋)
@@ -678,24 +681,84 @@ sequenceDiagram
     Note over RebuildJob, Redis: 운영 Key 교체 중 실시간 Consumer 충돌 방지는 후속 운영 절차로 결정한다.
 ```
 
+이 다이어그램은 주간/월간 랭킹이 API 조회 시점에 동기 집계되지 않고, Spring Batch가 미리 만든 조회 전용 테이블을 통해 제공되는지 확인하기 위한 흐름이다. 특히 `period/startDate/endDate`가 Batch 재실행 단위이고, `batch_run_id`가 Snapshot 버전 식별자로 쓰이는지를 검증한다.
+
 ```mermaid
 sequenceDiagram
-    title 오늘의 인기상품 랭킹 조회 및 상품 상세 랭킹 포함
+    title Spring Batch 기반 주간/월간 랭킹 MV 적재
+    participant Operator as Scheduler/Operator
+    participant Job as ProductRankingAggregationJob
+    participant BatchRunRepository
+    participant Reader as ProductMetricsItemReader
+    participant Processor as ProductRankAggregationProcessor
+    participant ProductRepository
+    participant Writer as ProductRankMvWriter
+    participant MetricsDB as product_metrics
+    participant MvDB as mv_product_rank_weekly/monthly
+
+    Operator->>Job: run(period, startDate, endDate)
+    Job->>Job: 기간 검증<br/>WEEKLY=월~일, MONTHLY=1일~말일
+    Job->>BatchRunRepository: create(period, startDate, endDate, status=RUNNING)
+    BatchRunRepository-->>Job: batchRunId
+    Job->>Reader: Chunk 단위 메트릭 조회 요청
+    loop Chunk-Oriented Processing
+        Reader->>MetricsDB: 기간 내 product_metrics 조회
+        MetricsDB-->>Reader: ProductMetrics chunk
+        Processor->>Processor: productId별 daily_ranking_score 합산
+        Processor->>ProductRepository: 활성 상품 조회
+        ProductRepository-->>Processor: 논리 삭제 상품 제외
+    end
+    Processor-->>Job: score 기준 Top 100
+    Writer->>MvDB: Top 100 INSERT<br/>batch_run_id=batchRunId, is_active=false
+    Job->>Writer: Snapshot 검증 요청
+    Writer->>MvDB: rank/product 중복 및 건수 검증
+    alt 검증 성공
+        Writer->>MvDB: 트랜잭션 시작
+        Writer->>MvDB: 기존 active Snapshot 비활성화
+        Writer->>MvDB: batchRunId Snapshot 활성화
+        Writer->>MvDB: 트랜잭션 커밋
+        Job->>BatchRunRepository: markCompleted(batchRunId)
+        Job-->>Operator: COMPLETED
+    else 검증 실패 또는 적재 실패
+        Job->>BatchRunRepository: markFailed(batchRunId)
+        Note right of MvDB: 기존 active Snapshot은 유지된다.
+        Job-->>Operator: FAILED
+    end
+
+    Note over Job,MvDB: 새 Snapshot이 완전히 검증되기 전까지 API는 기존 active Snapshot을 조회한다.
+```
+
+이 구조에서 봐야 할 포인트는 Reader가 `product_metrics`를 Chunk 단위로 읽고, Processor가 기간 점수 집계와 삭제 상품 제외를 담당하며, Writer가 Snapshot 적재와 active 전환을 분리한다는 점이다. Batch가 중간 실패하더라도 기존 active Snapshot을 건드리지 않으므로 조회 API는 빈 랭킹을 노출하지 않는다.
+
+```mermaid
+sequenceDiagram
+    title 기간별 인기상품 랭킹 조회 및 상품 상세 랭킹 포함
     actor User
     participant RankingController
     participant RankingFacade
     participant RankingStore as RankingRedisRepository
+    participant RankMvRepository
     participant ProductRepository
     participant ProductController
     participant ProductFacade
 
-    User->>RankingController: GET /api/v1/rankings?date=yyyyMMdd&size=20&page=1
+    User->>RankingController: GET /api/v1/rankings?period=DAILY&startDate=yyyyMMdd&endDate=yyyyMMdd&size=20&page=1
     RankingController->>RankingFacade: 랭킹 페이지 조회 요청
-    RankingFacade->>RankingStore: ZREVRANGE ranking:all:{yyyyMMdd} with scores
-    RankingStore-->>RankingFacade: productId, score 목록
+    RankingFacade->>RankingFacade: period별 기간 검증
+    alt DAILY
+        RankingFacade->>RankingStore: ZREVRANGE ranking:all:{yyyyMMdd} with scores
+        RankingStore-->>RankingFacade: productId, score 목록
+    else WEEKLY/MONTHLY
+        RankingFacade->>RankMvRepository: findActivePage(period, startDate, endDate, page, size)
+        alt active Snapshot 없음
+            RankMvRepository-->>RankingFacade: empty page
+        else active Snapshot 존재
+            RankMvRepository-->>RankingFacade: productId, rank, score 목록
+        end
+    end
     RankingFacade->>ProductRepository: 상품/브랜드 정보 조회
     ProductRepository-->>RankingFacade: 상품 정보 목록
-    Note right of RankingFacade: 삭제 상품은 삭제 시 ZSET에서 제거됨<br/>남아 있다면 2차 방어로 응답에서 제외
+    Note right of RankingFacade: 일간은 Redis, 주간/월간은 Batch MV를 조회한다.<br/>삭제 상품이 남아 있다면 2차 방어로 응답에서 제외
     RankingFacade-->>RankingController: 랭킹 순위 + 상품 정보 DTO
     RankingController-->>User: 200 OK
 

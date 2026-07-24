@@ -1,0 +1,254 @@
+질문 1. product_metrics를 일자별 메트릭 테이블로 바꾸는 방향이 맞을까요?
+선택지는 이렇게 볼 수 있습니다.
+A. product_metrics를 일자별 테이블로 변경
+예: (metric_date, product_id) 기준으로 view_count, like_count, sales_count, order_amount 등을 저장
+영향: 요구사항의 “대상 테이블 product_metrics”와 가장 잘 맞고 Batch가 하루치 데이터를 읽기 쉽지만, 기존 “누적 통계” 설계는 수정이 필요합니다.
+
+B. 기존 product_metrics는 누적 테이블로 유지하고, 일자별 테이블을 별도로 추가
+예: product_metric_daily 또는 product_daily_metrics 추가
+영향: 기존 설계 변경 폭은 작지만, 요구사항의 대상 테이블명이 product_metrics라는 점과 살짝 어긋납니다.
+
+C. product_metrics는 누적 유지, Batch는 Outbox/Event 로그에서 하루치 이벤트를 재집계
+영향: 기존 테이블은 보존되지만 Batch 요구사항의 “메트릭 테이블을 읽는다”와 가장 멀고, 배치 책임이 복잡해집니다.
+
+질문 2. mv_product_rank_weekly, mv_product_rank_monthly는 실제 DB Materialized View로 볼까요, 아니면 Batch가 적재하는 조회 전용 물리 테이블로 볼까요?
+A. Batch가 직접 적재하는 물리 테이블
+예: DELETE/UPSERT mv_product_rank_weekly WHERE rank_date = :date 후 Top 100 저장
+영향: Spring Batch Writer 요구사항과 잘 맞고, 실패/재실행/파라미터 기반 처리가 명확합니다. 이름은 mv_지만 실제 구현은 Read Model 테이블입니다.
+
+B. DB의 실제 Materialized View
+예: DB 쿼리로 MV 정의 후 REFRESH MATERIALIZED VIEW
+영향: DB 기능에 더 의존하고, Spring Batch는 refresh 트리거 역할에 가까워집니다. MySQL 계열이면 네이티브 MV가 없어 구현이 애매해질 수 있습니다.
+
+C. 일반 View + 별도 캐시/Redis
+영향: 저장 요구사항과 Top 100 스냅샷 요구에는 덜 맞습니다.
+
+질문 3. Ranking API의 기간 정보는 어떤 형태로 받을까요?
+A. period + 기준일
+예: /api/v1/rankings?period=WEEKLY&date=20260721&page=1&size=20
+영향: API가 단순하고 기존 date 파라미터를 유지하기 쉽습니다. 다만 실제 집계 범위는 서버 정책으로 해석해야 합니다.
+
+B. startDate + endDate
+예: /api/v1/rankings?startDate=20260715&endDate=20260721&page=1&size=20
+영향: “기간 전달” 의미가 가장 명확합니다. 다만 일간/주간/월간 중 무엇인지 서버가 기간 길이로 판별하거나, 임의 기간 랭킹까지 허용할지 결정해야 합니다.
+
+C. period + startDate + endDate
+예: /api/v1/rankings?period=WEEKLY&startDate=20260715&endDate=20260721&page=1&size=20
+영향: 기간도 명시되고, 일간/주간/월간 라우팅도 명확합니다. 대신 파라미터가 조금 늘고 period와 날짜 범위가 맞지 않을 때 검증 규칙이 필요합니다.
+
+질문 4. period와 startDate/endDate의 검증 정책은 얼마나 엄격하게 갈까요?
+A. 엄격 검증
+DAILY: startDate == endDate
+WEEKLY: 정확히 7일
+MONTHLY: 정확히 1개월 또는 서버가 정한 월간 길이
+영향: API 의미가 명확하고 MV 조회 키가 안정적입니다. 대신 사용자가 임의 기간 랭킹을 요청할 수 없습니다.
+
+B. 느슨한 검증
+period는 조회 소스 선택용으로만 사용
+startDate/endDate는 기간 길이 제한 없이 허용
+영향: 유연하지만 WEEKLY인데 10일 범위를 보내는 식의 애매한 요청이 가능해지고, mv_product_rank_weekly/monthly와 이름이 어긋납니다.
+
+C. 고정 period는 엄격 검증, 임의 기간은 별도 CUSTOM으로 분리
+DAILY/WEEKLY/MONTHLY는 엄격 검증
+나중에 필요하면 CUSTOM을 추가
+영향: 현재 요구사항의 일간/주간/월간 의미를 보존하면서 확장 여지를 남깁니다.
+
+질문 5. MONTHLY는 어떤 기간을 유효한 월간 랭킹으로 볼까요?
+A. 달력 월 기준
+예: 20260701~20260731
+영향: “7월 랭킹”처럼 비즈니스/운영 리포트와 맞추기 쉽습니다. startDate는 1일, endDate는 해당 월 말일이어야 합니다.
+
+B. 요청 종료일 기준 최근 30일
+예: 20260622~20260721
+영향: 최신 흐름 반영에는 좋지만 “월간”이 실제 달력 월과 다르고, 월별 스냅샷/운영 리포트 의미는 약해집니다.
+
+C. 요청 종료일 기준 최근 1개월
+예: 20260622~20260721 또는 월 길이에 따라 28~31일
+영향: 자연어의 “한 달”에 가깝지만 검증 규칙이 복잡하고, 월마다 기간 길이가 달라집니다.
+
+질문 6. WEEKLY도 달력 주 기준으로 제한할까요, 아니면 임의의 7일 범위를 허용할까요?
+A. 달력 주 기준
+예: 월요일~일요일 7일
+영향: “주간 랭킹” 의미가 명확하고 운영 리포트/MV 스냅샷 관리가 쉽습니다. 대신 주 시작 요일을 정해야 합니다.
+
+B. 임의의 7일 범위 허용
+예: 20260715~20260721
+영향: API 사용자는 유연하지만, 가능한 주간 MV 조합이 많아집니다. Batch를 모든 7일 조합으로 미리 적재하기 어렵고, 요청된 기간만 배치로 생성했는지 여부도 고려해야 합니다.
+
+C. 기본은 달력 주, Batch 수동 실행 시에만 임의 7일 허용
+영향: 운영은 단순하게 가져가면서 예외 분석은 가능하지만, API 정책과 운영 정책이 이원화됩니다.
+
+질문 7. period=DAILY일 때 startDate/endDate는 어떻게 받을까요?
+A. DAILY도 동일하게 startDate/endDate를 받되 두 값이 같아야 한다
+예: /api/v1/rankings?period=DAILY&startDate=20260721&endDate=20260721
+영향: API 입력 형태가 일/주/月 모두 통일됩니다. 내부 조회 소스만 DAILY=Redis, WEEKLY/MONTHLY=MV로 분기합니다.
+
+B. DAILY는 기존처럼 date만 받고, 주간/월간만 startDate/endDate를 받는다
+영향: 기존 API 호환성은 좋지만 파라미터 규칙이 갈라집니다.
+
+C. 하위 호환을 위해 DAILY는 date와 startDate/endDate를 모두 허용한다
+영향: 마이그레이션은 부드럽지만 검증 규칙과 문서가 조금 복잡해집니다.
+
+질문 8. Batch Job 파라미터는 어떤 단위로 받을까요?
+A. period + startDate + endDate
+예: period=WEEKLY, startDate=20260720, endDate=20260726
+영향: API 조회 조건과 Batch 적재 조건이 같아서 단순합니다. 재처리도 특정 기간 단위로 명확합니다.
+
+B. targetDate만 받고 서버가 기간을 계산
+예: targetDate=20260726이면 해당 주 월~일, 해당 월 1일~말일 계산
+영향: 운영 입력은 간단하지만, 월간/주간을 동시에 돌릴지 분리할지 추가 규칙이 필요합니다.
+
+C. jobDate + period
+예: period=WEEKLY, jobDate=20260726
+영향: A보다 입력은 짧고 B보다 명확합니다. 다만 실제 저장 키는 결국 계산된 startDate/endDate가 됩니다.
+
+질문 9. 주간/월간 랭킹 점수 계산은 기존 Redis 일간 랭킹과 같은 정책을 사용할까요?
+현재 문서의 일간 랭킹 점수는:
+조회: 0.1 * 1
+좋아요: 0.2 * 1
+주문: 0.6 * log(price * amount + 1)
+그런데 product_metrics를 하루치 메트릭 테이블로 보면 보통 저장 값은 view_count, like_count, sales_count, order_amount 같은 집계값이 됩니다.
+선택지는:
+A. 기존 점수 정책을 기간 집계에 맞게 변환
+예: view_count * 0.1 + like_count * 0.2 + 0.6 * log(total_order_amount + 1)
+영향: 일간 랭킹과 정책적 일관성이 있습니다. 다만 주문 이벤트별 log(price * amount + 1) 합산과 log(기간 총액 + 1)은 결과가 다를 수 있습니다.
+
+B. product_metrics에 ranking_score를 일자별로 저장
+Metrics Consumer가 이벤트별 점수까지 계산해 하루치 ranking_score를 누적
+Batch는 기간 내 ranking_score를 단순 합산
+영향: 일간 Redis 점수와 주간/월간 Batch 점수를 가장 일관되게 맞출 수 있습니다. 대신 product_metrics가 단순 메트릭뿐 아니라 랭킹 점수 Projection 역할도 갖습니다.
+
+C. 주간/월간은 별도 점수 정책 사용
+예: 판매량 중심, 조회수는 약하게 반영
+영향: 비즈니스 의도에 맞게 최적화할 수 있지만 일간 랭킹과 정책이 달라져 설명 비용이 생깁니다.
+
+질문 10. 주간/월간 MV 적재를 재실행 가능하고 멱등하게 만들기 위해 어떤 방식을 선택할까요?
+A. 단일 Job 내 Step 분리: 기존 결과 삭제 Step + 신규 결과 INSERT Step
+구조: clearPreviousRankingStep 후 aggregateAndInsertRankingStep
+영향: 책임은 Writer 하나에 몰리지 않고 Step 단위로 분리됩니다. 구현이 단순하고 과제 요구사항에 잘 맞습니다.
+리스크: 삭제 후 INSERT 전에 실패하면 해당 기간 랭킹이 비어 보일 수 있습니다.
+
+B. Staging Table + 운영 테이블 교체
+구조: staging 비우기 → staging에 새 결과 적재 → 검증 후 운영 테이블의 해당 기간 데이터 교체
+영향: 중간 실패 시 기존 운영 랭킹을 유지하기 쉽습니다. 사용자 조회 대상 Read Model에 더 안전합니다.
+리스크: staging 테이블과 교체 Step이 추가되어 설계/구현이 조금 복잡해집니다.
+
+C. Versioned Snapshot 방식
+구조: batch_run_id 또는 version을 두고 새 버전으로 INSERT → 마지막에 active 버전 전환
+영향: 실패해도 기존 active 랭킹 유지, 실행 이력 추적, 롤백이 가장 좋습니다. 현업형 안정성이 가장 높습니다.
+리스크: 테이블 구조와 조회 조건이 복잡해지고, 과제 범위에서는 다소 무거울 수 있습니다.
+
+C. Versioned Snapshot 방식은 “운영 테이블을 지웠다가 다시 채우는” 게 아니라, 새 랭킹 결과를 새 버전으로 먼저 쌓아두고, 마지막에 활성 버전만 바꾸는 방식입니다.
+예를 들어 주간 랭킹 테이블을 이렇게 둡니다.
+mv_product_rank_weekly
+- id
+- rank_start_date
+- rank_end_date
+- product_id
+- rank_no
+- score
+- batch_run_id
+- is_active
+- created_at
+기존에 활성화된 결과가 있다고 해볼게요.
+rank_start_date | rank_end_date | product_id | rank_no | score | batch_run_id | is_active
+2026-07-20      | 2026-07-26    | 10         | 1       | 98.1  | run_001      | true
+2026-07-20      | 2026-07-26    | 20         | 2       | 95.4  | run_001      | true
+배치를 재실행하면 기존 데이터를 지우지 않습니다. 새 실행 ID로 새 결과를 INSERT합니다.
+rank_start_date | rank_end_date | product_id | rank_no | score | batch_run_id | is_active
+2026-07-20      | 2026-07-26    | 10         | 1       | 98.1  | run_001      | true
+2026-07-20      | 2026-07-26    | 20         | 2       | 95.4  | run_001      | true
+
+2026-07-20      | 2026-07-26    | 30         | 1       | 99.2  | run_002      | false
+2026-07-20      | 2026-07-26    | 10         | 2       | 98.1  | run_002      | false
+이때 배치가 중간에 실패하면 run_002는 is_active=false 상태라 API에 노출되지 않습니다. API는 계속 기존 run_001만 봅니다.
+SELECT *
+FROM mv_product_rank_weekly
+WHERE rank_start_date = '2026-07-20'
+  AND rank_end_date = '2026-07-26'
+  AND is_active = true
+ORDER BY rank_no
+LIMIT 20 OFFSET 0;
+배치가 끝까지 성공하면 마지막 단계에서만 활성 버전을 바꿉니다.
+UPDATE mv_product_rank_weekly
+SET is_active = false
+WHERE rank_start_date = '2026-07-20'
+  AND rank_end_date = '2026-07-26'
+  AND is_active = true;
+
+UPDATE mv_product_rank_weekly
+SET is_active = true
+WHERE rank_start_date = '2026-07-20'
+  AND rank_end_date = '2026-07-26'
+  AND batch_run_id = 'run_002';
+이 두 UPDATE는 짧은 트랜잭션으로 묶습니다.
+run_001 -> inactive
+run_002 -> active
+Batch Job 흐름은 이렇게 됩니다.
+ProductRankingAggregationJob
+ ├─ createBatchRunStep
+ ├─ aggregateAndInsertSnapshotStep
+ ├─ validateSnapshotStep
+ └─ activateSnapshotStep
+각 책임은:
+createBatchRunStep
+새 batch_run_id 생성
+실행 상태를 RUNNING으로 기록
+
+aggregateAndInsertSnapshotStep
+product_metrics를 Chunk로 읽음
+daily_ranking_score 합산
+새 batch_run_id, is_active=false로 Top 100 INSERT
+
+validateSnapshotStep
+100건 이하인지
+rank 중복 없는지
+같은 product 중복 없는지 확인
+
+activateSnapshotStep
+기존 active를 false로 변경
+새 batch_run_id 결과를 true로 변경
+batch run 상태를 COMPLETED로 변경
+
+이 방식의 장점은 명확합니다.
+배치 실패 중에도 API는 기존 랭킹을 계속 반환
+재실행 결과를 실행 ID 단위로 추적 가능
+과거 batch 결과를 비교하거나 롤백하기 쉬움
+delete 후 insert 사이에 빈 랭킹이 노출되지 않음
+대신 테이블이 조금 무거워집니다. batch_run_id, is_active, 배치 실행 이력 테이블 같은 요소가 추가됩니다. 과제 수준에서는 살짝 고급 설계지만, “현업에서 안전하게 Read Model을 갱신한다”는 관점에서는 꽤 좋은 선택입니다.
+
+D. UPSERT + Cleanup
+구조: Top 100 결과 upsert → 이번 결과에 없는 기존 row 삭제
+영향: delete 후 빈 구간 노출은 줄일 수 있습니다.
+리스크: Top N 랭킹에서는 순위 밖으로 밀린 데이터 cleanup 조건이 까다롭고, 실수하면 낡은 랭킹 row가 남을 수 있습니다.
+
+질문 11. 삭제 상품은 주간/월간 랭킹에서 어떻게 처리할까요?
+A. Batch 집계 시 현재 논리 삭제된 상품은 제외
+영향: API 응답에서 삭제 상품이 노출되지 않습니다. 과거 기간 랭킹도 현재 삭제 상태에 따라 바뀔 수 있습니다.
+
+B. Batch 집계에는 포함하고 API 응답 시 제외
+영향: 적재 데이터에는 당시 랭킹이 보존되지만, 응답 개수 부족이나 페이지 밀림이 생길 수 있습니다.
+
+C. 기간 종료일 기준으로 활성 상품이었던 경우 포함
+영향: 과거 스냅샷 의미는 가장 자연스럽지만, 상품 상태 이력 테이블이 없으면 구현이 어렵습니다.
+
+질문 12. 주간/월간 MV에는 상품 정보를 스냅샷으로 저장할까요, 아니면 product_id만 저장하고 API에서 상품 정보를 조인할까요?
+A. product_id만 저장하고 API에서 상품/브랜드 정보 조회
+영향: 상품명/가격 변경이 즉시 반영됩니다. MV 테이블은 작고 단순합니다. 기존 일간 Redis 조회 방식과 유사합니다.
+
+B. MV에 상품명, 브랜드명, 가격 스냅샷까지 저장
+영향: Batch 시점의 랭킹 응답을 안정적으로 보존합니다. API가 단순해지지만 상품 정보 중복 저장이 생깁니다.
+
+C. 핵심 표시 정보만 스냅샷 저장
+예: productName, brandName만 저장하고 가격은 조회
+영향: 절충안이지만 일관성 설명이 애매해질 수 있습니다.
+
+질문 13. 주간/월간 Batch 결과가 아직 없을 때 API는 어떻게 응답할까요?
+A. 빈 페이지 반환
+영향: 단순하고 장애를 숨기지 않습니다. 클라이언트는 “아직 생성되지 않은 랭킹”으로 처리할 수 있습니다.
+
+B. 즉시 product_metrics를 조회해 동기 집계 후 응답
+영향: 사용자 경험은 좋아 보일 수 있지만, Batch로 미리 처리한다는 요구사항을 흐리고 대량 데이터 조회 위험이 생깁니다.
+
+C. 404 또는 비즈니스 에러 반환
+영향: 생성되지 않은 기간을 명확히 알릴 수 있지만, 랭킹 조회 API로는 다소 딱딱하고 클라이언트 처리가 복잡해집니다.

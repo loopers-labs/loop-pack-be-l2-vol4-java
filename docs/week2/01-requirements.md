@@ -117,12 +117,12 @@
     *   `acks=all`, `idempotence=true` 설정을 통해 Kafka 브로커 측의 유실 방지 및 중복 발행을 방어한다.
     *   **Partition Key 정책:** `product_id`를 파티션 키로 지정하여, 특정 상품에 대한 이벤트 소비 순서를 완벽하게 보장한다. (단, 핫 파티션 문제 발생 시 Consumer 랙 모니터링 필요)
 *   **Consumer 멱등성 및 순서 보장 (소비 보장):**
-    *   수동 커밋(Manual Ack)을 사용하여 `product_metrics` 집계 및 DB 반영 트랜잭션이 완벽히 성공했을 때만 오프셋을 갱신한다.
+    *   수동 커밋(Manual Ack)을 사용하여 일자별 `product_metrics` 집계 및 DB 반영 트랜잭션이 완벽히 성공했을 때만 오프셋을 갱신한다.
     *   `event_handled` 테이블을 도입하여 메시지의 고유 식별자(새로운 UUID 생성 없이 `OUTBOX_EVENTS`의 `bigint id`를 그대로 재사용)를 단건 저장해 중복을 필터링한다. (단, 데이터가 무한히 쌓이는 것을 방지하기 위해 주기적 삭제 배치가 필요하다.)
-    *   파티션 키로 순서가 보장되며, 멱등성 테이블로 중복 수신이 방어되므로 `PRODUCT_METRICS`는 단순 증감(Delta) 처리를 수행하여 누락 없는 총합을 유지한다.
+    *   파티션 키로 순서가 보장되며, 멱등성 테이블로 중복 수신이 방어되므로 `PRODUCT_METRICS`는 `(metric_date, product_id)` 단위 증감(Delta) 처리를 수행하여 하루치 메트릭을 유지한다.
 
-### 2.12 실시간 상품 랭킹 정책
-*   **목적:** 기존 `product_metrics` 누적 집계를 응용하여, 조회/좋아요/주문 이벤트 기반의 **오늘의 인기상품** 랭킹을 빠르게 제공한다. `PRODUCT_METRICS`는 영속 누적 통계의 기준 데이터로 유지하고, Redis ZSET은 일간 랭킹 조회를 위한 파생 Read Model로 사용한다.
+### 2.12 상품 랭킹 정책
+*   **목적:** 조회/좋아요/주문 이벤트 기반의 인기상품 랭킹을 일간/주간/월간으로 제공한다. Redis ZSET은 실시간 일간 랭킹 조회를 위한 파생 Read Model로 사용하고, `PRODUCT_METRICS`는 주간/월간 Batch 집계의 기준이 되는 일자별 메트릭 테이블로 유지한다.
 *   **이벤트 날짜 기준:** 랭킹 일자는 Consumer 처리 시각이 아니라 **이벤트 발생 시각**을 기준으로 계산한다. 지연 소비가 발생하더라도 실제 7월 14일에 발생한 이벤트는 `ranking:all:20260714`에 반영한다.
 *   **Redis Key 전략 및 TTL:**
     *   랭킹 ZSET Key는 `ranking:all:{yyyyMMdd}` 형식을 사용한다.
@@ -142,7 +142,8 @@
     *   좋아요 이벤트: `0.2 * 1`
     *   주문 이벤트: `0.6 * log(price * amount + 1)`
     *   주문 점수는 주문 금액의 영향은 반영하되, 고가 상품 1건이 랭킹을 과도하게 지배하지 않도록 로그 정규화를 적용한다.
-*   **Consumer 처리 책임:** `MetricsKafkaConsumer`와 `RankingKafkaConsumer`를 분리한다. 두 Consumer는 같은 상품 이벤트 토픽을 서로 다른 Consumer Group으로 독립 소비한다. `MetricsKafkaConsumer`는 `product_metrics` 누적 집계만 담당하고, `RankingKafkaConsumer`는 Redis 랭킹 Read Model 갱신만 담당한다.
+    *   `MetricsKafkaConsumer`는 같은 점수 정책으로 계산한 `daily_ranking_score`를 `product_metrics`에 일자별로 누적한다. 주간/월간 Batch는 이벤트를 다시 해석하지 않고 기간 내 `daily_ranking_score`를 합산한다.
+*   **Consumer 처리 책임:** `MetricsKafkaConsumer`와 `RankingKafkaConsumer`를 분리한다. 두 Consumer는 같은 상품 이벤트 토픽을 서로 다른 Consumer Group으로 독립 소비한다. `MetricsKafkaConsumer`는 일자별 `product_metrics` 집계를 담당하고, `RankingKafkaConsumer`는 Redis 일간 랭킹 Read Model 갱신만 담당한다.
 *   **독립 Projection 및 최종 일관성:** `PRODUCT_METRICS`와 Redis 랭킹은 서로 다른 목적의 Projection이다. 한쪽 Consumer의 지연이나 장애가 다른 쪽 처리를 막지 않으며, 두 Projection은 Consumer 재시도를 통해 최종적으로 수렴한다.
 *   **공통 계약 모듈 분리:** 랭킹 관련 비즈니스 계약과 이벤트 로그 조회 계약은 기술 모듈에 두지 않는다.
     *   `modules/ranking-contract`: `ProductRankingEvent`, `RankingEventType`, `RankingScorePolicy`, `RankingKeyPolicy`를 제공한다. `commerce-api`와 `commerce-streamer`는 같은 랭킹 Key/date/score 정책을 사용한다.
@@ -151,7 +152,16 @@
 *   **Redis 멱등성:** Kafka 재처리로 인한 `ZINCRBY` 중복 가산을 막기 위해, 조회/좋아요/주문 이벤트는 `ranking:handled:{yyyyMMdd}` Set에 `eventId`를 먼저 저장한다. 최초 저장에 성공한 이벤트에 대해서만 `ranking:all:{yyyyMMdd}`에 점수를 누적한다. 상품 삭제 이벤트는 `ZREM` 자체가 멱등적이므로 별도 Redis handled Set을 사용하지 않는다.
 *   **랭킹 표준 이벤트:** Outbox에는 랭킹 표준 이벤트를 `PRODUCT_RANKING_EVENT` 단일 `event_type`으로 기록한다. 실제 행위는 payload 내부 `rankingEventType`(`VIEW`, `LIKE`, `ORDER`, `PRODUCT_DELETED`)으로 구분한다. DB에 저장되는 raw payload에는 `eventId`를 넣지 않고, Kafka Relay 또는 재빌드 조회 구현이 `OUTBOX_EVENTS.id`를 `ProductRankingEvent.eventId`로 주입한다.
 *   **Kafka 배치 리스너 (선택적 최적화):** 기본 설계는 단건 이벤트 처리로 검증한다. 트래픽 증가로 ZSET/DB 연산이 과도해질 경우 배치 리스너를 적용해 `(date, productId)` 단위로 점수를 합산한 뒤 Redis Pipeline 및 DB Batch Update로 처리량을 높인다.
-*   **Ranking API 조회:** `GET /api/v1/rankings?date=yyyyMMdd&size=20&page=1` 호출 시 Redis ZSET에서 상품 ID와 점수를 읽고, 상품 Repository로 상품/브랜드 정보를 조회해 랭킹 응답을 조합한다. 페이징 정책은 기존 프로젝트 API 정책을 따른다.
+*   **주간/월간 랭킹 Batch:** Spring Batch Job은 `period`, `startDate`, `endDate` 파라미터를 받아 Chunk-Oriented 방식으로 `product_metrics`를 읽고, 상품별 `daily_ranking_score`를 기간 합산한다.
+    *   `WEEKLY`: 월요일~일요일 7일 범위만 허용한다.
+    *   `MONTHLY`: 매월 1일~말일 범위만 허용한다.
+    *   Batch는 현재 논리 삭제된 상품을 제외하고 Top 100만 `mv_product_rank_weekly`, `mv_product_rank_monthly`에 저장한다.
+    *   MV 테이블은 DB의 네이티브 Materialized View가 아니라 Batch가 적재하는 조회 전용 물리 테이블로 정의한다.
+    *   Batch는 `batch_run_id` 기반 Versioned Snapshot 방식으로 동작한다. 새 실행 결과는 `is_active=false` 상태로 먼저 적재하고, 검증이 끝난 뒤 짧은 트랜잭션에서 기존 active 결과를 비활성화하고 새 결과를 active로 전환한다.
+    *   같은 기간 재실행 시 새 `batch_run_id`로 별도 Snapshot을 만들며, 실행 중 실패하면 기존 active 랭킹을 유지한다.
+    *   **잠재 리스크:** 실행 이력이 누적되므로 오래된 `batch_run_id` 결과를 정리하는 보관/삭제 정책이 필요하다.
+    *   **잠재 리스크:** 주간/월간 랭킹은 Batch 실행 시점의 상품 삭제 상태를 기준으로 하므로, 과거 기간 랭킹도 현재 삭제 상태의 영향을 받을 수 있다.
+*   **Ranking API 조회:** `GET /api/v1/rankings?period=DAILY&startDate=yyyyMMdd&endDate=yyyyMMdd&size=20&page=1` 형식으로 기간 정보를 전달받는다. `DAILY`는 `startDate == endDate`인 경우만 허용하고 Redis ZSET에서 조회한다. `WEEKLY`, `MONTHLY`는 Batch가 적재한 MV 테이블의 active Snapshot에서 상품 ID와 점수를 읽고, 상품 Repository로 상품/브랜드 정보를 조회해 랭킹 응답을 조합한다. active Snapshot이 아직 없으면 빈 페이지를 반환한다.
 *   **삭제 상품 처리:** 상품이 논리 삭제되면 상품 삭제 트랜잭션 안에서 `PRODUCT_RANKING_EVENT` Outbox 이벤트를 기록하고, payload의 `rankingEventType`은 `PRODUCT_DELETED`로 둔다. 기존 Outbox Relay가 Kafka 발행 시 `OUTBOX_EVENTS.id`를 `eventId`로 주입하고, `RankingKafkaConsumer`는 이 이벤트를 소비해 최근 TTL 범위의 랭킹 ZSET에서 해당 `productId`를 제거한다. 현재 TTL이 2일이므로 삭제 시점 기준 오늘/전일 Key(`ranking:all:{yyyyMMdd}`)에서 `ZREM`을 수행한다. API 조회 시에는 삭제 이벤트 처리 지연 등으로 ZSET에 남아 있는 삭제 상품을 2차 방어로 제외한다.
 *   **Redis 유실 복구:** Redis 데이터가 유실된 경우, `commerce-streamer`의 `RankingRebuildEventRepository` 구현이 `OUTBOX_EVENTS`에서 `PRODUCT_RANKING_EVENT`를 조회해 `ProductRankingEvent`로 변환한다. 조회 대상 상태는 `INIT`, `COMPLETED`이며 `FAILED`는 제외한다. 후보 조회는 `createdAt` 기준 최근 3일 버퍼를 두고, 실제 랭킹 반영 여부는 payload 내부 `occurredAt`이 오늘/전일인지로 판단한다. 재빌드 Job은 조회한 이벤트를 `ranking:rebuild:all:{yyyyMMdd}` 임시 Key에 재계산한 뒤 운영 Key(`ranking:all:{yyyyMMdd}`)로 교체한다. 운영 Key 교체 중 `RankingKafkaConsumer`와의 충돌 방지는 후속 운영 절차로 남기며, Consumer 일시 중단 또는 기준 시각 이후 이벤트 replay 중 하나를 선택해야 한다.
 *   **상품 상세 랭킹 포함:** `GET /api/v1/products/{productId}` 응답에는 서버의 오늘 날짜 기준 랭킹 정보를 함께 반환한다. 해당 상품이 오늘 랭킹에 없으면 랭킹 정보는 `null`로 반환한다.
@@ -222,15 +232,20 @@
 ### 3.3 랭킹 (Rankings)
 | METHOD | URI | user_required | 설명 |
 | --- | --- | --- | --- |
-| GET | `/api/v1/rankings?date=yyyyMMdd&size=20&page=1` | X | 일자별 인기상품 랭킹 페이지 조회 |
+| GET | `/api/v1/rankings?period=DAILY&startDate=yyyyMMdd&endDate=yyyyMMdd&size=20&page=1` | X | 일간/주간/월간 인기상품 랭킹 페이지 조회 |
 
 *   **랭킹 조회 파라미터:**
-    *   `date`: 조회할 랭킹 일자 (`yyyyMMdd`). 미입력 시 서버의 오늘 날짜를 사용한다.
+    *   `period`: 조회 기간 유형 (`DAILY`, `WEEKLY`, `MONTHLY`).
+    *   `startDate`, `endDate`: 조회 기간 (`yyyyMMdd`).
+    *   `DAILY`: `startDate`와 `endDate`가 같아야 하며, Redis 일간 랭킹을 조회한다.
+    *   `WEEKLY`: 월요일~일요일 7일 범위만 허용하며, `mv_product_rank_weekly`를 조회한다.
+    *   `MONTHLY`: 매월 1일~말일 범위만 허용하며, `mv_product_rank_monthly`를 조회한다.
     *   `page`, `size`: 기존 프로젝트 페이징 정책을 따른다.
 *   **응답 정책:**
-    *   Redis ZSET의 member는 `productId`, score는 가중치가 반영된 누적 점수이다.
+    *   일간 Redis ZSET 및 주간/월간 MV의 공통 식별자는 `productId`, score는 가중치가 반영된 누적 점수이다.
     *   응답은 단순 상품 ID 목록이 아니라 상품명, 가격, 브랜드명, 랭킹 순위, 랭킹 점수를 함께 제공한다.
-    *   논리 삭제된 상품은 상품 삭제 시 Redis ZSET에서 제거한다. 조회 시점에 남아 있는 삭제 상품은 2차 방어로 제외한다.
+    *   주간/월간 active Snapshot이 아직 생성되지 않은 기간은 빈 페이지를 반환한다.
+    *   논리 삭제된 상품은 상품 삭제 시 Redis ZSET에서 제거하고, 주간/월간 Batch 집계 시 제외한다. 조회 시점에 남아 있는 삭제 상품은 2차 방어로 제외한다.
 
 ### 3.4 좋아요 (Likes)
 | METHOD | URI | user_required | 설명 |
@@ -312,13 +327,26 @@
 ### 5.2 Ranking API
 *   랭킹 Page 조회 시 정상적으로 랭킹 정보가 반환된다.
 *   랭킹 Page 조회 시 단순 상품 ID가 아닌 상품 정보가 Aggregation 되어 제공된다.
+*   `period=DAILY`는 `startDate == endDate`인 경우만 허용하고 Redis 일간 랭킹을 조회한다.
+*   `period=WEEKLY`는 월요일~일요일 7일 범위만 허용하고 `mv_product_rank_weekly`를 조회한다.
+*   `period=MONTHLY`는 매월 1일~말일 범위만 허용하고 `mv_product_rank_monthly`를 조회한다.
+*   주간/월간 active Snapshot이 아직 생성되지 않은 기간은 빈 페이지를 반환한다.
 *   상품 논리 삭제 시 최근 TTL 범위의 랭킹 ZSET에서 해당 상품이 제거된다.
 *   삭제 이벤트 처리 지연 등으로 ZSET에 남아 있는 삭제 상품은 API 응답에서 제외된다.
 *   상품 상세 조회 시 오늘 기준 해당 상품의 순위가 함께 반환된다.
 *   상품이 오늘 랭킹에 없다면 상품 상세 응답의 랭킹 정보는 `null`이다.
 
-### 5.3 E2E 검증
+### 5.3 Ranking Batch
+*   Spring Batch Job은 `period`, `startDate`, `endDate` 파라미터 기반으로 실행된다.
+*   Batch Reader는 Chunk-Oriented 방식으로 기간 내 `product_metrics`를 읽는다.
+*   Batch Processor는 상품별 `daily_ranking_score`를 합산하고 현재 논리 삭제된 상품을 제외한다.
+*   Batch Writer는 새 `batch_run_id`의 inactive Snapshot으로 Top 100 결과를 INSERT한다.
+*   Snapshot 검증이 끝난 뒤 active 전환 Step에서 기존 active Snapshot을 비활성화하고 새 Snapshot을 활성화한다.
+*   같은 파라미터로 재실행 중 실패해도 기존 active Snapshot은 유지된다.
+
+### 5.4 E2E 검증
 *   이벤트 발행 -> Kafka Consumer 수신 -> `PRODUCT_METRICS` 갱신 -> Redis ZSET 점수 반영 -> API 조회 흐름이 정상 동작한다.
 *   일자가 변경되어도 이전 날짜의 랭킹 조회가 TTL 내에서 정상 동작한다.
 *   가중치 적용이 의도대로 랭킹 순서에 반영된다.
 *   Kafka 배치 리스너 적용 시에도 단건 처리와 동일한 점수 결과가 나온다.
+*   주간/월간 Batch 실행 후 Ranking API가 MV 기반 랭킹을 반환한다.

@@ -7,13 +7,22 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Getter
 @Entity
-@Table(name = "product_metrics")
+@Table(
+    name = "product_metrics",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_product_metrics_metric_date_product_id", columnNames = {"metric_date", "product_id"})
+    }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductMetrics extends BaseTimeEntity {
 
@@ -21,35 +30,49 @@ public class ProductMetrics extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "product_id", nullable = false, unique = true)
+    @Column(name = "metric_date", nullable = false)
+    private LocalDate metricDate;
+
+    @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Column(name = "total_views", nullable = false)
-    private long totalViews;
+    @Column(name = "view_count", nullable = false)
+    private long viewCount;
 
-    @Column(name = "total_likes", nullable = false)
-    private long totalLikes;
+    @Column(name = "like_count", nullable = false)
+    private long likeCount;
 
-    @Column(name = "total_sales", nullable = false)
-    private long totalSales;
+    @Column(name = "sales_count", nullable = false)
+    private long salesCount;
 
-    private ProductMetrics(Long productId) {
+    @Column(name = "order_amount", nullable = false)
+    private BigDecimal orderAmount = BigDecimal.ZERO;
+
+    @Column(name = "daily_ranking_score", nullable = false)
+    private double dailyRankingScore;
+
+    private ProductMetrics(LocalDate metricDate, Long productId) {
+        this.metricDate = metricDate;
         this.productId = productId;
     }
 
-    public static ProductMetrics create(Long productId) {
-        return new ProductMetrics(productId);
+    public static ProductMetrics create(LocalDate metricDate, Long productId) {
+        return new ProductMetrics(metricDate, productId);
     }
 
-    public void addView() {
-        this.totalViews++;
+    public void addView(double scoreDelta) {
+        this.viewCount++;
+        this.dailyRankingScore += scoreDelta;
     }
 
-    public void addLike() {
-        this.totalLikes++;
+    public void addLike(double scoreDelta) {
+        this.likeCount++;
+        this.dailyRankingScore += scoreDelta;
     }
 
-    public void addSales(int amount) {
-        this.totalSales += amount;
+    public void addSales(int amount, BigDecimal price, double scoreDelta) {
+        this.salesCount += amount;
+        this.orderAmount = this.orderAmount.add(price.multiply(BigDecimal.valueOf(amount)));
+        this.dailyRankingScore += scoreDelta;
     }
 }

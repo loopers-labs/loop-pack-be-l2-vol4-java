@@ -129,11 +129,15 @@ classDiagram
 
     class ProductMetrics {
         +Long productId
-        +int totalLikes
-        +int totalSales
-        +int totalViews
-        +addLikes(int amount)
-        +addSales(int amount)
+        +LocalDate metricDate
+        +int viewCount
+        +int likeCount
+        +int salesCount
+        +BigDecimal orderAmount
+        +double dailyRankingScore
+        +addView(scoreDelta)
+        +addLike(scoreDelta)
+        +addSales(amount, orderAmount, scoreDelta)
     }
     ProductMetrics --|> BaseTimeEntity
     
@@ -151,7 +155,9 @@ classDiagram
         +BigDecimal price
         +int rank
         +double score
-        +String date
+        +RankingPeriod period
+        +String startDate
+        +String endDate
     }
 
     class ProductRankingInfo {
@@ -159,6 +165,43 @@ classDiagram
         +int rank
         +double score
         +String date
+    }
+
+    class RankingPeriod {
+        <<enumeration>>
+        DAILY
+        WEEKLY
+        MONTHLY
+    }
+
+    class ProductRankMv {
+        +RankingPeriod period
+        +LocalDate rankStartDate
+        +LocalDate rankEndDate
+        +Long productId
+        +int rank
+        +double score
+        +Long batchRunId
+        +boolean isActive
+    }
+    ProductRankMv --|> BaseTimeEntity
+
+    class ProductRankBatchRun {
+        +Long id
+        +RankingPeriod period
+        +LocalDate rankStartDate
+        +LocalDate rankEndDate
+        +BatchRunStatus status
+        +markCompleted()
+        +markFailed()
+    }
+    ProductRankBatchRun --|> BaseTimeEntity
+
+    class BatchRunStatus {
+        <<enumeration>>
+        RUNNING
+        COMPLETED
+        FAILED
     }
 
     class OutboxEventLog {
@@ -302,7 +345,7 @@ classDiagram
         +retrieveProducts(condition, pageable)
     }
     class RankingFacade {
-        +retrieveRankings(date, page, size)
+        +retrieveRankings(period, startDate, endDate, page, size)
     }
 
     %% 도메인 서비스 (Domain Service) - 여러 엔티티의 협력이 필요한 순수 로직
@@ -368,6 +411,22 @@ classDiagram
     class RankingCarryOverJob {
         +carryOver(today)
     }
+    class ProductRankingAggregationJob {
+        +aggregate(period, startDate, endDate)
+    }
+    class ProductMetricsItemReader {
+        +readChunk(startDate, endDate)
+    }
+    class ProductRankAggregationProcessor {
+        +aggregate(metrics)
+        +filterActiveProducts(productIds)
+        +top100(items)
+    }
+    class ProductRankMvWriter {
+        +saveSnapshot(batchRunId, rankings)
+        +validateSnapshot(batchRunId)
+        +activateSnapshot(period, startDate, endDate, batchRunId)
+    }
     class MetricsUpdateService {
         <<DomainService>>
         +addMetrics(eventId, payload)
@@ -390,6 +449,24 @@ classDiagram
         +isCarryOverDone(dateKey): boolean
         +expire(dateKey, ttl)
     }
+    class ProductMetricsRepository {
+        <<interface>>
+        +findByMetricDateBetween(startDate, endDate)
+    }
+    class ProductRankMvRepository {
+        <<interface>>
+        +findActivePage(period, startDate, endDate, page, size)
+        +saveAll(batchRunId, rankings)
+        +existsInvalidSnapshot(batchRunId): boolean
+        +deactivateActiveSnapshot(period, startDate, endDate)
+        +activateSnapshot(batchRunId)
+    }
+    class ProductRankBatchRunRepository {
+        <<interface>>
+        +create(period, startDate, endDate): Long
+        +markCompleted(batchRunId)
+        +markFailed(batchRunId)
+    }
     
     OutboxRelayScheduler ..> KafkaEventProducer
     MetricsKafkaConsumer ..> MetricsUpdateService
@@ -405,10 +482,20 @@ classDiagram
     RankingCarryOverJob ..> RankingKeyPolicy
     RankingCarryOverJob ..> RankingRedisRepository
     RankingCarryOverJob ..> ProductRepository
+    ProductRankingAggregationJob ..> ProductMetricsItemReader
+    ProductRankingAggregationJob ..> ProductRankAggregationProcessor
+    ProductRankingAggregationJob ..> ProductRankMvWriter
+    ProductRankingAggregationJob ..> ProductRankBatchRunRepository
+    ProductMetricsItemReader ..> ProductMetricsRepository
+    ProductRankAggregationProcessor ..> ProductRepository
+    ProductRankAggregationProcessor ..> ProductRankMv
+    ProductRankMvWriter ..> ProductRankMvRepository
+    ProductRankMv ..> ProductRankBatchRun
     RankingRebuildEventRepository ..> OutboxEventLog
     RankingRebuildEventRepository ..> ProductRankingEvent
     RankingFacade ..> RankingRedisRepository
     RankingFacade ..> RankingKeyPolicy
+    RankingFacade ..> ProductRankMvRepository
     RankingFacade ..> ProductRepository
     RankingFacade ..> RankingItem
     ProductFacade ..> RankingRedisRepository

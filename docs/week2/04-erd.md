@@ -112,12 +112,56 @@ erDiagram
     }
 
     PRODUCT_METRICS {
-        bigint product_id PK
-        int total_likes "누적 좋아요 수"
-        int total_sales "누적 판매량"
-        int total_views "누적 조회수"
+        date metric_date PK "이벤트 발생일 기준 메트릭 일자"
+        bigint product_id PK, FK
+        int view_count "일자별 조회수"
+        int like_count "일자별 좋아요 수"
+        int sales_count "일자별 판매량"
+        decimal_15_4 order_amount "일자별 주문 금액 합계"
+        double daily_ranking_score "일자별 랭킹 점수 합계"
         datetime created_at
         datetime updated_at
+    }
+
+    PRODUCT_RANK_BATCH_RUNS {
+        bigint id PK
+        varchar period "WEEKLY, MONTHLY"
+        date rank_start_date
+        date rank_end_date
+        varchar status "RUNNING, COMPLETED, FAILED"
+        datetime created_at
+        datetime updated_at
+        %% Index: (period, rank_start_date, rank_end_date, status)
+    }
+
+    MV_PRODUCT_RANK_WEEKLY {
+        date rank_start_date PK "월요일"
+        date rank_end_date PK "일요일"
+        bigint batch_run_id PK, FK
+        bigint product_id PK, FK
+        int rank_no
+        double score
+        boolean is_active "API 조회 대상 Snapshot 여부"
+        datetime created_at
+        datetime updated_at
+        %% Unique Index: (rank_start_date, rank_end_date, batch_run_id, rank_no)
+        %% Index: (rank_start_date, rank_end_date, is_active, rank_no)
+        %% Active Snapshot 조회는 is_active=true 조건으로 수행
+    }
+
+    MV_PRODUCT_RANK_MONTHLY {
+        date rank_start_date PK "월 1일"
+        date rank_end_date PK "월 말일"
+        bigint batch_run_id PK, FK
+        bigint product_id PK, FK
+        int rank_no
+        double score
+        boolean is_active "API 조회 대상 Snapshot 여부"
+        datetime created_at
+        datetime updated_at
+        %% Unique Index: (rank_start_date, rank_end_date, batch_run_id, rank_no)
+        %% Index: (rank_start_date, rank_end_date, is_active, rank_no)
+        %% Active Snapshot 조회는 is_active=true 조건으로 수행
     }
 
     EVENT_HANDLED {
@@ -137,5 +181,9 @@ erDiagram
     COUPON_TEMPLATES ||--o{ COUPON_ISSUES : "issues"
     COUPON_ISSUES ||--o| ORDERS : "applied to"
     ORDERS ||--o{ PAYMENTS : "has (1:N 결제 시도 이력)"
-    PRODUCTS ||--o| PRODUCT_METRICS : "has metrics"
+    PRODUCTS ||--o{ PRODUCT_METRICS : "has daily metrics"
+    PRODUCTS ||--o{ MV_PRODUCT_RANK_WEEKLY : "ranked weekly"
+    PRODUCTS ||--o{ MV_PRODUCT_RANK_MONTHLY : "ranked monthly"
+    PRODUCT_RANK_BATCH_RUNS ||--o{ MV_PRODUCT_RANK_WEEKLY : "versions"
+    PRODUCT_RANK_BATCH_RUNS ||--o{ MV_PRODUCT_RANK_MONTHLY : "versions"
 ```

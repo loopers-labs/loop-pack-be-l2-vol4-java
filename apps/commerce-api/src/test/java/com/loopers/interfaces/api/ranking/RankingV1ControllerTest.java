@@ -45,12 +45,19 @@ class RankingV1ControllerTest {
             "Nike",
             new BigDecimal("1000.0000")
         );
-        given(rankingFacade.getRankings("20260714", 1, 20))
+        given(rankingFacade.getRankings(
+            com.loopers.domain.ranking.RankingPeriod.DAILY,
+            "20260714",
+            "20260714",
+            1,
+            20
+        ))
             .willReturn(new PageImpl<>(List.of(info), PageRequest.of(0, 20), 1));
 
         // when & then
         mockMvc.perform(get("/api/v1/rankings")
                 .param("date", "20260714")
+                .param("period", "DAILY")
                 .param("page", "1")
                 .param("size", "20")
                 .contentType(MediaType.APPLICATION_JSON))
@@ -72,7 +79,13 @@ class RankingV1ControllerTest {
     void getRankings_WhenDateMissing_ShouldUseToday() throws Exception {
         // given
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        given(rankingFacade.getRankings(today, 1, 20))
+        given(rankingFacade.getRankings(
+            com.loopers.domain.ranking.RankingPeriod.DAILY,
+            today,
+            today,
+            1,
+            20
+        ))
             .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         // when & then
@@ -83,6 +96,91 @@ class RankingV1ControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.meta.result").value("SUCCESS"));
 
-        verify(rankingFacade).getRankings(today, 1, 20);
+        verify(rankingFacade).getRankings(
+            com.loopers.domain.ranking.RankingPeriod.DAILY,
+            today,
+            today,
+            1,
+            20
+        );
+    }
+
+    @Test
+    @DisplayName("period와 startDate/endDate가 있으면 해당 기간 랭킹을 조회한다.")
+    void getRankings_WhenPeriodRangeGiven_ShouldQueryRange() throws Exception {
+        // given
+        given(rankingFacade.getRankings(
+            com.loopers.domain.ranking.RankingPeriod.WEEKLY,
+            "20260720",
+            "20260726",
+            1,
+            20
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/rankings")
+                .param("period", "WEEKLY")
+                .param("startDate", "20260720")
+                .param("endDate", "20260726")
+                .param("page", "1")
+                .param("size", "20")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.meta.result").value("SUCCESS"));
+
+        verify(rankingFacade).getRankings(
+            com.loopers.domain.ranking.RankingPeriod.WEEKLY,
+            "20260720",
+            "20260726",
+            1,
+            20
+        );
+    }
+
+    @Test
+    @DisplayName("DAILY 기간의 startDate와 endDate가 다르면 BAD_REQUEST를 반환한다.")
+    void getRankings_WhenInvalidDailyRange_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/rankings")
+                .param("period", "DAILY")
+                .param("startDate", "20260720")
+                .param("endDate", "20260721")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.meta.result").value("FAIL"));
+    }
+
+    @Test
+    @DisplayName("WEEKLY 기간이 월요일부터 일요일까지 7일이 아니면 BAD_REQUEST를 반환한다.")
+    void getRankings_WhenInvalidWeeklyRange_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/rankings")
+                .param("period", "WEEKLY")
+                .param("startDate", "20260721")
+                .param("endDate", "20260727")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.meta.result").value("FAIL"));
+    }
+
+    @Test
+    @DisplayName("MONTHLY 기간이 월초부터 월말까지가 아니면 BAD_REQUEST를 반환한다.")
+    void getRankings_WhenInvalidMonthlyRange_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/rankings")
+                .param("period", "MONTHLY")
+                .param("startDate", "20260702")
+                .param("endDate", "20260731")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.meta.result").value("FAIL"));
+    }
+
+    @Test
+    @DisplayName("WEEKLY/MONTHLY 요청에서 startDate 또는 endDate가 없으면 BAD_REQUEST를 반환한다.")
+    void getRankings_WhenRangePeriodWithoutRange_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/rankings")
+                .param("period", "WEEKLY")
+                .param("date", "20260720")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.meta.result").value("FAIL"));
     }
 }

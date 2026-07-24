@@ -4,6 +4,7 @@ import com.loopers.application.brand.BrandRepository;
 import com.loopers.application.product.ProductRepository;
 import com.loopers.domain.brand.BrandModel;
 import com.loopers.domain.product.ProductModel;
+import com.loopers.domain.ranking.RankingPeriod;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,9 @@ class RankingFacadeTest {
     private RankingRedisRepository rankingRedisRepository;
 
     @Mock
+    private RankingSnapshotRepository rankingSnapshotRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -52,7 +56,13 @@ class RankingFacadeTest {
         given(brandRepository.findByIds(List.of(10L))).willReturn(List.of(brand));
 
         // when
-        Page<RankingProductInfo> result = rankingFacade.getRankings(dateKey, 1, 20);
+        Page<RankingProductInfo> result = rankingFacade.getRankings(
+            RankingPeriod.DAILY,
+            dateKey,
+            dateKey,
+            1,
+            20
+        );
 
         // then
         assertThat(result.getContent()).hasSize(1);
@@ -86,9 +96,49 @@ class RankingFacadeTest {
         given(brandRepository.findByIds(List.of(10L))).willReturn(List.of(brand));
 
         // when
-        Page<RankingProductInfo> result = rankingFacade.getRankings(dateKey, 1, 20);
+        Page<RankingProductInfo> result = rankingFacade.getRankings(
+            RankingPeriod.DAILY,
+            dateKey,
+            dateKey,
+            1,
+            20
+        );
 
         // then
         assertThat(result.getContent()).extracting(RankingProductInfo::productId).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("주간 랭킹은 MV 저장소에서 조회한 상품 ID를 상품/브랜드 정보와 조합해 반환한다.")
+    void getRankings_WhenWeekly_ShouldUseSnapshotRepository() {
+        // given
+        given(rankingSnapshotRepository.findRankings(
+            RankingPeriod.WEEKLY,
+            "20260720",
+            "20260726",
+            1,
+            20
+        )).willReturn(List.of(new RankingEntry(1L, 1, 30.0)));
+        given(rankingSnapshotRepository.count(RankingPeriod.WEEKLY, "20260720", "20260726")).willReturn(1L);
+
+        ProductModel product = new ProductModel(10L, "Air Max", new BigDecimal("1000.0000"));
+        ReflectionTestUtils.setField(product, "id", 1L);
+        given(productRepository.findByIds(List.of(1L))).willReturn(List.of(product));
+
+        BrandModel brand = new BrandModel("Nike");
+        ReflectionTestUtils.setField(brand, "id", 10L);
+        given(brandRepository.findByIds(List.of(10L))).willReturn(List.of(brand));
+
+        // when
+        Page<RankingProductInfo> result = rankingFacade.getRankings(
+            RankingPeriod.WEEKLY,
+            "20260720",
+            "20260726",
+            1,
+            20
+        );
+
+        // then
+        assertThat(result.getContent()).extracting(RankingProductInfo::score).containsExactly(30.0);
     }
 }
