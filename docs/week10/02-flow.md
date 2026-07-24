@@ -53,7 +53,7 @@ flowchart LR
 
 | 구성 | 컨슈머 그룹 | 상태 |
 | --- | --- | --- |
-| 랭킹 컨슈머 → ZSET | `ranking-catalog`, `ranking-order` | `[R10↻]` 가중치 설정 주입 + `occurredAt`/`paidAt` null 가드 |
+| 랭킹 컨슈머 → ZSET | `ranking-catalog`, `ranking-order` | `[R10↻]` `occurredAt`/`paidAt` null 가드 (가중치는 상수 그대로) |
 | carry-over / finalize / rebuild | — | `[R9]` 변경 없음 |
 | 메트릭 컨슈머 → `product_metrics` | `catalog-consumer`, `metrics-consumer` | `[R10↻]` 일별화 |
 | 배치 → MV | — | `[R10]` 신규 |
@@ -165,7 +165,7 @@ flowchart TD
     W -->|EOF| END["완료"]
 ```
 
-- **Reader** — DB가 `products`를 join해 삭제·판매중지를 걸러내고 → `GROUP BY product_id` → 가중치로 score 계산 → `ORDER BY score DESC, product_id ASC LIMIT 150`까지 한 번에 한다. 그 150행을 `JdbcCursorItemReader`가 읽는다. 커서를 고른 건 `LIMIT 150`을 SQL에 직접 쓸 수 있어서다 — 페이징 리더는 `LIMIT` 자리를 `pageSize`가 차지해 상위 150 컷을 SQL로 표현할 수 없다(근거는 요구사항 문서). 가중치는 SQL 바인딩 파라미터로 주입한다(설정에서 옴).
+- **Reader** — DB가 `products`를 join해 삭제·판매중지를 걸러내고 → `GROUP BY product_id` → 가중치로 score 계산 → `ORDER BY score DESC, product_id ASC LIMIT 150`까지 한 번에 한다. 그 150행을 `JdbcCursorItemReader`가 읽는다. 커서를 고른 건 `LIMIT 150`을 SQL에 직접 쓸 수 있어서다 — 페이징 리더는 `LIMIT` 자리를 `pageSize`가 차지해 상위 150 컷을 SQL로 표현할 수 없다(근거는 요구사항 문서). 가중치는 SQL 바인딩 파라미터로 주입한다(`RankingScoreWeights` 상수).
 - **Processor** — 읽은 행을 MV 엔티티로 매핑한다. score는 이미 계산돼 있다.
 - **Writer** — MV에 그대로 쓴다. weekly/monthly 대상 테이블은 enum으로 분기한다.
 

@@ -1,22 +1,18 @@
 package com.loopers.batch.job.ranking;
 
 import com.loopers.ranking.domain.RankingScoreWeights;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 가중치는 SQL 에 박지 않고 설정에서 읽어 바인딩 파라미터로 넣는다.
- * 기본값은 streamer 의 RankingScorePolicy 와 같은 값이다 — 공유 위치가 정해지면 이 프로퍼티 이름 그대로 옮긴다.
+ * 가중치를 빈으로 제공한다. streamer 의 RankingScorePolicy 와 같은 상수다 —
+ * 거의 고정인 값이라 설정으로 빼지 않는다(설정 있는 척하지 않는다). 값 일치는 두 앱의 계약 테스트가 지킨다.
  */
 @Configuration
 public class RankingScoreConfig {
 
     @Bean
-    public RankingScoreWeights rankingScoreWeights(
-            @Value("${ranking.score.view:0.1}") double view,
-            @Value("${ranking.score.like:0.2}") double like,
-            @Value("${ranking.score.order:0.6}") double order) {
-        return new RankingScoreWeights(view, like, order);
+    public RankingScoreWeights rankingScoreWeights() {
+        return RankingScoreWeights.standard();
     }
 }

@@ -21,7 +21,7 @@ R9가 만든 일간 랭킹 기계는 그대로 둔다.
 
 | 구성 | 역할 | 이번 주 변경 |
 | --- | --- | --- |
-| 랭킹 컨슈머 → Redis ZSET | 오늘의 실시간 랭킹 | 가중치를 설정 주입으로, `occurredAt` null 가드 추가 |
+| 랭킹 컨슈머 → Redis ZSET | 오늘의 실시간 랭킹 | `occurredAt` null 가드 추가 (가중치는 `RankingScorePolicy` 상수 그대로) |
 | 23:50 carry-over | 내일 판에 오늘 점수 ×0.1 심기 | 없음 |
 | 00:30 finalize → `ranking_snapshot` | 어제 ZSET을 DB에 확정 | 없음 |
 | `rebuild` 엔드포인트 | Redis 소실 시 snapshot으로 오늘 판 복구 | 없음 |
@@ -235,7 +235,7 @@ ORDER BY score DESC, product_id ASC
 LIMIT 150
 ```
 
-가중치는 SQL에 박지 않고 바인딩 파라미터로 주입한다. 값은 「점수 정책 공유」에서 설정으로 관리한다.
+가중치는 SQL에 박지 않고 바인딩 파라미터로 주입한다. 값은 「점수 정책 공유」의 `RankingScoreWeights` 상수에서 온다.
 
 ### 집계 쿼리는 버티나 — 실측
 
@@ -373,15 +373,11 @@ Step2가 중간에 실패해 다음 실행까지 반쪽으로 남는 것도 감�
 
 가중치(view 0.1 / like 0.2 / order 0.6)를 streamer와 batch가 모두 알아야 하는데 `apps`끼리는 서로 의존할 수 없다.
 
-각 앱이 자기 상수를 갖고 값 일치를 테스트로 고정하는 안을 잡았다가 접었다. 복제는 한쪽만 배포되면 조용히 어긋나고, 컴파일러도 테스트도 두 앱에 걸친 불일치는 잡지 못한다.
+`ranking.yml`을 공유 위치에 두고 두 앱이 가져오는 안을 검토했다가 접었다. `modules`/`supports`가 도메인에 의존하지 않는다는 규칙을 굽혀 별도 모듈을 신설해야 하는데, **가중치는 거의 고정인 값 하나**라 그만한 무게를 질 값어치가 없다.
 
-`ranking.yml`을 공유 위치에 두고 두 앱이 `spring.config.import`로 가져와 `@ConfigurationProperties`로 바인딩한다. 각 앱 리소스에 복사하면 코드 복제가 설정 복제로 바뀔 뿐이라, 공유 위치에 두는 것이 핵심이다.
+그래서 양쪽 상수로 둔다 — streamer는 `RankingScorePolicy`, batch는 `RankingScoreWeights.standard()`. batch는 한때 `ranking.score.*` 설정에서 읽었지만 그 설정이 어디에도 없어 늘 기본값으로 떨어졌다. "설정으로 관리하는 척"이 오히려 헷갈려, 설정 배선을 걷어내고 상수로 되돌렸다.
 
-다만 이건 의도적으로 규칙을 굽히는 결정이다. CLAUDE.md는 `modules`/`supports`가 도메인에 의존하지 않는다고 못박는데, 랭킹 가중치는 인프라 설정이 아니라 도메인 정책이다. 설정 파일만 담는 모듈은 코드 의존이 없어 의존 방향은 깨지 않지만 도메인 지식이 들어가는 건 사실이다. 기존 `modules:jpa` 같은 데 슬쩍 얹지 않고 별도 위치에 두어 그 사실이 드러나게 한다.
-
-**현재 상태는 아직 공유 전이다.** streamer는 `RankingScorePolicy`에 `0.1/0.2/0.6`을 하드코딩하고, batch는 `ranking.score.*` 설정에서 읽는다(기본값 동일). 값이 같아 지금은 일치하지만, **batch 설정만 바꿔도 일간(streamer)과 주간·월간(batch)이 조용히 갈라진다.** 진짜 크로스-앱 계약 테스트는 두 앱이 같은 값을 참조하는 공유 위치가 있어야 가능하다 — `apps`끼리 의존할 수 없어 한 테스트에서 두 계산을 맞대어 볼 수 없기 때문이다.
-
-공유 위치가 정해지기 전까지의 부분 방어로, 두 앱에 **같은 조합(view 10, like 5, order 2)·같은 기대값(3.2)** 테스트를 둔다(`RankingScorePolicyTest` ↔ `WeeklyRankingAggregationE2ETest`). 한쪽 가중치가 합의값을 벗어나면 최소한 그 앱의 테스트가 깨진다. 완전한 방어는 아니다 — 양쪽이 같은 방향으로 함께 틀리면 못 잡는다.
+값 일치는 계약 테스트로 지킨다. 두 앱에 **같은 조합(view 10, like 5, order 2)·같은 기대값(3.2)** 을 박아(`RankingScorePolicyTest` ↔ `WeeklyRankingAggregationE2ETest`) 한쪽이 합의값을 벗어나면 그 앱의 테스트가 깨진다. 완전한 방어는 아니다 — `apps` 분리로 한 테스트에서 두 계산을 맞댈 수 없어 양쪽이 같은 방향으로 함께 틀리면 못 잡는다. 가중치가 자주 바뀌는 값이 되면 그때 공유 위치를 다시 검토한다.
 
 ## Ranking API 확장
 
@@ -402,7 +398,7 @@ port는 둘로 나눈다 — `RankingRepository`(Redis)와 `RankingMvRepository`
 
 어디를 읽을지 정하는 건 순수 규칙이므로(입력 `period`, 출력 `SPEED | BATCH`, I/O 없음) `RankingDatePolicy`와 같은 자리에 정책 객체로 둔다. `period_key` 계산·완결 판정은 commerce-api의 `RankingPeriod` enum이 맡는다(DAILY 제외 — 그건 ZSET 2일 창이라 `RankingDatePolicy`).
 
-**`period_key` 형식이 batch와 API 두 곳에 복제된다.** `apps`끼리 의존할 수 없어 ISO 주/KST 월 계산을 양쪽이 각자 구현한다. 형식이 어긋나면 batch가 저장한 키와 API 조회 키가 안 맞아 조용히 빈 결과가 된다. 가중치 이중화와 같은 범주의 문제이고, 같은 공유 위치가 생기면 함께 해소된다. 지금은 양쪽 경계 테스트(`RankingPeriodTest`)가 같은 기대값(`2026-W30`, 해 경계 `2026-W01`/`2026-W53`)을 붙잡아 부분 방어한다.
+**`period_key` 형식이 batch와 API 두 곳에 복제된다.** `apps`끼리 의존할 수 없어 ISO 주/KST 월 계산을 양쪽이 각자 구현한다. 형식이 어긋나면 batch가 저장한 키와 API 조회 키가 안 맞아 조용히 빈 결과가 된다. 가중치와 같은 범주의 복제이고, 같은 이유로 공유 모듈을 신설하지 않는다 — 양쪽 경계 테스트(`RankingPeriodTest`)가 같은 기대값(`2026-W30`, 해 경계 `2026-W01`/`2026-W53`)을 붙잡아 부분 방어한다.
 
 ## 테스트 데이터 — 배치를 돌릴 게 없다
 
@@ -444,8 +440,7 @@ POST /admin/metrics/seed
 
 ## 미결
 
-- [ ] `ranking.yml`을 둘 모듈 — "공유 위치"만 정하고 어디인지는 안 정했다. `modules` 아래 신설할지, 기존 위치에 얹을지
-- [ ] score 정책 공유 — 가중치가 streamer 하드코딩 / batch 설정으로 갈라져 있다. batch 설정만 바꿔도 지금 어긋난다. 공유 위치(위 항목)가 정해지면 두 앱이 같은 값을 참조하는 진짜 계약 테스트로 승격한다. 지금은 양쪽에 같은 조합·기대값을 둔 부분 방어뿐이다(「점수 정책 공유」)
+- [x] ~~`ranking.yml` 공유 위치~~ — 만들지 않기로 결론. 가중치는 거의 고정인 값 하나라 공유 모듈을 신설할 값어치가 없다. 양쪽 상수 + 계약 테스트로 간다(「점수 정책 공유」). 자주 바뀌는 값이 되면 그때 재검토
 - [ ] 소비 지연 watermark — 월요일 새벽 실행 시점에 일요일 이벤트가 모두 반영됐다는 보장이 없다. Kafka lag가 남아 있으면 첫 확정본부터 낡는다. 실행 전 lag 확인, 실행 시각 늦추기, 재집계로 흡수 중 하나를 정한다
 - [ ] MV 보존 기간 — 지난 기간 `period_key`가 계속 쌓인다. 언젠가 정리 배치가 필요하나 당장은 아니다
 - [ ] 배치 실패 알림 — `JobListener.afterJob`에 `getStatus() == FAILED` 분기 추가 (Slack appender는 이미 붙어 있음)
