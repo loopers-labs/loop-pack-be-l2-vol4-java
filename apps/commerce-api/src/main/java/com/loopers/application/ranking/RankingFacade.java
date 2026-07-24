@@ -2,7 +2,9 @@ package com.loopers.application.ranking;
 
 import com.loopers.domain.product.ProductModel;
 import com.loopers.domain.product.ProductRepository;
+import com.loopers.domain.ranking.MvRankingRepository;
 import com.loopers.domain.ranking.RankingKeys;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.domain.ranking.RankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,15 +28,25 @@ import java.util.stream.Collectors;
 public class RankingFacade {
 
     private final RankingRepository rankingRepository;
+    private final MvRankingRepository mvRankingRepository;
     private final ProductRepository productRepository;
 
-    public Page<RankingInfo> getRankingPage(LocalDate date, Integer hour, int page, int size) {
-        String key = RankingKeys.of(date, hour);
+    public Page<RankingInfo> getRankingPage(RankingPeriod period, LocalDate date, Integer hour, int page, int size) {
         long offset = (long) (page - 1) * size;
         PageRequest pageRequest = PageRequest.of(page - 1, size);
 
-        List<Long> productIds = rankingRepository.topProductIds(key, offset, size);
-        long total = rankingRepository.size(key);
+        // 일간은 Redis ZSET(실시간), 주간·월간은 배치가 적재한 MV에서 읽는다. 이후 상품정보 합성은 동일.
+        List<Long> productIds;
+        long total;
+        if (period.isDaily()) {
+            String key = RankingKeys.of(date, hour);
+            productIds = rankingRepository.topProductIds(key, offset, size);
+            total = rankingRepository.size(key);
+        } else {
+            String periodKey = period.mvPeriodKey(date);
+            productIds = mvRankingRepository.topProductIds(period, periodKey, offset, size);
+            total = mvRankingRepository.size(period, periodKey);
+        }
         if (productIds.isEmpty()) {
             return new PageImpl<>(List.of(), pageRequest, total);
         }

@@ -1,6 +1,7 @@
 package com.loopers.interfaces.api.ranking;
 
 import com.loopers.application.ranking.RankingFacade;
+import com.loopers.domain.ranking.RankingPeriod;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.interfaces.api.ranking.dto.RankingV1Response;
 import com.loopers.support.error.CoreException;
@@ -32,10 +33,12 @@ public class RankingV1Controller implements RankingV1ApiSpec {
     public ApiResponse<Page<RankingV1Response>> getRankings(
         @RequestParam String date,
         @RequestParam(required = false) Integer hour,
+        @RequestParam(required = false, defaultValue = "DAILY") String period,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        Page<RankingV1Response> result = rankingFacade.getRankingPage(parseDate(date), hour, page, size)
+        RankingPeriod rankingPeriod = RankingPeriod.from(period);
+        Page<RankingV1Response> result = rankingFacade.getRankingPage(rankingPeriod, parseDate(date), hour, page, size)
             .map(RankingV1Response::from);
         return ApiResponse.success(result);
     }
