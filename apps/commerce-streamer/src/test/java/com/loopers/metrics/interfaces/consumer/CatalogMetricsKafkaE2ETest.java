@@ -32,6 +32,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -57,6 +58,7 @@ class CatalogMetricsKafkaE2ETest {
     private static final Long USER_ID = 1L;
     private static final long DLT_AWAIT_SECONDS = 40;
     private static final ZonedDateTime OCCURRED_AT = ZonedDateTime.parse("2026-07-02T10:00:00+09:00");
+    private static final LocalDate METRIC_DATE = LocalDate.of(2026, 7, 2);
 
     @Container
     private static final KafkaContainer KAFKA = new KafkaContainer(
@@ -105,7 +107,7 @@ class CatalogMetricsKafkaE2ETest {
         assertAll(
             () -> assertThat(first.getRecordMetadata().partition())
                 .isEqualTo(second.getRecordMetadata().partition()),
-            () -> assertThat(metric.likeCount()).isEqualTo(1),
+            () -> assertThat(metric.likeDelta()).isEqualTo(1),
             () -> assertThat(metric.viewCount()).isEqualTo(1),
             () -> assertThat(handledEventCount()).isEqualTo(2)
         );
@@ -178,10 +180,10 @@ class CatalogMetricsKafkaE2ETest {
         );
     }
 
-    private ProductMetricRow awaitMetric(Long productId, long likeCount, long viewCount) throws InterruptedException {
+    private ProductMetricRow awaitMetric(Long productId, long likeDelta, long viewCount) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         ProductMetricRow metric = findMetric(productId);
-        while (!matches(metric, likeCount, viewCount) && System.nanoTime() < deadline) {
+        while (!matches(metric, likeDelta, viewCount) && System.nanoTime() < deadline) {
             Thread.sleep(200);
             metric = findMetric(productId);
         }
@@ -189,9 +191,9 @@ class CatalogMetricsKafkaE2ETest {
         return metric;
     }
 
-    private boolean matches(ProductMetricRow metric, long likeCount, long viewCount) {
+    private boolean matches(ProductMetricRow metric, long likeDelta, long viewCount) {
         return metric != null
-            && metric.likeCount() == likeCount
+            && metric.likeDelta() == likeDelta
             && metric.viewCount() == viewCount;
     }
 
@@ -199,14 +201,16 @@ class CatalogMetricsKafkaE2ETest {
         try {
             return jdbcTemplate.queryForObject(
                 """
-                    select like_count, view_count
+                    select like_delta, view_count
                     from product_metrics
-                    where product_id = ?
+                    where metric_date = ?
+                      and product_id = ?
                     """,
                 (resultSet, rowNum) -> new ProductMetricRow(
-                    resultSet.getLong("like_count"),
+                    resultSet.getLong("like_delta"),
                     resultSet.getLong("view_count")
                 ),
+                METRIC_DATE,
                 productId
             );
         } catch (EmptyResultDataAccessException exception) {
@@ -229,7 +233,7 @@ class CatalogMetricsKafkaE2ETest {
         );
     }
 
-    private record ProductMetricRow(long likeCount, long viewCount) {
+    private record ProductMetricRow(long likeDelta, long viewCount) {
     }
 
     @TestConfiguration

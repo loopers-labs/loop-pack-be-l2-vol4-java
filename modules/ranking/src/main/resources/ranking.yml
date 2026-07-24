@@ -1,6 +1,7 @@
 commerce:
   ranking:
     score:
+      policy-version: V1
       view-weight: 0.1
       like-weight: 0.2
       order-weight: 0.7

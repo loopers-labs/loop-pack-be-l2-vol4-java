@@ -2,6 +2,7 @@ package com.loopers.ranking.application;
 
 import com.loopers.product.application.ProductListInfo;
 import com.loopers.product.application.ProductListQuery;
+import com.loopers.ranking.RankingPeriod;
 import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
 import com.loopers.shared.pagination.PageQuery;
@@ -22,12 +23,21 @@ import java.util.stream.Collectors;
 @Component
 public class RankingFacade {
 
-    private final RankingService rankingService;
+    private final RankingReadService rankingReadService;
     private final ProductListQuery productListQuery;
     private final RankingMetrics rankingMetrics;
 
-    public PageResult<RankingItemInfo> getDailyRankings(LocalDate date, int page, int size) {
-        PageResult<RankingPosition> rankingPage = getRankingPage(date, new PageQuery(page, size));
+    public PageResult<RankingItemInfo> getRankings(
+        RankingPeriod period,
+        LocalDate date,
+        int page,
+        int size
+    ) {
+        PageResult<RankingPosition> rankingPage = getRankingPage(
+            period,
+            date,
+            new PageQuery(page, size)
+        );
         if (rankingPage.content().isEmpty()) {
             return withContent(rankingPage, List.of());
         }
@@ -35,7 +45,7 @@ public class RankingFacade {
         List<Long> productIds = rankingPage.content().stream()
             .map(RankingPosition::productId)
             .toList();
-        Map<Long, ProductListInfo> productsById = productListQuery.findVisibleProductsByIds(productIds).stream()
+        Map<Long, ProductListInfo> productsById = findVisibleProducts(period, date, productIds).stream()
             .collect(Collectors.toMap(ProductListInfo::id, Function.identity()));
         List<RankingItemInfo> content = rankingPage.content().stream()
             .filter(position -> productsById.containsKey(position.productId()))
@@ -45,17 +55,52 @@ public class RankingFacade {
         return withContent(rankingPage, content);
     }
 
-    private PageResult<RankingPosition> getRankingPage(LocalDate date, PageQuery pageQuery) {
+    private PageResult<RankingPosition> getRankingPage(
+        RankingPeriod period,
+        LocalDate date,
+        PageQuery pageQuery
+    ) {
         try {
-            return rankingService.getDailyRanking(date, pageQuery);
+            return rankingReadService.getRankings(period, date, pageQuery);
         } catch (DataAccessException e) {
-            rankingMetrics.recordPageLookupFailure();
-            log.error("Failed to look up daily ranking. date={}", date, e);
-            throw new CoreException(
-                ErrorType.SERVICE_UNAVAILABLE,
-                "랭킹을 잠시 조회할 수 없습니다. 잠시 후 다시 시도해주세요."
+            rankingMetrics.recordPageLookupFailure(period, RankingLookupStage.RANKING_LOOKUP);
+            log.error(
+                "Failed to look up ranking. period={}, date={}, page={}, size={}",
+                period,
+                date,
+                pageQuery.page(),
+                pageQuery.size(),
+                e
             );
+            throw rankingUnavailable();
         }
+    }
+
+    private List<ProductListInfo> findVisibleProducts(
+        RankingPeriod period,
+        LocalDate date,
+        List<Long> productIds
+    ) {
+        try {
+            return productListQuery.findVisibleProductsByIds(productIds);
+        } catch (DataAccessException e) {
+            rankingMetrics.recordPageLookupFailure(period, RankingLookupStage.PRODUCT_ENRICHMENT);
+            log.error(
+                "Failed to enrich ranking products. period={}, date={}, productIds={}",
+                period,
+                date,
+                productIds,
+                e
+            );
+            throw rankingUnavailable();
+        }
+    }
+
+    private CoreException rankingUnavailable() {
+        return new CoreException(
+            ErrorType.SERVICE_UNAVAILABLE,
+            "랭킹을 잠시 조회할 수 없습니다. 잠시 후 다시 시도해주세요."
+        );
     }
 
     private PageResult<RankingItemInfo> withContent(

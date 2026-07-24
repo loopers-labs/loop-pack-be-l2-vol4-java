@@ -2,7 +2,7 @@ package com.loopers.product.application;
 
 import com.loopers.brand.application.BrandInfo;
 import com.loopers.product.application.event.ProductEventPublisher;
-import com.loopers.ranking.application.RankingService;
+import com.loopers.ranking.application.RankingReadService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ class ProductFacadeTest {
     private ProductEventPublisher productEventPublisher;
 
     @Mock
-    private RankingService rankingService;
+    private RankingReadService rankingReadService;
 
     @Mock
     private ProductDetailMetrics productDetailMetrics;
@@ -53,7 +53,7 @@ class ProductFacadeTest {
             productListQuery,
             productDetailQuery,
             productEventPublisher,
-            rankingService,
+            rankingReadService,
             productDetailMetrics,
             CLOCK
         );
@@ -69,7 +69,7 @@ class ProductFacadeTest {
             // arrange
             ProductDetailInfo product = createProductDetailInfo();
             when(productDetailQuery.findVisibleProduct(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(rankingService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
+            when(rankingReadService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
                 .thenReturn(Optional.of(3L));
 
             // act
@@ -86,7 +86,7 @@ class ProductFacadeTest {
             // arrange
             ProductDetailInfo product = createProductDetailInfo();
             when(productDetailQuery.findVisibleProduct(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(rankingService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
+            when(rankingReadService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
                 .thenReturn(Optional.empty());
 
             // act
@@ -102,7 +102,7 @@ class ProductFacadeTest {
             // arrange
             ProductDetailInfo product = createProductDetailInfo();
             when(productDetailQuery.findVisibleProduct(PRODUCT_ID)).thenReturn(Optional.of(product));
-            when(rankingService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
+            when(rankingReadService.getDailyRank(LocalDate.of(2026, 6, 25), PRODUCT_ID))
                 .thenThrow(new RedisConnectionFailureException("redis down"));
 
             // act

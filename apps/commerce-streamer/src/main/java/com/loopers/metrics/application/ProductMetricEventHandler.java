@@ -4,7 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,6 +22,7 @@ public class ProductMetricEventHandler {
     private final ProductMetricsRepository productMetricsRepository;
     private final ProductMetricHourlyRepository productMetricHourlyRepository;
     private final CatalogMetricsMetrics catalogMetricsMetrics;
+    private final Clock clock;
 
     @Transactional
     public void handle(CatalogEventEnvelope event, EventHandlingMetadata metadata) {
@@ -30,8 +35,9 @@ public class ProductMetricEventHandler {
     }
 
     private void handleCommands(List<ProductMetricEventCommand> commands) {
-        ZonedDateTime handledAt = ZonedDateTime.now();
-        Map<Long, ProductMetricDelta> metricDeltas = new LinkedHashMap<>();
+        Instant handledAt = clock.instant();
+        ZonedDateTime handledAtUtc = handledAt.atZone(ZoneOffset.UTC);
+        Map<ProductMetricGroup, ProductMetricDelta> metricDeltas = new LinkedHashMap<>();
         Map<ProductMetricHourlyGroup, ProductMetricHourlyDelta> hourlyDeltas = new LinkedHashMap<>();
         int newEventCount = 0;
 
@@ -39,7 +45,7 @@ public class ProductMetricEventHandler {
             boolean saved = eventHandledRepository.saveIfAbsent(
                 command.event(),
                 command.metadata(),
-                handledAt
+                handledAtUtc
             );
             if (!saved) {
                 continue;
@@ -47,7 +53,11 @@ public class ProductMetricEventHandler {
             newEventCount++;
 
             ProductMetricDelta metricDelta = command.metricDelta();
-            metricDeltas.merge(metricDelta.productId(), metricDelta, ProductMetricDelta::plus);
+            ProductMetricGroup metricGroup = new ProductMetricGroup(
+                metricDelta.metricDate(),
+                metricDelta.productId()
+            );
+            metricDeltas.merge(metricGroup, metricDelta, ProductMetricDelta::plus);
 
             ProductMetricHourlyDelta hourlyDelta = command.hourlyDelta();
             ProductMetricHourlyGroup hourlyGroup = new ProductMetricHourlyGroup(
@@ -61,7 +71,7 @@ public class ProductMetricEventHandler {
             productMetricsRepository.addAll(List.copyOf(metricDeltas.values()), handledAt);
         }
         if (!hourlyDeltas.isEmpty()) {
-            productMetricHourlyRepository.addAll(List.copyOf(hourlyDeltas.values()), handledAt);
+            productMetricHourlyRepository.addAll(List.copyOf(hourlyDeltas.values()), handledAtUtc);
         }
         catalogMetricsMetrics.recordAggregation(
             commands.size(),
@@ -69,6 +79,12 @@ public class ProductMetricEventHandler {
             metricDeltas.size(),
             hourlyDeltas.size()
         );
+    }
+
+    private record ProductMetricGroup(
+        LocalDate metricDate,
+        long productId
+    ) {
     }
 
     private record ProductMetricHourlyGroup(

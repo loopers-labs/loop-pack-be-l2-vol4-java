@@ -21,27 +21,15 @@ public record ProductMetricHourlyDelta(
 
     public static ProductMetricHourlyDelta from(CatalogEventEnvelope event) {
         RankingWindow window = RankingWindow.from(event.occurredAt());
-        if (event.eventType() == CatalogEventType.PRODUCT_ORDERED) {
-            ProductOrderEventData order = ProductOrderEventData.from(event);
-            return new ProductMetricHourlyDelta(
-                window.date().atTime(window.hour(), 0),
-                order.productId(),
-                0,
-                0,
-                order.quantity(),
-                order.totalPrice()
-            );
-        }
-
         ProductMetricDelta metricDelta = ProductMetricDelta.from(event);
 
         return new ProductMetricHourlyDelta(
             window.date().atTime(window.hour(), 0),
             metricDelta.productId(),
             metricDelta.viewCountDelta(),
-            metricDelta.likeCountDelta(),
-            0,
-            0
+            metricDelta.likeDelta(),
+            metricDelta.orderQuantityDelta(),
+            metricDelta.orderAmountDelta()
         );
     }
 

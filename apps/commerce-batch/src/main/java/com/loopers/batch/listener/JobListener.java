@@ -18,7 +18,7 @@ public class JobListener {
 
     @BeforeJob
     void beforeJob(JobExecution jobExecution) {
-        log.info("Job '${jobExecution.jobInstance.jobName}' 시작");
+        log.info("Job '{}' 시작", jobExecution.getJobInstance().getJobName());
         jobExecution.getExecutionContext().putLong("startTime", System.currentTimeMillis());
     }
 

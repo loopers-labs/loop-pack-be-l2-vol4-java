@@ -2,7 +2,7 @@ package com.loopers.product.application;
 
 import com.loopers.product.application.event.ProductEventPublisher;
 import com.loopers.product.domain.ProductSort;
-import com.loopers.ranking.application.RankingService;
+import com.loopers.ranking.application.RankingReadService;
 import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
 import com.loopers.shared.pagination.PageQuery;
@@ -24,7 +24,7 @@ public class ProductFacade {
     private final ProductListQuery productListQuery;
     private final ProductDetailQuery productDetailQuery;
     private final ProductEventPublisher productEventPublisher;
-    private final RankingService rankingService;
+    private final RankingReadService rankingReadService;
     private final ProductDetailMetrics productDetailMetrics;
     private final Clock clock;
 
@@ -50,7 +50,7 @@ public class ProductFacade {
 
     private Long findTodayRank(Long productId) {
         try {
-            return rankingService.getDailyRank(LocalDate.now(clock), productId)
+            return rankingReadService.getDailyRank(LocalDate.now(clock), productId)
                 .orElse(null);
         } catch (DataAccessException e) {
             productDetailMetrics.recordRankingLookupFailure();

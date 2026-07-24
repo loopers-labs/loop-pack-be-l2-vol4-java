@@ -2,8 +2,8 @@ package com.loopers.ranking.infrastructure;
 
 import com.loopers.config.redis.RedisConfig;
 import com.loopers.ranking.RankingRedisKey;
-import com.loopers.ranking.application.RankingEntries;
-import com.loopers.ranking.application.RankingQuery;
+import com.loopers.ranking.application.DailyRankingEntries;
+import com.loopers.ranking.application.DailyRankingQuery;
 import com.loopers.testcontainers.RedisTestContainersConfig;
 import com.loopers.utils.RedisCleanUp;
 import org.junit.jupiter.api.AfterEach;
@@ -24,21 +24,21 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest
 @Import(RedisTestContainersConfig.class)
-class RedisRankingQueryIntegrationTest {
+class RedisDailyRankingQueryIntegrationTest {
 
     private static final LocalDate RANKING_DATE = LocalDate.of(2099, 7, 13);
 
-    private final RankingQuery rankingQuery;
+    private final DailyRankingQuery dailyRankingQuery;
     private final RedisTemplate<String, String> masterRedisTemplate;
     private final RedisCleanUp redisCleanUp;
 
     @Autowired
-    RedisRankingQueryIntegrationTest(
-        RankingQuery rankingQuery,
+    RedisDailyRankingQueryIntegrationTest(
+        DailyRankingQuery dailyRankingQuery,
         @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER) RedisTemplate<String, String> masterRedisTemplate,
         RedisCleanUp redisCleanUp
     ) {
-        this.rankingQuery = rankingQuery;
+        this.dailyRankingQuery = dailyRankingQuery;
         this.masterRedisTemplate = masterRedisTemplate;
         this.redisCleanUp = redisCleanUp;
     }
@@ -62,7 +62,7 @@ class RedisRankingQueryIntegrationTest {
             masterRedisTemplate.opsForZSet().add(key, "309", 2.0);
 
             // act
-            RankingEntries result = rankingQuery.findDaily(RANKING_DATE, 1, 2);
+            DailyRankingEntries result = dailyRankingQuery.findDaily(RANKING_DATE, 1, 2);
 
             // assert
             assertAll(
@@ -75,7 +75,7 @@ class RedisRankingQueryIntegrationTest {
         @Test
         void returnsEmptyResult_whenRankingKeyDoesNotExist() {
             // act
-            RankingEntries result = rankingQuery.findDaily(RANKING_DATE, 0, 19);
+            DailyRankingEntries result = dailyRankingQuery.findDaily(RANKING_DATE, 0, 19);
 
             // assert
             assertAll(
@@ -99,7 +99,7 @@ class RedisRankingQueryIntegrationTest {
             masterRedisTemplate.opsForZSet().add(key, "309", 2.0);
 
             // act
-            Optional<Long> result = rankingQuery.findDailyRank(RANKING_DATE, 309L);
+            Optional<Long> result = dailyRankingQuery.findDailyRank(RANKING_DATE, 309L);
 
             // assert
             assertThat(result).contains(1L);
@@ -109,7 +109,7 @@ class RedisRankingQueryIntegrationTest {
         @Test
         void returnsEmpty_whenProductIsNotRanked() {
             // act
-            Optional<Long> result = rankingQuery.findDailyRank(RANKING_DATE, 999L);
+            Optional<Long> result = dailyRankingQuery.findDailyRank(RANKING_DATE, 999L);
 
             // assert
             assertThat(result).isEmpty();

@@ -11,7 +11,8 @@ public class RankingScoreConfig {
 
     @Bean
     public RankingScorePolicy rankingScorePolicy(RankingScoreProperties properties) {
-        return new RankingScorePolicy(
+        return RankingScorePolicy.from(
+            properties.policyVersion(),
             properties.viewWeight(),
             properties.likeWeight(),
             properties.orderWeight(),

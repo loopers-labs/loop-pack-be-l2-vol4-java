@@ -1,5 +1,6 @@
 package com.loopers.metrics.application;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -9,11 +10,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +27,8 @@ import static org.mockito.Mockito.when;
 class ProductMetricEventHandlerTest {
 
     private static final ZonedDateTime OCCURRED_AT = ZonedDateTime.parse("2026-07-02T10:00:00+09:00");
+    private static final LocalDate METRIC_DATE = LocalDate.of(2026, 7, 2);
+    private static final Instant HANDLED_AT = Instant.parse("2026-07-02T02:00:00Z");
     private static final EventHandlingMetadata METADATA = new EventHandlingMetadata("catalog-events", 0, 10L);
 
     @Mock
@@ -36,8 +43,16 @@ class ProductMetricEventHandlerTest {
     @Mock
     private CatalogMetricsMetrics catalogMetricsMetrics;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private ProductMetricEventHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        when(clock.instant()).thenReturn(HANDLED_AT);
+    }
 
     @DisplayName("catalog 이벤트로 상품 지표를 집계할 때")
     @Nested
@@ -70,7 +85,9 @@ class ProductMetricEventHandlerTest {
 
             // assert
             ProductMetricDelta delta = captureDelta();
-            assertThat(delta).isEqualTo(new ProductMetricDelta(101L, 0L, 1L, 0L));
+            assertThat(delta).isEqualTo(
+                new ProductMetricDelta(METRIC_DATE, 101L, 1, 0, 0, 0)
+            );
         }
 
         @DisplayName("신규 상품 이벤트면 발생 시간 Window의 Raw Metric을 저장한다.")
@@ -108,7 +125,9 @@ class ProductMetricEventHandlerTest {
 
             // assert
             ProductMetricDelta delta = captureDelta();
-            assertThat(delta).isEqualTo(new ProductMetricDelta(101L, 1L, 0L, 0L));
+            assertThat(delta).isEqualTo(
+                new ProductMetricDelta(METRIC_DATE, 101L, 0, 1, 0, 0)
+            );
         }
 
         @DisplayName("좋아요 취소 이벤트면 좋아요 수를 1 감소시킨다.")
@@ -123,12 +142,14 @@ class ProductMetricEventHandlerTest {
 
             // assert
             ProductMetricDelta delta = captureDelta();
-            assertThat(delta).isEqualTo(new ProductMetricDelta(101L, -1L, 0L, 0L));
+            assertThat(delta).isEqualTo(
+                new ProductMetricDelta(METRIC_DATE, 101L, 0, -1, 0, 0)
+            );
         }
 
-        @DisplayName("상품 주문 이벤트면 판매 수량을 주문 수량만큼 증가시킨다.")
+        @DisplayName("상품 주문 이벤트면 주문 수량과 주문 금액을 함께 증가시킨다.")
         @Test
-        void increasesSalesCountByOrderQuantity_whenProductOrdered() {
+        void increasesOrderQuantityAndAmount_whenProductOrdered() {
             // arrange
             CatalogEventEnvelope event = orderedEvent("event-1");
             when(eventHandledRepository.saveIfAbsent(any(), any(), any())).thenReturn(true);
@@ -138,7 +159,9 @@ class ProductMetricEventHandlerTest {
 
             // assert
             ProductMetricDelta delta = captureDelta();
-            assertThat(delta).isEqualTo(new ProductMetricDelta(101L, 0L, 0L, 2L));
+            assertThat(delta).isEqualTo(
+                new ProductMetricDelta(METRIC_DATE, 101L, 0, 0, 2, 25_000)
+            );
         }
     }
 
@@ -160,7 +183,9 @@ class ProductMetricEventHandlerTest {
 
             // assert
             ProductMetricDelta delta = captureDelta();
-            assertThat(delta).isEqualTo(new ProductMetricDelta(101L, 0, 1, 0));
+            assertThat(delta).isEqualTo(
+                new ProductMetricDelta(METRIC_DATE, 101L, 1, 0, 0, 0)
+            );
             ArgumentCaptor<List<ProductMetricHourlyDelta>> hourlyCaptor = listCaptor();
             verify(productMetricHourlyRepository).addAll(hourlyCaptor.capture(), any());
             assertThat(hourlyCaptor.getValue()).containsExactly(new ProductMetricHourlyDelta(
@@ -190,7 +215,9 @@ class ProductMetricEventHandlerTest {
             ArgumentCaptor<List<ProductMetricHourlyDelta>> hourlyCaptor = listCaptor();
             verify(productMetricsRepository).addAll(metricCaptor.capture(), any());
             verify(productMetricHourlyRepository).addAll(hourlyCaptor.capture(), any());
-            assertThat(metricCaptor.getValue()).containsExactly(new ProductMetricDelta(101L, 1, 1, 2));
+            assertThat(metricCaptor.getValue()).containsExactly(
+                new ProductMetricDelta(METRIC_DATE, 101L, 1, 1, 2, 25_000)
+            );
             assertThat(hourlyCaptor.getValue()).containsExactly(new ProductMetricHourlyDelta(
                 OCCURRED_AT.toLocalDateTime().withMinute(0).withSecond(0).withNano(0),
                 101L,
@@ -228,8 +255,8 @@ class ProductMetricEventHandlerTest {
             verify(productMetricsRepository).addAll(metricCaptor.capture(), any());
             verify(productMetricHourlyRepository).addAll(hourlyCaptor.capture(), any());
             assertThat(metricCaptor.getValue()).containsExactly(
-                new ProductMetricDelta(101L, 0, 2, 0),
-                new ProductMetricDelta(202L, 0, 1, 0)
+                new ProductMetricDelta(METRIC_DATE, 101L, 2, 0, 0, 0),
+                new ProductMetricDelta(METRIC_DATE, 202L, 1, 0, 0, 0)
             );
             assertThat(hourlyCaptor.getValue()).containsExactly(
                 new ProductMetricHourlyDelta(
@@ -259,11 +286,38 @@ class ProductMetricEventHandlerTest {
             );
             verify(catalogMetricsMetrics).recordAggregation(3, 3, 2, 3);
         }
+
+        @DisplayName("같은 상품이어도 서울 날짜가 다르면 별도의 일간 지표로 분리한다.")
+        @Test
+        void separatesDailyMetricsForDifferentSeoulDates() {
+            // arrange
+            ProductMetricEventCommand firstDate = command(
+                viewedEvent("event-1", 101L, OCCURRED_AT),
+                10L
+            );
+            ProductMetricEventCommand nextDate = command(
+                viewedEvent("event-2", 101L, OCCURRED_AT.plusDays(1)),
+                11L
+            );
+            when(eventHandledRepository.saveIfAbsent(any(), any(), any())).thenReturn(true);
+
+            // act
+            handler.handleBatch(List.of(firstDate, nextDate));
+
+            // assert
+            ArgumentCaptor<List<ProductMetricDelta>> captor = listCaptor();
+            verify(productMetricsRepository).addAll(captor.capture(), eq(HANDLED_AT));
+            assertThat(captor.getValue()).containsExactly(
+                new ProductMetricDelta(METRIC_DATE, 101L, 1, 0, 0, 0),
+                new ProductMetricDelta(METRIC_DATE.plusDays(1), 101L, 1, 0, 0, 0)
+            );
+            verify(catalogMetricsMetrics).recordAggregation(2, 2, 2, 2);
+        }
     }
 
     private ProductMetricDelta captureDelta() {
         ArgumentCaptor<List<ProductMetricDelta>> captor = listCaptor();
-        verify(productMetricsRepository).addAll(captor.capture(), any());
+        verify(productMetricsRepository).addAll(captor.capture(), eq(HANDLED_AT));
         assertThat(captor.getValue()).hasSize(1);
         return captor.getValue().getFirst();
     }

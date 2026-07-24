@@ -2,6 +2,7 @@ package com.loopers.ranking.application;
 
 import com.loopers.product.application.ProductListInfo;
 import com.loopers.product.application.ProductListQuery;
+import com.loopers.ranking.RankingPeriod;
 import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
 import com.loopers.shared.pagination.PageQuery;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.time.LocalDate;
@@ -32,7 +34,7 @@ class RankingFacadeTest {
     private static final LocalDate RANKING_DATE = LocalDate.of(2026, 7, 13);
 
     @Mock
-    private RankingService rankingService;
+    private RankingReadService rankingReadService;
 
     @Mock
     private ProductListQuery productListQuery;
@@ -43,13 +45,13 @@ class RankingFacadeTest {
     @InjectMocks
     private RankingFacade rankingFacade;
 
-    @DisplayName("일간 Ranking 상품 Page를 조회할 때")
+    @DisplayName("Ranking 상품 Page를 조회할 때")
     @Nested
-    class GetDailyRankings {
+    class GetRankings {
 
-        @DisplayName("상품을 일괄 조회해 Redis 순서로 복원하고 누락 상품의 원래 순위는 비워 둔다")
+        @DisplayName("상품을 일괄 조회해 Ranking 순서로 복원하고 누락 상품의 원래 순위는 비워 둔다")
         @Test
-        void restoresRedisOrderAndKeepsRankGaps_whenProductsAreMissingOrUnordered() {
+        void restoresRankingOrderAndKeepsRankGaps_whenProductsAreMissingOrUnordered() {
             // arrange
             PageQuery pageQuery = new PageQuery(0, 3);
             PageResult<RankingPosition> positions = new PageResult<>(
@@ -67,12 +69,18 @@ class RankingFacadeTest {
             );
             ProductListInfo product101 = product(101L);
             ProductListInfo product309 = product(309L);
-            when(rankingService.getDailyRanking(RANKING_DATE, pageQuery)).thenReturn(positions);
+            when(rankingReadService.getRankings(RankingPeriod.WEEKLY, RANKING_DATE, pageQuery))
+                .thenReturn(positions);
             when(productListQuery.findVisibleProductsByIds(List.of(205L, 101L, 309L)))
                 .thenReturn(List.of(product309, product101));
 
             // act
-            PageResult<RankingItemInfo> result = rankingFacade.getDailyRankings(RANKING_DATE, 0, 3);
+            PageResult<RankingItemInfo> result = rankingFacade.getRankings(
+                RankingPeriod.WEEKLY,
+                RANKING_DATE,
+                0,
+                3
+            );
 
             // assert
             assertAll(
@@ -90,7 +98,7 @@ class RankingFacadeTest {
             verify(productListQuery).findVisibleProductsByIds(List.of(205L, 101L, 309L));
         }
 
-        @DisplayName("Redis Ranking이 비어 있으면 상품을 조회하지 않고 빈 Page를 반환한다")
+        @DisplayName("Ranking이 비어 있으면 상품을 조회하지 않고 빈 Page를 반환한다")
         @Test
         void skipsProductQuery_whenRankingIsEmpty() {
             // arrange
@@ -104,10 +112,16 @@ class RankingFacadeTest {
                 true,
                 true
             );
-            when(rankingService.getDailyRanking(RANKING_DATE, pageQuery)).thenReturn(positions);
+            when(rankingReadService.getRankings(RankingPeriod.MONTHLY, RANKING_DATE, pageQuery))
+                .thenReturn(positions);
 
             // act
-            PageResult<RankingItemInfo> result = rankingFacade.getDailyRankings(RANKING_DATE, 0, 20);
+            PageResult<RankingItemInfo> result = rankingFacade.getRankings(
+                RankingPeriod.MONTHLY,
+                RANKING_DATE,
+                0,
+                20
+            );
 
             // assert
             assertThat(result.content()).isEmpty();
@@ -119,16 +133,59 @@ class RankingFacadeTest {
         void throwsServiceUnavailable_whenRedisRankingLookupFails() {
             // arrange
             PageQuery pageQuery = new PageQuery(0, 20);
-            when(rankingService.getDailyRanking(RANKING_DATE, pageQuery))
+            when(rankingReadService.getRankings(RankingPeriod.DAILY, RANKING_DATE, pageQuery))
                 .thenThrow(new RedisConnectionFailureException("redis down"));
 
             // act & assert
-            assertThatThrownBy(() -> rankingFacade.getDailyRankings(RANKING_DATE, 0, 20))
+            assertThatThrownBy(() -> rankingFacade.getRankings(
+                RankingPeriod.DAILY,
+                RANKING_DATE,
+                0,
+                20
+            ))
                 .isInstanceOf(CoreException.class)
                 .extracting("errorType")
                 .isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
-            verify(rankingMetrics).recordPageLookupFailure();
+            verify(rankingMetrics).recordPageLookupFailure(
+                RankingPeriod.DAILY,
+                RankingLookupStage.RANKING_LOOKUP
+            );
             verifyNoInteractions(productListQuery);
+        }
+
+        @DisplayName("상품 정보 조회에 실패하면 503 Service Unavailable 예외를 반환한다")
+        @Test
+        void throwsServiceUnavailable_whenProductEnrichmentFails() {
+            // arrange
+            PageQuery pageQuery = new PageQuery(0, 20);
+            PageResult<RankingPosition> positions = new PageResult<>(
+                List.of(new RankingPosition(1, 205L)),
+                1,
+                1,
+                0,
+                20,
+                true,
+                true
+            );
+            when(rankingReadService.getRankings(RankingPeriod.WEEKLY, RANKING_DATE, pageQuery))
+                .thenReturn(positions);
+            when(productListQuery.findVisibleProductsByIds(List.of(205L)))
+                .thenThrow(new DataRetrievalFailureException("database down"));
+
+            // act & assert
+            assertThatThrownBy(() -> rankingFacade.getRankings(
+                RankingPeriod.WEEKLY,
+                RANKING_DATE,
+                0,
+                20
+            ))
+                .isInstanceOf(CoreException.class)
+                .extracting("errorType")
+                .isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
+            verify(rankingMetrics).recordPageLookupFailure(
+                RankingPeriod.WEEKLY,
+                RankingLookupStage.PRODUCT_ENRICHMENT
+            );
         }
     }
 

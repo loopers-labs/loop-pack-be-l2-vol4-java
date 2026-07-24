@@ -243,7 +243,7 @@ function Get-FlowState {
 
     return [ordered]@{
         outboxPublished = [int](Invoke-MySqlScalar -Sql "select count(*) from catalog_event_outbox where aggregate_id = $productId and status = 'PUBLISHED'")
-        metricViews = [long](Invoke-MySqlScalar -Sql "select coalesce(sum(view_count), 0) from product_metrics where product_id = $productId")
+        metricViews = [long](Invoke-MySqlScalar -Sql "select coalesce(sum(view_count), 0) from product_metrics where metric_date = str_to_date('$rankingDate', '%Y%m%d') and product_id = $productId")
         hourlyViews = [long](Invoke-MySqlScalar -Sql "select coalesce(sum(view_count), 0) from product_metric_hourly where product_id = $productId")
         databaseHandled = [int](Invoke-MySqlScalar -Sql "select count(*) from event_handled where aggregate_id = $productId")
         dailyScore = Get-RedisValue -Arguments @("ZSCORE", $dailyKey, "$productId")

@@ -1,0 +1,250 @@
+pipeline {
+    agent {
+        label 'linux && java21-ranking'
+    }
+
+    triggers {
+        cron('TZ=Asia/Seoul\n0 2 * * *')
+    }
+
+    parameters {
+        choice(
+            name: 'RUN_PERIODS',
+            choices: ['BOTH', 'WEEKLY', 'MONTHLY'],
+            description: '정기 실행은 BOTH, 실패 재시작은 실패한 기간만 선택합니다.'
+        )
+        string(
+            name: 'AGGREGATION_END_DATE',
+            defaultValue: '',
+            description: 'yyyyMMdd. 비워두면 빌드 예약 시각의 서울 날짜 기준 전날입니다.'
+        )
+        string(
+            name: 'REVISION',
+            defaultValue: '1',
+            description: '실패 재시작은 같은 값을 사용하고, 완료 결과 재집계만 증가시킵니다.'
+        )
+        string(
+            name: 'SOURCE_COMMIT',
+            defaultValue: '',
+            description: 'Cron만 빈 값을 허용합니다. 수동 실행은 검증된 Git SHA를 입력합니다.'
+        )
+    }
+
+    environment {
+        SPRING_PROFILES_ACTIVE = 'local-dev'
+        SPRING_BATCH_JDBC_INITIALIZE_SCHEMA = 'never'
+        SPRING_JPA_HIBERNATE_DDL_AUTO = 'none'
+        RANKING_BATCH_CHUNK_SIZE = '1000'
+    }
+
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        disableRestartFromStage()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                deleteDir()
+                checkout scm
+            }
+        }
+
+        stage('Resolve Execution') {
+            steps {
+                script {
+                    env.TRUSTED_SOURCE_HEAD = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    String requestedCommit = params.SOURCE_COMMIT?.trim()
+                    boolean scheduledBuild = !currentBuild.getBuildCauses(
+                        'hudson.triggers.TimerTrigger$TimerTriggerCause'
+                    ).isEmpty()
+                    if (!requestedCommit && !scheduledBuild) {
+                        error(
+                            'SOURCE_COMMIT is required for every manual execution'
+                        )
+                    }
+                    if (requestedCommit) {
+                        if (!(requestedCommit ==~ /[0-9a-fA-F]{7,40}/)) {
+                            error('SOURCE_COMMIT must be a 7 to 40 character Git SHA')
+                        }
+
+                        env.REQUESTED_SOURCE_COMMIT = requestedCommit
+                        int commitExists = sh(
+                            script: '''
+                                git cat-file -e \
+                                    "$REQUESTED_SOURCE_COMMIT^{commit}"
+                            ''',
+                            returnStatus: true
+                        )
+                        if (commitExists != 0) {
+                            error(
+                                'SOURCE_COMMIT does not exist in the checked out repository'
+                            )
+                        }
+
+                        env.RESOLVED_SOURCE_COMMIT = sh(
+                            script: '''
+                                git rev-parse \
+                                    "$REQUESTED_SOURCE_COMMIT^{commit}"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        int trustedCommit = sh(
+                            script: '''
+                                git merge-base --is-ancestor \
+                                    "$RESOLVED_SOURCE_COMMIT" \
+                                    "$TRUSTED_SOURCE_HEAD"
+                            ''',
+                            returnStatus: true
+                        )
+                        if (trustedCommit != 0) {
+                            error(
+                                'SOURCE_COMMIT must belong to the configured protected branch history'
+                            )
+                        }
+                        sh 'git checkout --detach "$RESOLVED_SOURCE_COMMIT"'
+                    } else {
+                        env.RESOLVED_SOURCE_COMMIT = env.TRUSTED_SOURCE_HEAD
+                    }
+
+                    env.RESOLVED_SOURCE_COMMIT = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.REQUESTED_AGGREGATION_END_DATE =
+                        params.AGGREGATION_END_DATE?.trim() ?: ''
+                    env.REQUESTED_REVISION = params.REVISION?.trim() ?: ''
+                    env.BUILD_SCHEDULED_TIME_MILLIS =
+                        "${currentBuild.timeInMillis}"
+                    env.RESOLVED_AGGREGATION_END_DATE = sh(
+                        script: '''
+                            sh jenkins/resolve-ranking-parameters.sh \
+                                aggregation-end-date
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    env.RESOLVED_REVISION = sh(
+                        script: '''
+                            sh jenkins/resolve-ranking-parameters.sh \
+                                revision
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    env.RESOLVED_PERIODS = params.RUN_PERIODS == 'BOTH'
+                        ? 'WEEKLY,MONTHLY'
+                        : params.RUN_PERIODS
+
+                    currentBuild.description =
+                        "${env.RESOLVED_PERIODS} / " +
+                        "${env.RESOLVED_AGGREGATION_END_DATE} / " +
+                        "revision ${env.RESOLVED_REVISION} / " +
+                        env.RESOLVED_SOURCE_COMMIT
+                }
+            }
+        }
+
+        stage('Verify Runtime') {
+            steps {
+                sh 'java -version'
+                script {
+                    List<String> requiredVariables = [
+                        'REDIS_MASTER_HOST',
+                        'REDIS_MASTER_PORT',
+                        'REDIS_REPLICA_1_HOST',
+                        'REDIS_REPLICA_1_PORT'
+                    ]
+                    List<String> missingVariables = requiredVariables.findAll {
+                        !env[it]?.trim()
+                    }
+                    if (!missingVariables.isEmpty()) {
+                        error(
+                            'Missing Jenkins environment variables: ' +
+                            missingVariables.join(', ')
+                        )
+                    }
+                }
+            }
+        }
+
+        stage('Build Batch Jar') {
+            steps {
+                sh '''
+                    ./gradlew --no-daemon \
+                        :apps:commerce-batch:clean \
+                        :apps:commerce-batch:bootJar
+                '''
+                script {
+                    env.BATCH_JAR = sh(
+                        script: '''
+                            find apps/commerce-batch/build/libs \
+                                -maxdepth 1 \
+                                -type f \
+                                -name 'commerce-batch-*.jar' \
+                                -print \
+                                -quit
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    if (!env.BATCH_JAR) {
+                        error('commerce-batch Boot Jar was not created')
+                    }
+                }
+            }
+        }
+
+        stage('Run Ranking Snapshot') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'ranking-mysql-jdbc-url',
+                        variable: 'DATASOURCE_MYSQL_JPA_MAIN_JDBC_URL'
+                    ),
+                    usernamePassword(
+                        credentialsId: 'ranking-mysql-credentials',
+                        usernameVariable: 'DATASOURCE_MYSQL_JPA_MAIN_USERNAME',
+                        passwordVariable: 'DATASOURCE_MYSQL_JPA_MAIN_PASSWORD'
+                    )
+                ]) {
+                    script {
+                        List<String> failedPeriods = []
+
+                        env.RESOLVED_PERIODS.split(',').each { String period ->
+                            int exitCode = withEnv(["RANKING_PERIOD=${period}"]) {
+                                sh(
+                                    script: '''
+                                        set +x
+                                        java -jar "$BATCH_JAR" \
+                                            --spring.profiles.active="$SPRING_PROFILES_ACTIVE" \
+                                            --job.name=productRankingSnapshotJob \
+                                            "period=$RANKING_PERIOD,java.lang.String,true" \
+                                            "aggregationEndDate=$RESOLVED_AGGREGATION_END_DATE,java.lang.String,true" \
+                                            "revision=$RESOLVED_REVISION,java.lang.Long,true"
+                                    ''',
+                                    returnStatus: true
+                                )
+                            }
+
+                            if (exitCode != 0) {
+                                failedPeriods.add(period)
+                            }
+                        }
+
+                        if (!failedPeriods.isEmpty()) {
+                            error(
+                                'Failed Ranking Batch periods: ' +
+                                failedPeriods.join(', ')
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

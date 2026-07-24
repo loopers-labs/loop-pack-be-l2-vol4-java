@@ -1,5 +1,6 @@
 package com.loopers.ranking.interfaces.api;
 
+import com.loopers.ranking.RankingPeriod;
 import com.loopers.ranking.application.RankingFacade;
 import com.loopers.ranking.application.RankingItemInfo;
 import com.loopers.shared.pagination.PageResult;
@@ -20,12 +21,19 @@ public class RankingV1Controller {
 
     @GetMapping
     public ApiResponse<PageResponse<RankingV1Dto.RankingItemResponse>> getRankings(
+        @RequestParam(defaultValue = "DAILY") RankingPeriod period,
         @RequestParam String date,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        RankingV1Dto.RankingRequest request = new RankingV1Dto.RankingRequest(date, page, size);
-        PageResult<RankingItemInfo> rankings = rankingFacade.getDailyRankings(
+        RankingV1Dto.RankingRequest request = new RankingV1Dto.RankingRequest(
+            period,
+            date,
+            page,
+            size
+        );
+        PageResult<RankingItemInfo> rankings = rankingFacade.getRankings(
+            request.period(),
             request.rankingDate(),
             request.page(),
             request.size()

@@ -2,6 +2,7 @@ package com.loopers.ranking.interfaces.api;
 
 import com.loopers.brand.application.BrandInfo;
 import com.loopers.product.application.ProductListInfo;
+import com.loopers.ranking.RankingPeriod;
 import com.loopers.ranking.application.RankingItemInfo;
 import com.loopers.shared.error.CoreException;
 import com.loopers.shared.error.ErrorType;
@@ -13,6 +14,7 @@ import java.time.format.DateTimeParseException;
 public class RankingV1Dto {
 
     public record RankingRequest(
+        RankingPeriod period,
         String date,
         int page,
         int size

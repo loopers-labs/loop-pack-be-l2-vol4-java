@@ -2,12 +2,12 @@ package com.loopers.ranking.application;
 
 import java.util.List;
 
-public record RankingEntries(
+public record DailyRankingEntries(
     List<Long> productIds,
     long totalElements
 ) {
 
-    public RankingEntries {
+    public DailyRankingEntries {
         productIds = List.copyOf(productIds);
     }
 }

@@ -8,6 +8,7 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        column_ordering_strategy: legacy
         timezone.default_storage: NORMALIZE_UTC
         jdbc.time_zone: UTC
 
@@ -37,7 +38,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
 
 datasource:
   mysql-jpa:
@@ -94,3 +95,33 @@ datasource:
       jdbc-url: jdbc:mysql://localhost:3306/loopers
       username: application
       password: application
+
+---
+spring.config.activate.on-profile: perf-seed
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+datasource:
+  mysql-jpa:
+    main:
+      jdbc-url: jdbc:mysql://${PERF_MYSQL_HOST}:${PERF_MYSQL_PORT}/${PERF_MYSQL_DATABASE}
+      username: ${PERF_MYSQL_USER}
+      password: "${PERF_MYSQL_PWD}"
+
+---
+spring.config.activate.on-profile: perf
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+datasource:
+  mysql-jpa:
+    main:
+      jdbc-url: jdbc:mysql://${PERF_MYSQL_HOST}:${PERF_MYSQL_PORT}/${PERF_MYSQL_DATABASE}
+      username: ${PERF_MYSQL_USER}
+      password: "${PERF_MYSQL_PWD}"

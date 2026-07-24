@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.ZonedDateTime;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -16,38 +18,45 @@ public class JdbcProductMetricsRepository implements ProductMetricsRepository {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public void addAll(List<ProductMetricDelta> deltas, ZonedDateTime updatedAt) {
+    public void addAll(List<ProductMetricDelta> deltas, Instant updatedAt) {
         if (deltas.isEmpty()) {
             return;
         }
 
+        LocalDateTime updatedAtUtc = LocalDateTime.ofInstant(updatedAt, ZoneOffset.UTC);
         List<Object[]> batchArguments = deltas.stream()
             .map(delta -> new Object[]{
+                delta.metricDate(),
                 delta.productId(),
-                delta.likeCountDelta(),
                 delta.viewCountDelta(),
-                delta.salesCountDelta(),
-                updatedAt,
-                delta.likeCountDelta(),
+                delta.likeDelta(),
+                delta.orderQuantityDelta(),
+                delta.orderAmountDelta(),
+                updatedAtUtc,
                 delta.viewCountDelta(),
-                delta.salesCountDelta(),
-                updatedAt
+                delta.likeDelta(),
+                delta.orderQuantityDelta(),
+                delta.orderAmountDelta(),
+                updatedAtUtc
             })
             .toList();
 
         jdbcTemplate.batchUpdate("""
                 insert into product_metrics(
+                    metric_date,
                     product_id,
-                    like_count,
                     view_count,
-                    sales_count,
+                    like_delta,
+                    order_quantity,
+                    order_amount,
                     updated_at
                 )
-                values (?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, ?, ?)
                 on duplicate key update
-                    like_count = like_count + ?,
                     view_count = view_count + ?,
-                    sales_count = sales_count + ?,
+                    like_delta = like_delta + ?,
+                    order_quantity = order_quantity + ?,
+                    order_amount = order_amount + ?,
                     updated_at = ?
                 """,
             batchArguments);

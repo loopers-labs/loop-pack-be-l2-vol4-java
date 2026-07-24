@@ -3,9 +3,9 @@ package com.loopers.ranking.application;
 import java.time.LocalDate;
 import java.util.Optional;
 
-public interface RankingQuery {
+public interface DailyRankingQuery {
 
-    RankingEntries findDaily(LocalDate date, long start, long end);
+    DailyRankingEntries findDaily(LocalDate date, long start, long end);
 
     Optional<Long> findDailyRank(LocalDate date, Long productId);
 }

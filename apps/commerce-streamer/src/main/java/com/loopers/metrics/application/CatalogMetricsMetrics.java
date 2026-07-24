@@ -14,7 +14,7 @@ public class CatalogMetricsMetrics {
     private final DistributionSummary batchRecordSummary;
     private final DistributionSummary newEventSummary;
     private final DistributionSummary duplicateEventSummary;
-    private final DistributionSummary productGroupSummary;
+    private final DistributionSummary dailyProductGroupSummary;
     private final DistributionSummary hourlyGroupSummary;
     private final Timer batchProcessingTimer;
     private final Counter batchFailureCounter;
@@ -35,10 +35,10 @@ public class CatalogMetricsMetrics {
             "catalog.metrics.batch.duplicate.events",
             "이미 처리되어 SOT 반영에서 제외한 이벤트 수"
         );
-        this.productGroupSummary = summary(
+        this.dailyProductGroupSummary = summary(
             meterRegistry,
             "catalog.metrics.batch.product.groups",
-            "Product Metric으로 선집계한 상품 그룹 수"
+            "Daily Product Metric으로 선집계한 날짜와 상품 그룹 수"
         );
         this.hourlyGroupSummary = summary(
             meterRegistry,
@@ -61,12 +61,12 @@ public class CatalogMetricsMetrics {
     public void recordAggregation(
         int eventCount,
         int newEventCount,
-        int productGroupCount,
+        int dailyProductGroupCount,
         int hourlyGroupCount
     ) {
         newEventSummary.record(newEventCount);
         duplicateEventSummary.record(eventCount - newEventCount);
-        productGroupSummary.record(productGroupCount);
+        dailyProductGroupSummary.record(dailyProductGroupCount);
         hourlyGroupSummary.record(hourlyGroupCount);
     }
 

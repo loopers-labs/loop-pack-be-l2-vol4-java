@@ -16,14 +16,14 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
 
 @RequiredArgsConstructor
-@Component
+@Repository
 public class ProductListQueryDsl implements ProductListQuery {
 
     private static final QProduct product = QProduct.product;

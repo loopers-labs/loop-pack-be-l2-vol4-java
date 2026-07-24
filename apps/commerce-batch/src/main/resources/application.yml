@@ -20,6 +20,8 @@ spring:
 
 commerce:
   ranking:
+    batch:
+      chunk-size: ${RANKING_BATCH_CHUNK_SIZE:1000}
     cold-start:
       carry-over-rate: 0.1
 
@@ -36,6 +38,20 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+
+---
+spring:
+  config:
+    activate:
+      on-profile: perf-seed
+  batch:
+    job:
+      enabled: false
+
+commerce:
+  ranking:
+    perf-seed:
+      expected-database: ${PERF_SEED_EXPECTED_DATABASE}
 
 ---
 spring:

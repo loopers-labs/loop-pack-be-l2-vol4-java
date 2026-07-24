@@ -1,8 +1,8 @@
 package com.loopers.ranking.infrastructure;
 
 import com.loopers.ranking.RankingRedisKey;
-import com.loopers.ranking.application.RankingEntries;
-import com.loopers.ranking.application.RankingQuery;
+import com.loopers.ranking.application.DailyRankingEntries;
+import com.loopers.ranking.application.DailyRankingQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -14,17 +14,17 @@ import java.util.Set;
 
 @RequiredArgsConstructor
 @Component
-public class RedisRankingQuery implements RankingQuery {
+public class RedisDailyRankingQuery implements DailyRankingQuery {
 
     private final RedisTemplate<String, String> redisTemplate;
 
     @Override
-    public RankingEntries findDaily(LocalDate date, long start, long end) {
+    public DailyRankingEntries findDaily(LocalDate date, long start, long end) {
         String key = RankingRedisKey.daily(date);
         Set<String> members = redisTemplate.opsForZSet().reverseRange(key, start, end);
         Long totalElements = redisTemplate.opsForZSet().zCard(key);
 
-        return new RankingEntries(toProductIds(members), totalElements == null ? 0 : totalElements);
+        return new DailyRankingEntries(toProductIds(members), totalElements == null ? 0 : totalElements);
     }
 
     @Override
