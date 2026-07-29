@@ -13,5 +13,23 @@ GET {{commerce-api}}/api/v1/rankings?date=20260101
 ### 랭킹 페이지 조회 - 형식 오류 → 400 RANKING_INVALID_DATE
 GET {{commerce-api}}/api/v1/rankings?date=2026-07-17
 
+### [R10] 주간 랭킹 - 가장 최근 확정본 (date 생략)
+GET {{commerce-api}}/api/v1/rankings?period=WEEKLY
+
+### [R10] 주간 랭킹 - 특정 날짜가 속한 주
+GET {{commerce-api}}/api/v1/rankings?period=WEEKLY&date=20260722&page=1&size=20
+
+### [R10] 월간 랭킹 - 가장 최근 확정본
+GET {{commerce-api}}/api/v1/rankings?period=MONTHLY
+
+### [R10] 월간 랭킹 - 특정 날짜가 속한 달
+GET {{commerce-api}}/api/v1/rankings?period=MONTHLY&date=20260715
+
+### [R10] 진행 중인 주(아직 안 끝남) → 404 RANKING_NOT_AVAILABLE
+GET {{commerce-api}}/api/v1/rankings?period=WEEKLY&date=20260726
+
+### [R10] 알 수 없는 period → 400 RANKING_INVALID_PERIOD
+GET {{commerce-api}}/api/v1/rankings?period=YEARLY
+
 ### 상품 상세 - 응답에 todayRank 포함(랭킹에 없으면 생략)
 GET {{commerce-api}}/api/v1/products/1

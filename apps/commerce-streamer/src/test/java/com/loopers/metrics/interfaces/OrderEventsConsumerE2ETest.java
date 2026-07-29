@@ -2,7 +2,9 @@ package com.loopers.metrics.interfaces;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.confg.kafka.KafkaTopic;
+import com.loopers.metrics.domain.MetricStatDate;
 import com.loopers.metrics.domain.ProductMetric;
+import com.loopers.metrics.domain.ProductMetricId;
 import com.loopers.metrics.infrastructure.ProductMetricJpaRepository;
 import com.loopers.utils.DatabaseCleanUp;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -87,8 +89,9 @@ class OrderEventsConsumerE2ETest {
         stringKafkaTemplate.send(KafkaTopic.ORDER_EVENTS, String.valueOf(message.orderId()),
                 objectMapper.writeValueAsString(message)).get();
 
+        ProductMetricId key = new ProductMetricId(100L, MetricStatDate.today());
         await().atMost(Duration.ofSeconds(20)).pollInterval(Duration.ofMillis(500)).untilAsserted(() -> {
-            ProductMetric metric = productMetricJpaRepository.findById(100L).orElse(null);
+            ProductMetric metric = productMetricJpaRepository.findById(key).orElse(null);
             assertThat(metric).isNotNull();
             assertThat(metric.getSalesCount()).isEqualTo(4);
         });

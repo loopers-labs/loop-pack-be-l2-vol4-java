@@ -58,6 +58,7 @@ public class RankingOrderConsumer {
                     }
                 }
                 case FUTURE -> deadLetterPublisher.publish(record, new IllegalStateException("ranking future paidAt=" + message.paidAt()));
+                case UNDATED -> deadLetterPublisher.publish(record, new IllegalStateException("ranking paidAt 없음 lines=" + message.items().size()));
                 case TOO_OLD -> log.warn("ranking drop reason=too_old paidAt={}", message.paidAt());
             }
         }
