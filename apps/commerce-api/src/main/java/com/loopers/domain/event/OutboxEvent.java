@@ -1,0 +1,3 @@
+package com.loopers.domain.event;import com.loopers.domain.BaseEntity;import jakarta.persistence.*;
+// Hides: stable event identity and relay publication state.
+@Entity @Table(name="outbox_event") public class OutboxEvent extends BaseEntity{public enum Status{PENDING,PUBLISHED}private String eventId,aggregateId,payload;@Enumerated(EnumType.STRING)private Status status;protected OutboxEvent(){}public OutboxEvent(String eventId,String aggregateId,String payload){this.eventId=eventId;this.aggregateId=aggregateId;this.payload=payload;this.status=Status.PENDING;}public void published(){status=Status.PUBLISHED;}public String getEventId(){return eventId;}public String getPayload(){return payload;}public Status getStatus(){return status;}}
