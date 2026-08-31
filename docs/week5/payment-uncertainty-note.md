@@ -1,0 +1,3 @@
+# W5 payment uncertainty note
+
+Timeout after provider effect is `UNKNOWN`, never immediate failure. Commerce owns `paymentAttemptKey`; the provider owns `transactionKey`; `LP-ORD-%010d` is the shared provider-order authority. Dispatch fencing prevents a second POST. Reconciliation uses the same user/order identity: zero results remain UNKNOWN, one result settles, multiple results isolate. Callback-first and lookup-first share the monotonic terminal transition; a late conflicting terminal result cannot overwrite it. The real simulator wire test is bounded to five unique smoke IDs and is separate from the controlled effect-then-drop oracle.

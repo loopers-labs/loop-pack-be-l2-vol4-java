@@ -1,0 +1,8 @@
+package com.loopers.domain.payment;
+import com.loopers.domain.BaseEntity;import com.loopers.support.error.*;import jakarta.persistence.*;
+// Hides: payment uncertainty transitions, provider identifiers, and terminal-state monotonicity.
+@Entity @Table(name="payment_intent",uniqueConstraints={@UniqueConstraint(columnNames={"internalOrderId","paymentAttemptKey"}),@UniqueConstraint(columnNames="providerOrderId")}) public class PaymentIntent extends BaseEntity{
+ public enum Status{READY,REQUESTED,UNKNOWN,CONFIRMED,FAILED} private Long internalOrderId;private String providerOrderId,paymentAttemptKey,pgTransactionId;@Enumerated(EnumType.STRING)private Status status;private Long amount;protected PaymentIntent(){}
+ public PaymentIntent(long orderId,String attempt,long amount){if(orderId<=0||attempt==null||attempt.isBlank()||amount<0)throw new CoreException(ErrorType.BAD_REQUEST);this.internalOrderId=orderId;this.providerOrderId="LP-ORD-%010d".formatted(orderId);this.paymentAttemptKey=attempt;this.amount=amount;this.status=Status.READY;}
+ public void requested(){if(status==Status.READY)status=Status.REQUESTED;}public void unknown(){if(status==Status.REQUESTED)status=Status.UNKNOWN;}public void settle(String tx,Status next){if(next!=Status.CONFIRMED&&next!=Status.FAILED)throw new CoreException(ErrorType.BAD_REQUEST);if(status==Status.CONFIRMED||status==Status.FAILED)return;pgTransactionId=tx;status=next;}public Status getStatus(){return status;}public String getProviderOrderId(){return providerOrderId;}public String getPaymentAttemptKey(){return paymentAttemptKey;}public String getPgTransactionId(){return pgTransactionId;}public long getAmount(){return amount;}
+}

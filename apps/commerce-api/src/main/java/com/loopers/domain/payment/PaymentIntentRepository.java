@@ -1,0 +1,1 @@
+package com.loopers.domain.payment;import java.util.*;public interface PaymentIntentRepository{PaymentIntent save(PaymentIntent p);Optional<PaymentIntent> find(long id);Optional<PaymentIntent> findByAttempt(long orderId,String attempt);Optional<PaymentIntent> findByProviderOrderId(String orderId);}
