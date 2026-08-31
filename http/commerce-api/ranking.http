@@ -7,6 +7,15 @@ GET {{commerce-api}}/api/v1/rankings?date=20260716&size=20&page=2
 ### 시간별 랭킹 조회 (HOURLY — 특정 시간대)
 GET {{commerce-api}}/api/v1/rankings?type=HOURLY&date=2026071619&size=20&page=1
 
+### 주간 랭킹 조회 (이번 주, 상위 20개)
+GET {{commerce-api}}/api/v1/rankings?type=WEEKLY&date=20260723&size=20&page=1
+
+### 주간 랭킹 조회 (2페이지)
+GET {{commerce-api}}/api/v1/rankings?type=WEEKLY&date=20260723&size=20&page=2
+
+### 월간 랭킹 조회 (2026년 7월, 상위 20개)
+GET {{commerce-api}}/api/v1/rankings?type=MONTHLY&date=202507&size=20&page=1
+
 ### 랭킹 가중치 수정 — VIEW
 PUT {{commerce-api}}/api-admin/v1/rankings/weights/VIEW
 X-Loopers-Ldap: loopers.admin

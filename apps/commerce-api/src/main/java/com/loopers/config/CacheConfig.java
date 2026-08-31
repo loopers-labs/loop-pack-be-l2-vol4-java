@@ -26,6 +26,8 @@ public class CacheConfig {
     // 필드 타입 변경 시 버전 올릴 것 — 기존 캐시 자연 소멸(TTL) 후 새 버전으로 재적재
     public static final String PRODUCT_CACHE = "product:v1";
     public static final String RANKING_WEIGHT_CACHE = "ranking-weight:v1";
+    public static final String WEEKLY_RANKING_CACHE = "weekly-ranking:v1";
+    public static final String MONTHLY_RANKING_CACHE = "monthly-ranking:v1";
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
@@ -53,9 +55,18 @@ public class CacheConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
+        RedisCacheConfiguration mvRankingCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofHours(1))
+                .serializeKeysWith(RedisSerializationContext.SerializationPair
+                        .fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair
+                        .fromSerializer(new GenericJackson2JsonRedisSerializer()));
+
         return RedisCacheManager.builder(connectionFactory)
                 .withCacheConfiguration(PRODUCT_CACHE, productCacheConfig)
                 .withCacheConfiguration(RANKING_WEIGHT_CACHE, weightCacheConfig)
+                .withCacheConfiguration(WEEKLY_RANKING_CACHE, mvRankingCacheConfig)
+                .withCacheConfiguration(MONTHLY_RANKING_CACHE, mvRankingCacheConfig)
                 .build();
     }
 }

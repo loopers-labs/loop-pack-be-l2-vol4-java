@@ -1,8 +1,14 @@
 package com.loopers.interfaces.api;
 
 import com.loopers.config.redis.RedisConfig;
+import com.loopers.domain.ranking.MvActiveVersionEntity;
+import com.loopers.domain.ranking.MvProductRankMonthlyEntity;
+import com.loopers.domain.ranking.MvProductRankWeeklyEntity;
 import com.loopers.fixture.BrandFixture;
 import com.loopers.fixture.ProductFixture;
+import com.loopers.infrastructure.ranking.MvActiveVersionJpaRepository;
+import com.loopers.infrastructure.ranking.MvProductRankMonthlyJpaRepository;
+import com.loopers.infrastructure.ranking.MvProductRankWeeklyJpaRepository;
 import com.loopers.interfaces.api.brand.BrandV1Dto;
 import com.loopers.interfaces.api.common.response.ApiResponse;
 import com.loopers.interfaces.api.common.response.PageResponse;
@@ -10,12 +16,14 @@ import com.loopers.interfaces.api.product.ProductV1Dto;
 import com.loopers.interfaces.api.ranking.RankingV1Dto;
 import com.loopers.utils.DatabaseCleanUp;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.cache.CacheManager;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
@@ -27,6 +35,8 @@ import org.springframework.http.ResponseEntity;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.WeekFields;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -51,13 +61,41 @@ class RankingV1ApiE2ETest {
     @Qualifier(RedisConfig.REDIS_TEMPLATE_MASTER)
     private RedisTemplate<String, String> redisTemplate;
 
+    @Autowired
+    private MvProductRankWeeklyJpaRepository weeklyRepository;
+
+    @Autowired
+    private MvProductRankMonthlyJpaRepository monthlyRepository;
+
+    @Autowired
+    private MvActiveVersionJpaRepository activeVersionRepository;
+
+    @Autowired
+    private CacheManager cacheManager;
+
     @AfterEach
     void tearDown() {
+        cacheManager.getCacheNames().forEach(name -> {
+            var cache = cacheManager.getCache(name);
+            if (cache != null) cache.clear();
+        });
         databaseCleanUp.truncateAllTables();
         Set<String> keys = redisTemplate.keys("ranking:all:*");
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
+    }
+
+    private int currentYearWeek() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        int year = today.get(WeekFields.ISO.weekBasedYear());
+        int week = today.get(WeekFields.ISO.weekOfWeekBasedYear());
+        return year * 100 + week;
+    }
+
+    private int currentYearMonth() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        return today.getYear() * 100 + today.getMonthValue();
     }
 
     private String today() {
@@ -135,6 +173,128 @@ class RankingV1ApiE2ETest {
                 () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
                 () -> assertThat(response.getBody().data().getContent()).isEmpty(),
                 () -> assertThat(response.getBody().data().getTotalElements()).isZero()
+            );
+        }
+    }
+
+    @DisplayName("주간 랭킹 조회 시,")
+    @Nested
+    class 주간_랭킹_목록_조회 {
+
+        @DisplayName("MV 데이터가 있으면 rank 순으로 상품 정보와 함께 반환된다.")
+        @Test
+        void returnsWeeklyRanking_whenMvDataExists() {
+            // arrange
+            UUID brandId = createBrand();
+            UUID productA = createProduct(brandId);
+            UUID productB = createProduct(brandId);
+
+            int yearWeek = currentYearWeek();
+            long batchId = 9000L;
+            weeklyRepository.saveAll(List.of(
+                new MvProductRankWeeklyEntity(productA, 2, 30.0, yearWeek, batchId),
+                new MvProductRankWeeklyEntity(productB, 1, 50.0, yearWeek, batchId)
+            ));
+            activeVersionRepository.save(new MvActiveVersionEntity("WEEKLY:" + yearWeek, batchId));
+
+            String date = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingResponse>>> response =
+                testRestTemplate.exchange(
+                    RANKING_URL + "?type=WEEKLY&date=" + date + "&size=20&page=1",
+                    HttpMethod.GET, null, new ParameterizedTypeReference<>() {}
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getContent()).hasSize(2),
+                () -> assertThat(response.getBody().data().getContent().get(0).rank()).isEqualTo(1L),
+                () -> assertThat(response.getBody().data().getContent().get(0).productId()).isEqualTo(productB),
+                () -> assertThat(response.getBody().data().getContent().get(1).rank()).isEqualTo(2L),
+                () -> assertThat(response.getBody().data().getContent().get(1).productId()).isEqualTo(productA)
+            );
+        }
+
+        @DisplayName("배치가 아직 실행되지 않았으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmpty_whenNoMvData() {
+            // arrange
+            String date = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingResponse>>> response =
+                testRestTemplate.exchange(
+                    RANKING_URL + "?type=WEEKLY&date=" + date + "&size=20&page=1",
+                    HttpMethod.GET, null, new ParameterizedTypeReference<>() {}
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getContent()).isEmpty()
+            );
+        }
+    }
+
+    @DisplayName("월간 랭킹 조회 시,")
+    @Nested
+    class 월간_랭킹_목록_조회 {
+
+        @DisplayName("MV 데이터가 있으면 rank 순으로 상품 정보와 함께 반환된다.")
+        @Test
+        void returnsMonthlyRanking_whenMvDataExists() {
+            // arrange
+            UUID brandId = createBrand();
+            UUID productA = createProduct(brandId);
+            UUID productB = createProduct(brandId);
+
+            int yearMonth = currentYearMonth();
+            long batchId = 9001L;
+            monthlyRepository.saveAll(List.of(
+                new MvProductRankMonthlyEntity(productA, 2, 30.0, yearMonth, batchId),
+                new MvProductRankMonthlyEntity(productB, 1, 50.0, yearMonth, batchId)
+            ));
+            activeVersionRepository.save(new MvActiveVersionEntity("MONTHLY:" + yearMonth, batchId));
+
+            String date = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMM"));
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingResponse>>> response =
+                testRestTemplate.exchange(
+                    RANKING_URL + "?type=MONTHLY&date=" + date + "&size=20&page=1",
+                    HttpMethod.GET, null, new ParameterizedTypeReference<>() {}
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getContent()).hasSize(2),
+                () -> assertThat(response.getBody().data().getContent().get(0).rank()).isEqualTo(1L),
+                () -> assertThat(response.getBody().data().getContent().get(0).productId()).isEqualTo(productB),
+                () -> assertThat(response.getBody().data().getContent().get(1).rank()).isEqualTo(2L),
+                () -> assertThat(response.getBody().data().getContent().get(1).productId()).isEqualTo(productA)
+            );
+        }
+
+        @DisplayName("배치가 아직 실행되지 않았으면 빈 목록을 반환한다.")
+        @Test
+        void returnsEmpty_whenNoMvData() {
+            // arrange
+            String date = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMM"));
+
+            // act
+            ResponseEntity<ApiResponse<PageResponse<RankingV1Dto.RankingResponse>>> response =
+                testRestTemplate.exchange(
+                    RANKING_URL + "?type=MONTHLY&date=" + date + "&size=20&page=1",
+                    HttpMethod.GET, null, new ParameterizedTypeReference<>() {}
+                );
+
+            // assert
+            assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK),
+                () -> assertThat(response.getBody().data().getContent()).isEmpty()
             );
         }
     }

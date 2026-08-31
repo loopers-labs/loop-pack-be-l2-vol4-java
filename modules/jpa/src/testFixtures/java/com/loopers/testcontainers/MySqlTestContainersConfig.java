@@ -2,6 +2,7 @@ package com.loopers.testcontainers;
 
 import org.springframework.context.annotation.Configuration;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 @Configuration
@@ -19,7 +20,8 @@ public class MySqlTestContainersConfig {
                 "--character-set-server=utf8mb4",
                 "--collation-server=utf8mb4_general_ci",
                 "--skip-character-set-client-handshake"
-            );
+            )
+            .waitingFor(Wait.forLogMessage(".*mysqld: ready for connections.*", 2));
         mySqlContainer.start();
 
         String mySqlJdbcUrl = String.format(
