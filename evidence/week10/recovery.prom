@@ -1,12 +1,12 @@
 # HELP application_ready_time_seconds Time taken for the application to be ready to service requests
 # TYPE application_ready_time_seconds gauge
-application_ready_time_seconds{application="commerce-api",main_application_class="com.loopers.support.incident.IncidentScenarioTest"} 0.893
+application_ready_time_seconds{application="commerce-api",main_application_class="com.loopers.support.incident.IncidentScenarioTest"} 0.738
 # HELP application_started_time_seconds Time taken to start the application
 # TYPE application_started_time_seconds gauge
-application_started_time_seconds{application="commerce-api",main_application_class="com.loopers.support.incident.IncidentScenarioTest"} 0.893
+application_started_time_seconds{application="commerce-api",main_application_class="com.loopers.support.incident.IncidentScenarioTest"} 0.737
 # HELP disk_free_bytes Usable space for path
 # TYPE disk_free_bytes gauge
-disk_free_bytes{application="commerce-api",path="/Users/alen/Desktop/lab/loop-pack-be-l2-vol4-java-w2-w10-assets/apps/commerce-api/."} 1.658789830656E12
+disk_free_bytes{application="commerce-api",path="/Users/alen/Desktop/lab/loop-pack-be-l2-vol4-java-w2-w10-assets/apps/commerce-api/."} 1.658824761344E12
 # HELP disk_total_bytes Total space for path
 # TYPE disk_total_bytes gauge
 disk_total_bytes{application="commerce-api",path="/Users/alen/Desktop/lab/loop-pack-be-l2-vol4-java-w2-w10-assets/apps/commerce-api/."} 1.99516573696E12
@@ -33,7 +33,7 @@ executor_queue_remaining_tasks{application="commerce-api",name="applicationTaskE
 executor_queued_tasks{application="commerce-api",name="applicationTaskExecutor"} 0.0
 # HELP hikaricp_connections Total connections
 # TYPE hikaricp_connections gauge
-hikaricp_connections{application="commerce-api",pool="mysql-main-pool"} 6.0
+hikaricp_connections{application="commerce-api",pool="mysql-main-pool"} 5.0
 # HELP hikaricp_connections_acquire_seconds Connection acquire time
 # TYPE hikaricp_connections_acquire_seconds summary
 hikaricp_connections_acquire_seconds_count{application="commerce-api",pool="mysql-main-pool"} 115
@@ -53,7 +53,7 @@ hikaricp_connections_creation_seconds_sum{application="commerce-api",pool="mysql
 hikaricp_connections_creation_seconds_max{application="commerce-api",pool="mysql-main-pool"} 0.0
 # HELP hikaricp_connections_idle Idle connections
 # TYPE hikaricp_connections_idle gauge
-hikaricp_connections_idle{application="commerce-api",pool="mysql-main-pool"} 6.0
+hikaricp_connections_idle{application="commerce-api",pool="mysql-main-pool"} 5.0
 # HELP hikaricp_connections_max Max connections
 # TYPE hikaricp_connections_max gauge
 hikaricp_connections_max{application="commerce-api",pool="mysql-main-pool"} 10.0
@@ -69,16 +69,16 @@ hikaricp_connections_timeout_total{application="commerce-api",pool="mysql-main-p
 # HELP hikaricp_connections_usage_seconds Connection usage time
 # TYPE hikaricp_connections_usage_seconds summary
 hikaricp_connections_usage_seconds_count{application="commerce-api",pool="mysql-main-pool"} 115
-hikaricp_connections_usage_seconds_sum{application="commerce-api",pool="mysql-main-pool"} 0.616
+hikaricp_connections_usage_seconds_sum{application="commerce-api",pool="mysql-main-pool"} 0.439
 # HELP hikaricp_connections_usage_seconds_max Connection usage time
 # TYPE hikaricp_connections_usage_seconds_max gauge
-hikaricp_connections_usage_seconds_max{application="commerce-api",pool="mysql-main-pool"} 0.239
+hikaricp_connections_usage_seconds_max{application="commerce-api",pool="mysql-main-pool"} 0.146
 # HELP jdbc_connections_active Current number of active connections that have been allocated from the data source.
 # TYPE jdbc_connections_active gauge
 jdbc_connections_active{application="commerce-api",name="mySqlMain"} 0.0
 # HELP jdbc_connections_idle Number of established but idle connections.
 # TYPE jdbc_connections_idle gauge
-jdbc_connections_idle{application="commerce-api",name="mySqlMain"} 6.0
+jdbc_connections_idle{application="commerce-api",name="mySqlMain"} 5.0
 # HELP jdbc_connections_max Maximum number of active connections that can be allocated at the same time.
 # TYPE jdbc_connections_max gauge
 jdbc_connections_max{application="commerce-api",name="mySqlMain"} 10.0
@@ -95,62 +95,55 @@ jvm_buffer_count_buffers{application="commerce-api",id="mapped"} 0.0
 jvm_buffer_count_buffers{application="commerce-api",id="mapped - 'non-volatile memory'"} 0.0
 # HELP jvm_buffer_memory_used_bytes An estimate of the memory that the Java virtual machine is using for this buffer pool
 # TYPE jvm_buffer_memory_used_bytes gauge
-jvm_buffer_memory_used_bytes{application="commerce-api",id="direct"} 8.4116898E7
+jvm_buffer_memory_used_bytes{application="commerce-api",id="direct"} 8.4116862E7
 jvm_buffer_memory_used_bytes{application="commerce-api",id="mapped"} 0.0
 jvm_buffer_memory_used_bytes{application="commerce-api",id="mapped - 'non-volatile memory'"} 0.0
 # HELP jvm_buffer_total_capacity_bytes An estimate of the total capacity of the buffers in this pool
 # TYPE jvm_buffer_total_capacity_bytes gauge
-jvm_buffer_total_capacity_bytes{application="commerce-api",id="direct"} 8.4116897E7
+jvm_buffer_total_capacity_bytes{application="commerce-api",id="direct"} 8.4116861E7
 jvm_buffer_total_capacity_bytes{application="commerce-api",id="mapped"} 0.0
 jvm_buffer_total_capacity_bytes{application="commerce-api",id="mapped - 'non-volatile memory'"} 0.0
 # HELP jvm_classes_loaded_classes The number of classes that are currently loaded in the Java virtual machine
 # TYPE jvm_classes_loaded_classes gauge
-jvm_classes_loaded_classes{application="commerce-api"} 29399.0
+jvm_classes_loaded_classes{application="commerce-api"} 29417.0
 # HELP jvm_classes_unloaded_classes_total The total number of classes unloaded since the Java virtual machine has started execution
 # TYPE jvm_classes_unloaded_classes_total counter
-jvm_classes_unloaded_classes_total{application="commerce-api"} 13.0
+jvm_classes_unloaded_classes_total{application="commerce-api"} 14.0
 # HELP jvm_compilation_time_ms_total The approximate accumulated elapsed time spent in compilation
 # TYPE jvm_compilation_time_ms_total counter
-jvm_compilation_time_ms_total{application="commerce-api",compiler="HotSpot 64-Bit Tiered Compilers"} 19234.0
-# HELP jvm_gc_concurrent_phase_time_seconds Time spent in concurrent phase
-# TYPE jvm_gc_concurrent_phase_time_seconds summary
-jvm_gc_concurrent_phase_time_seconds_count{action="end of concurrent GC pause",application="commerce-api",cause="No GC",gc="G1 Concurrent GC"} 2
-jvm_gc_concurrent_phase_time_seconds_sum{action="end of concurrent GC pause",application="commerce-api",cause="No GC",gc="G1 Concurrent GC"} 0.002
-# HELP jvm_gc_concurrent_phase_time_seconds_max Time spent in concurrent phase
-# TYPE jvm_gc_concurrent_phase_time_seconds_max gauge
-jvm_gc_concurrent_phase_time_seconds_max{action="end of concurrent GC pause",application="commerce-api",cause="No GC",gc="G1 Concurrent GC"} 0.002
+jvm_compilation_time_ms_total{application="commerce-api",compiler="HotSpot 64-Bit Tiered Compilers"} 19293.0
 # HELP jvm_gc_live_data_size_bytes Size of long-lived heap memory pool after reclamation
 # TYPE jvm_gc_live_data_size_bytes gauge
-jvm_gc_live_data_size_bytes{application="commerce-api"} 0.0
+jvm_gc_live_data_size_bytes{application="commerce-api"} 1.27475792E8
 # HELP jvm_gc_max_data_size_bytes Max size of long-lived heap memory pool
 # TYPE jvm_gc_max_data_size_bytes gauge
 jvm_gc_max_data_size_bytes{application="commerce-api"} 5.36870912E8
 # HELP jvm_gc_memory_allocated_bytes_total Incremented for an increase in the size of the (young) heap memory pool after one GC to before the next
 # TYPE jvm_gc_memory_allocated_bytes_total counter
-jvm_gc_memory_allocated_bytes_total{application="commerce-api"} 8.2837504E7
+jvm_gc_memory_allocated_bytes_total{application="commerce-api"} 7.5497472E7
 # HELP jvm_gc_memory_promoted_bytes_total Count of positive increases in the size of the old generation memory pool before GC to after GC
 # TYPE jvm_gc_memory_promoted_bytes_total counter
-jvm_gc_memory_promoted_bytes_total{application="commerce-api"} 1339552.0
+jvm_gc_memory_promoted_bytes_total{application="commerce-api"} 0.0
 # HELP jvm_gc_overhead An approximation of the percent of CPU time used by GC activities over the last lookback period or since monitoring began, whichever is shorter, in the range [0..1]
 # TYPE jvm_gc_overhead gauge
-jvm_gc_overhead{application="commerce-api"} 0.0011641902641969727
+jvm_gc_overhead{application="commerce-api"} 0.00290074345126418
 # HELP jvm_gc_pause_seconds Time spent in GC pause
 # TYPE jvm_gc_pause_seconds summary
 jvm_gc_pause_seconds_count{action="end of minor GC",application="commerce-api",cause="G1 Evacuation Pause",gc="G1 Young Generation"} 1
-jvm_gc_pause_seconds_sum{action="end of minor GC",application="commerce-api",cause="G1 Evacuation Pause",gc="G1 Young Generation"} 0.001
+jvm_gc_pause_seconds_sum{action="end of minor GC",application="commerce-api",cause="G1 Evacuation Pause",gc="G1 Young Generation"} 0.002
 # HELP jvm_gc_pause_seconds_max Time spent in GC pause
 # TYPE jvm_gc_pause_seconds_max gauge
-jvm_gc_pause_seconds_max{action="end of minor GC",application="commerce-api",cause="G1 Evacuation Pause",gc="G1 Young Generation"} 0.001
+jvm_gc_pause_seconds_max{action="end of minor GC",application="commerce-api",cause="G1 Evacuation Pause",gc="G1 Young Generation"} 0.002
 # HELP jvm_memory_committed_bytes The amount of memory in bytes that is committed for the Java virtual machine to use
 # TYPE jvm_memory_committed_bytes gauge
-jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Eden Space"} 8.0740352E7
-jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Old Gen"} 1.39460608E8
-jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Survivor Space"} 5242880.0
+jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Eden Space"} 8.5983232E7
+jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Old Gen"} 1.35266304E8
+jvm_memory_committed_bytes{application="commerce-api",area="heap",id="G1 Survivor Space"} 4194304.0
 jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-nmethods'"} 3670016.0
-jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-profiled nmethods'"} 1.376256E7
-jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'profiled nmethods'"} 3.7486592E7
+jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-profiled nmethods'"} 1.3238272E7
+jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'profiled nmethods'"} 3.7158912E7
 jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="Compressed Class Space"} 2.2085632E7
-jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="Metaspace"} 1.8612224E8
+jvm_memory_committed_bytes{application="commerce-api",area="nonheap",id="Metaspace"} 1.86253312E8
 # HELP jvm_memory_max_bytes The maximum amount of memory in bytes that can be used for memory management
 # TYPE jvm_memory_max_bytes gauge
 jvm_memory_max_bytes{application="commerce-api",area="heap",id="G1 Eden Space"} -1.0
@@ -163,17 +156,17 @@ jvm_memory_max_bytes{application="commerce-api",area="nonheap",id="Compressed Cl
 jvm_memory_max_bytes{application="commerce-api",area="nonheap",id="Metaspace"} -1.0
 # HELP jvm_memory_usage_after_gc The percentage of long-lived heap pool used after the last GC event, in the range [0..1]
 # TYPE jvm_memory_usage_after_gc gauge
-jvm_memory_usage_after_gc{application="commerce-api",area="heap",pool="long-lived"} 0.24038733541965485
+jvm_memory_usage_after_gc{application="commerce-api",area="heap",pool="long-lived"} 0.23744216561317444
 # HELP jvm_memory_used_bytes The amount of used memory
 # TYPE jvm_memory_used_bytes gauge
-jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Eden Space"} 3.8797312E7
-jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Old Gen"} 1.29056968E8
-jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Survivor Space"} 4388016.0
-jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-nmethods'"} 2946176.0
-jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-profiled nmethods'"} 1.3720576E7
-jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'profiled nmethods'"} 3.736128E7
-jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="Compressed Class Space"} 2.1518792E7
-jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="Metaspace"} 1.84860312E8
+jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Eden Space"} 4.0894464E7
+jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Old Gen"} 1.27475792E8
+jvm_memory_used_bytes{application="commerce-api",area="heap",id="G1 Survivor Space"} 4194304.0
+jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-nmethods'"} 3520384.0
+jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'non-profiled nmethods'"} 1.3185152E7
+jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="CodeHeap 'profiled nmethods'"} 3.7099904E7
+jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="Compressed Class Space"} 2.153004E7
+jvm_memory_used_bytes{application="commerce-api",area="nonheap",id="Metaspace"} 1.84949672E8
 # HELP jvm_threads_daemon_threads The current number of live daemon threads
 # TYPE jvm_threads_daemon_threads gauge
 jvm_threads_daemon_threads{application="commerce-api"} 133.0
@@ -185,7 +178,7 @@ jvm_threads_live_threads{application="commerce-api"} 149.0
 jvm_threads_peak_threads{application="commerce-api"} 149.0
 # HELP jvm_threads_started_threads_total The total number of application threads started in the JVM
 # TYPE jvm_threads_started_threads_total counter
-jvm_threads_started_threads_total{application="commerce-api"} 232.0
+jvm_threads_started_threads_total{application="commerce-api"} 235.0
 # HELP jvm_threads_states_threads The current number of threads
 # TYPE jvm_threads_states_threads gauge
 jvm_threads_states_threads{application="commerce-api",state="blocked"} 0.0
@@ -203,35 +196,35 @@ logback_events_total{application="commerce-api",level="trace"} 0.0
 logback_events_total{application="commerce-api",level="warn"} 0.0
 # HELP process_cpu_time_ns_total The "cpu time" used by the Java Virtual Machine process
 # TYPE process_cpu_time_ns_total counter
-process_cpu_time_ns_total{application="commerce-api"} 3.2451369E10
+process_cpu_time_ns_total{application="commerce-api"} 3.2751668E10
 # HELP process_cpu_usage The "recent cpu usage" for the Java Virtual Machine process
 # TYPE process_cpu_usage gauge
-process_cpu_usage{application="commerce-api"} 0.10036298496205157
+process_cpu_usage{application="commerce-api"} 0.10849811224163307
 # HELP process_files_max_files The maximum file descriptor count
 # TYPE process_files_max_files gauge
 process_files_max_files{application="commerce-api"} 1048576.0
 # HELP process_files_open_files The open file descriptor count
 # TYPE process_files_open_files gauge
-process_files_open_files{application="commerce-api"} 538.0
+process_files_open_files{application="commerce-api"} 537.0
 # HELP process_start_time_seconds Start time of the process since unix epoch.
 # TYPE process_start_time_seconds gauge
-process_start_time_seconds{application="commerce-api"} 1.788175657434E9
+process_start_time_seconds{application="commerce-api"} 1.788175875077E9
 # HELP process_uptime_seconds The uptime of the Java virtual machine
 # TYPE process_uptime_seconds gauge
-process_uptime_seconds{application="commerce-api"} 21.392
+process_uptime_seconds{application="commerce-api"} 19.898
 # HELP spring_data_repository_invocations_seconds Duration of repository invocations
 # TYPE spring_data_repository_invocations_seconds summary
 spring_data_repository_invocations_seconds_count{application="commerce-api",exception="None",method="findById",repository="PaymentJpaRepository",state="SUCCESS"} 3
-spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="findById",repository="PaymentJpaRepository",state="SUCCESS"} 0.001801041
+spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="findById",repository="PaymentJpaRepository",state="SUCCESS"} 0.001608125
 spring_data_repository_invocations_seconds_count{application="commerce-api",exception="None",method="findByInternalOrderIdAndPaymentAttemptKey",repository="PaymentJpaRepository",state="SUCCESS"} 30
-spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="findByInternalOrderIdAndPaymentAttemptKey",repository="PaymentJpaRepository",state="SUCCESS"} 0.033571335
+spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="findByInternalOrderIdAndPaymentAttemptKey",repository="PaymentJpaRepository",state="SUCCESS"} 0.031125459
 spring_data_repository_invocations_seconds_count{application="commerce-api",exception="None",method="save",repository="PaymentJpaRepository",state="SUCCESS"} 63
-spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="save",repository="PaymentJpaRepository",state="SUCCESS"} 0.031701418
+spring_data_repository_invocations_seconds_sum{application="commerce-api",exception="None",method="save",repository="PaymentJpaRepository",state="SUCCESS"} 0.024552331
 # HELP spring_data_repository_invocations_seconds_max Duration of repository invocations
 # TYPE spring_data_repository_invocations_seconds_max gauge
-spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="findById",repository="PaymentJpaRepository",state="SUCCESS"} 7.63334E-4
-spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="findByInternalOrderIdAndPaymentAttemptKey",repository="PaymentJpaRepository",state="SUCCESS"} 0.002620625
-spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="save",repository="PaymentJpaRepository",state="SUCCESS"} 0.00404825
+spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="findById",repository="PaymentJpaRepository",state="SUCCESS"} 6.56833E-4
+spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="findByInternalOrderIdAndPaymentAttemptKey",repository="PaymentJpaRepository",state="SUCCESS"} 0.001742833
+spring_data_repository_invocations_seconds_max{application="commerce-api",exception="None",method="save",repository="PaymentJpaRepository",state="SUCCESS"} 0.001291541
 # HELP spring_kafka_template_seconds KafkaTemplate Timer
 # TYPE spring_kafka_template_seconds summary
 spring_kafka_template_seconds_count{application="commerce-api",exception="none",name="kafkaTemplate",result="success"} 0
@@ -244,10 +237,10 @@ spring_kafka_template_seconds_max{application="commerce-api",exception="none",na
 system_cpu_count{application="commerce-api"} 18.0
 # HELP system_cpu_usage The "recent cpu usage" of the system the application is running in
 # TYPE system_cpu_usage gauge
-system_cpu_usage{application="commerce-api"} 0.16363636363636364
+system_cpu_usage{application="commerce-api"} 0.1896551724137931
 # HELP system_load_average_1m The sum of the number of runnable entities queued to available processors and the number of runnable entities running on the available processors averaged over a period of time
 # TYPE system_load_average_1m gauge
-system_load_average_1m{application="commerce-api"} 3.2529296875
+system_load_average_1m{application="commerce-api"} 2.7568359375
 # HELP tomcat_sessions_active_current_sessions  
 # TYPE tomcat_sessions_active_current_sessions gauge
 tomcat_sessions_active_current_sessions{application="commerce-api"} 0.0
