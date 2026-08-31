@@ -1,0 +1,3 @@
+package com.loopers.application.queue;import com.loopers.infrastructure.queue.RedisAdmissionStore;import lombok.RequiredArgsConstructor;import org.springframework.stereotype.Component;
+// Hides: capacity policy and fail-closed network failure semantics.
+@Component @RequiredArgsConstructor public class AdmissionService{public enum Result{ACCEPTED,REJECTED}private final RedisAdmissionStore store;public Result admit(String id,int capacity){if(id==null||id.isBlank()||capacity<=0)throw new IllegalArgumentException();try{return store.admit(id,capacity)?Result.ACCEPTED:Result.REJECTED;}catch(RuntimeException e){return Result.REJECTED;}}public void completed(String id){store.terminal(id);}public void failed(String id){store.terminal(id);}}
