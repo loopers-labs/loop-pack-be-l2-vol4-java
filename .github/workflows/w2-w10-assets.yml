@@ -47,7 +47,7 @@ jobs:
           docker compose -f docker/infra-compose.yml up -d mysql redis-master redis-readonly
           ready=0
           for i in $(seq 1 60); do
-            if docker compose -f docker/infra-compose.yml exec -T mysql mysqladmin ping -uroot -proot --silent &&
+            if docker compose -f docker/infra-compose.yml exec -T mysql mysql -uroot -proot -e 'SELECT 1' >/dev/null 2>&1 &&
                docker compose -f docker/infra-compose.yml exec -T redis-master redis-cli ping | grep -q PONG &&
                docker compose -f docker/infra-compose.yml exec -T redis-readonly redis-cli ping | grep -q PONG; then
               ready=1
