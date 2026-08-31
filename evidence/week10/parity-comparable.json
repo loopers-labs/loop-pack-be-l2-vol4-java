@@ -1,0 +1,445 @@
+{
+  "schemaVersion": 1,
+  "contractDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+  "weeks": [
+    {
+      "week": 2,
+      "inputDigest": "d6f98cd06ca072b356eca5293db8a4d96fffc5abfd7c14ed075cbf0db3202b63",
+      "tests": [
+        {
+          "fqcn": "com.loopers.domain.order.OrderDiscountTest",
+          "discovered": 6,
+          "passed": 6,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.domain.order.OrderDiscountPersistenceIntegrationTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.interfaces.api.OrderDiscountE2ETest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "discount-snapshot",
+          "businessIds": [
+            "INV-001",
+            "INV-002",
+            "INV-003",
+            "INV-004",
+            "INV-005",
+            "INV-006"
+          ],
+          "states": [
+            "CONFIRMED"
+          ],
+          "errorSemantic": "INVALID_DISCOUNT",
+          "counts": {
+            "originalAmount": 10000,
+            "discountAmount": 1000,
+            "finalAmount": 9000
+          },
+          "checksums": {
+            "w1Contract": "d6f98cd06ca072b356eca5293db8a4d96fffc5abfd7c14ed075cbf0db3202b63"
+          }
+        }
+      ],
+      "services": [
+        {
+          "name": "mysql",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "docs/week1/order-discount-contract.md",
+          "sha256": "d6f98cd06ca072b356eca5293db8a4d96fffc5abfd7c14ed075cbf0db3202b63"
+        }
+      ]
+    },
+    {
+      "week": 3,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.domain.stock.StockConcurrencyTest",
+          "discovered": 2,
+          "passed": 2,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "stock-contention",
+          "businessIds": [
+            "product-77"
+          ],
+          "states": [
+            "NON_NEGATIVE"
+          ],
+          "errorSemantic": "INSUFFICIENT_STOCK",
+          "counts": {
+            "initial": 5,
+            "requestsA": 8,
+            "requestsB": 12,
+            "successPlusFinal": 5
+          },
+          "checksums": {}
+        }
+      ],
+      "services": [
+        {
+          "name": "mysql",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 4,
+      "inputDigest": "e11553415b052b783779c36c5bd93122562a103e292d3aec55b82e773cbd4caf",
+      "tests": [
+        {
+          "fqcn": "com.loopers.application.product.ProductCacheFailureTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.application.product.ProductQueryE2ETest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "brand-7-query",
+          "businessIds": [
+            "brand-7"
+          ],
+          "states": [
+            "DB_AUTHORITY",
+            "CACHE_ASIDE"
+          ],
+          "errorSemantic": "CACHE_FALLBACK",
+          "counts": {
+            "totalCount": 10000,
+            "totalPriceSum": 472685000,
+            "brandCount": 100,
+            "brandPriceSum": 4647200,
+            "limit": 20
+          },
+          "checksums": {
+            "response": "46c0bdfab8b815a0bef93fd4b09ebbe37e45ae79a61279e6ac7d2792d544ee02"
+          }
+        }
+      ],
+      "services": [
+        {
+          "name": "redis-master+readonly",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "apps/commerce-api/src/test/resources/week4/product-query-seed.sql",
+          "sha256": "e11553415b052b783779c36c5bd93122562a103e292d3aec55b82e773cbd4caf"
+        },
+        {
+          "path": "docs/week4/product-query-index.sql",
+          "sha256": "142a3eca02ec5068f136d04215ac70f28185b65f6818a553c71252f8d8c44a14"
+        }
+      ]
+    },
+    {
+      "week": 5,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.interfaces.api.payment.PaymentIntegrationTest",
+          "discovered": 2,
+          "passed": 2,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.interfaces.api.payment.PgSimulatorContractTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "payment-response-loss",
+          "businessIds": [
+            "135135",
+            "LP-ORD-0000000042",
+            "attempt-01"
+          ],
+          "states": [
+            "UNKNOWN",
+            "CONFIRMED"
+          ],
+          "errorSemantic": "UNKNOWN",
+          "counts": {
+            "dispatch": 1,
+            "effect": 1,
+            "secondDispatch": 0
+          },
+          "checksums": {}
+        }
+      ],
+      "services": [
+        {
+          "name": "pg-simulator",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 6,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.interfaces.consumer.OrderConfirmedConsumerTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.interfaces.consumer.KafkaPartitionExperimentTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        },
+        {
+          "fqcn": "com.loopers.interfaces.consumer.KafkaRedeliveryExperimentTest",
+          "discovered": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "range-redelivery",
+          "businessIds": [
+            "A",
+            "B",
+            "C"
+          ],
+          "states": [
+            "A=[0]",
+            "B=[1]",
+            "C=[]"
+          ],
+          "errorSemantic": "REDELIVERED",
+          "counts": {
+            "partitions": 2,
+            "consumers": 3,
+            "delivery": 2,
+            "effect": 1
+          },
+          "checksums": {}
+        }
+      ],
+      "services": [
+        {
+          "name": "testcontainers-kafka",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 7,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.application.event.OutboxCrashWindowTest",
+          "discovered": 2,
+          "passed": 2,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "outbox-crash-window",
+          "businessIds": [
+            "event-1"
+          ],
+          "states": [
+            "PENDING",
+            "PUBLISHED"
+          ],
+          "errorSemantic": "CRASH_AFTER_PUBLISH",
+          "counts": {
+            "delivery": 2,
+            "effect": 1
+          },
+          "checksums": {}
+        }
+      ],
+      "services": [
+        {
+          "name": "mysql",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 8,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.application.queue.QueueCapacityTest",
+          "discovered": 3,
+          "passed": 3,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "atomic-admission",
+          "businessIds": [
+            "w1",
+            "w2",
+            "w3",
+            "w4"
+          ],
+          "states": [
+            "ACCEPTED",
+            "REJECTED",
+            "COMPLETED",
+            "FAILED"
+          ],
+          "errorSemantic": "CAPACITY_REJECTED",
+          "counts": {
+            "capacity": 3,
+            "lastSlotAccepted": 1
+          },
+          "checksums": {}
+        }
+      ],
+      "services": [
+        {
+          "name": "redis-master+readonly",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 9,
+      "inputDigest": "d80a24248fd42f959bddc497efa65afd0d3f1cab420933800140b3027bac98e1",
+      "tests": [
+        {
+          "fqcn": "com.loopers.job.ranking.RankingJobRestartE2ETest",
+          "discovered": 2,
+          "passed": 2,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "weekly-ranking-restart",
+          "businessIds": [
+            "snapshot-2026w34",
+            "event-01",
+            "event-02"
+          ],
+          "states": [
+            "FAILED",
+            "COMPLETED"
+          ],
+          "errorSemantic": "CONTROLLED_FAILURE",
+          "counts": {
+            "chunk": 2,
+            "checkpoint": 2,
+            "appliedEvents": 2
+          },
+          "checksums": {
+            "source": "d80a24248fd42f959bddc497efa65afd0d3f1cab420933800140b3027bac98e1",
+            "result": "cd34a2cb816c288cd704e7fdf27784c01b642b571288ec4f1a854b7a1a4a48e4"
+          }
+        }
+      ],
+      "services": [
+        {
+          "name": "mysql",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "week": 10,
+      "inputDigest": "303347cb068b4564754056f934e9ac8f59ec340baaf908dd2b26c146fdba5f52",
+      "tests": [
+        {
+          "fqcn": "com.loopers.support.incident.IncidentScenarioTest",
+          "discovered": 3,
+          "passed": 3,
+          "failed": 0
+        }
+      ],
+      "cases": [
+        {
+          "id": "checkout-latency-a",
+          "businessIds": [
+            "135135",
+            "LP-ORD-0000000001",
+            "LP-ORD-0000000010"
+          ],
+          "states": [
+            "BASELINE",
+            "FAULT",
+            "RECOVERY"
+          ],
+          "errorSemantic": "UNKNOWN",
+          "counts": {
+            "healthUp": 10,
+            "faultTerminal": 7,
+            "faultUnknown": 3,
+            "recoveryTerminal": 10,
+            "recoveryUnknown": 0,
+            "providerEffect": 10,
+            "secondDispatch": 0
+          },
+          "checksums": {
+            "faultHealth": "b9613659d8f4412c778e34293d5b865fb188c5814379ee3bfb8c819432e70020"
+          }
+        }
+      ],
+      "services": [
+        {
+          "name": "mysql+redis+pg-simulator",
+          "ready": true,
+          "cleanup": "verified"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "evidence/week10/fault-health.json",
+          "sha256": "b9613659d8f4412c778e34293d5b865fb188c5814379ee3bfb8c819432e70020"
+        }
+      ]
+    }
+  ]
+}
