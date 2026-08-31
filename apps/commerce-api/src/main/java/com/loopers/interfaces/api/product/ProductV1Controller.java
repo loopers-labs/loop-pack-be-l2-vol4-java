@@ -2,6 +2,7 @@ package com.loopers.interfaces.api.product;
 
 import com.loopers.application.product.ProductFacade;
 import com.loopers.application.product.ProductInfo;
+import com.loopers.application.product.ProductQueryService;
 import com.loopers.interfaces.api.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,13 @@ import java.util.List;
 public class ProductV1Controller {
 
     private final ProductFacade productFacade;
+    private final ProductQueryService productQueryService;
+
+    @GetMapping(params = {"brandId", "sort", "limit"})
+    public ApiResponse<List<ProductQueryService.Result>> query(@RequestParam long brandId, @RequestParam String sort, @RequestParam int limit) {
+        if (!"price_asc".equals(sort)) throw new IllegalArgumentException("sort must be price_asc");
+        return ApiResponse.success(productQueryService.find(brandId, limit));
+    }
 
     @PostMapping
     public ApiResponse<ProductV1Dto.ProductResponse> createProduct(
