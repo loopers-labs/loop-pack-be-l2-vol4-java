@@ -65,8 +65,8 @@ subprojects {
         testImplementation("org.instancio:instancio-junit:${project.properties["instancioJUnitVersion"]}")
         // Testcontainers
         testImplementation("org.springframework.boot:spring-boot-testcontainers")
-        testImplementation("org.testcontainers:testcontainers")
-        testImplementation("org.testcontainers:junit-jupiter")
+        testImplementation("org.testcontainers:testcontainers:1.21.3")
+        testImplementation("org.testcontainers:junit-jupiter:1.21.3")
     }
 
     tasks.withType(Jar::class) { enabled = true }
@@ -83,6 +83,10 @@ subprojects {
         systemProperty("user.timezone", "Asia/Seoul")
         systemProperty("spring.profiles.active", "test")
         jvmArgs("-Xshare:off")
+        // Docker 29.x / testcontainers 호환 이슈 회피: 로컬 docker-compose의 MySQL/Redis 사용
+        // 사용 전 `docker compose -f docker/infra-compose.yml up -d` 실행 필요
+        environment("USE_LOCAL_MYSQL", "true")
+        environment("USE_LOCAL_REDIS", "true")
     }
 
     tasks.withType<JacocoReport> {

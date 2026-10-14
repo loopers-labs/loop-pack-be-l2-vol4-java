@@ -14,20 +14,28 @@ spring:
   main:
     web-application-type: servlet
   application:
-    name: commerce-api
+    name: commerce-streamer
   profiles:
     active: local
   config:
     import:
       - jpa.yml
-      - redis.yml
       - kafka.yml
       - logging.yml
       - monitoring.yml
+  kafka:
+    consumer:
+      group-id: commerce-streamer-metrics
+      properties:
+        max.poll.records: 500
 
 demo-kafka:
   test:
     topic-name: demo.internal.topic-v1
+
+kafka-topics:
+  catalog-events: catalog-events
+  order-events: order-events
 
 ---
 spring:
